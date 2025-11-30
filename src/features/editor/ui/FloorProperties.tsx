@@ -32,9 +32,10 @@ export const FloorProperties = () => {
   };
 
   return (
-    <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-neutral-900/95 backdrop-blur-md border border-neutral-700 rounded-xl p-4 shadow-xl z-20 w-80 animate-in fade-in slide-in-from-top-2">
+    // CAMBIO AQUÍ: 'right-4' y quitamos 'left-1/2 -translate-x-1/2'
+    <div className="absolute top-20 right-4 bg-neutral-900/95 backdrop-blur-md border border-neutral-700 rounded-xl p-4 shadow-xl z-20 w-80 animate-in fade-in slide-in-from-right-2">
       
-      {/* CONTROL CAD (Solo aparece si seleccionas 2 vértices) */}
+      {/* CAD Control (Arriba del todo) */}
       <CadControl />
 
       <h3 className="text-white text-sm font-bold mb-4 flex items-center gap-2 border-b border-white/10 pb-2">
@@ -105,7 +106,7 @@ export const FloorProperties = () => {
       </div>
 
       <div className="mt-4 pt-2 border-t border-white/10 text-[10px] text-neutral-500 text-center">
-        💡 Tip: Mantén SHIFT y haz clic en dos vértices verdes para ajustar la medida exacta.
+        💡 Shift + Clic para seleccionar vértices múltiples.
       </div>
     </div>
   );

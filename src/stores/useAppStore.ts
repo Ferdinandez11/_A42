@@ -64,7 +64,7 @@ interface AppState {
   // --- CAD STATE ---
   selectedVertexIndices: number[];
   measuredDistance: number | null;
-  measuredAngle: number | null; // <--- NUEVO PARA ÁNGULOS
+  measuredAngle: number | null;
 
   // Acciones
   setMode: (mode: AppState['mode']) => void;
@@ -98,7 +98,6 @@ interface AppState {
   resetScene: () => void;
 
   // --- CAD ACTIONS ---
-  // Actualizado para aceptar ángulo
   setSelectedVertices: (indices: number[], distance: number | null, angle: number | null) => void;
 }
 
@@ -130,7 +129,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   setMode: (mode) => {
     if (mode !== 'editing') set({ selectedItemId: null });
     if (mode !== 'measuring') set({ measurementResult: null });
-    // Limpiamos selección CAD y Ángulo al cambiar modo
     set({ mode, selectedVertexIndices: [], measuredDistance: null, measuredAngle: null });
   },
 
@@ -145,7 +143,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       selectedItemId: uuid, 
       selectedProduct: null, 
       mode: uuid ? 'editing' : 'idle',
-      // Reset CAD al cambiar selección
       selectedVertexIndices: [],
       measuredDistance: null,
       measuredAngle: null
@@ -232,9 +229,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     } : i)
   })),
 
-  updateFloorPoints: (uuid, points) => set((state) => ({
-    items: state.items.map(i => i.uuid === uuid ? { ...i, points: points } : i)
-  })),
+  // AQUÍ ESTÁ EL CAMBIO IMPORTANTE: saveSnapshot()
+  updateFloorPoints: (uuid, points) => {
+    get().saveSnapshot(); 
+    set((state) => ({
+      items: state.items.map(i => i.uuid === uuid ? { ...i, points: points } : i)
+    }));
+  },
 
   undo: () => set((state) => {
     if (state.past.length === 0) return {};
