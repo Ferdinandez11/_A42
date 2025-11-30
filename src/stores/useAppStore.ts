@@ -1,8 +1,7 @@
 // --- START OF FILE src/stores/useAppStore.ts ---
 import { create } from 'zustand';
-import * as THREE from 'three';
+import * as THREE from 'three'; 
 
-// ... (ProductDefinition y SceneItem se mantienen igual) ...
 export interface ProductDefinition { 
   id: string;
   name: string;
@@ -14,65 +13,89 @@ export interface ProductDefinition {
   category?: string; 
 }
 
+export type FloorMaterialType = 'rubber_red' | 'rubber_green' | 'rubber_blue' | 'grass' | 'concrete';
+
 export interface SceneItem {
   uuid: string;
   productId: string;
   name?: string; 
-  price: number;
+  price: number; 
   position: [number, number, number];
   rotation: [number, number, number];
   scale: [number, number, number];
   type: 'model' | 'floor' | 'fence';
   modelUrl?: string; 
   points?: { x: number, z: number }[]; 
+  
+  // Propiedades de Suelo
+  floorMaterial?: FloorMaterialType;
+  // Nuevas propiedades para Texturas
+  textureUrl?: string;
+  textureScale?: number;
+  textureRotation?: number;
+
   data?: any; 
 }
 
 export type CameraView = 'top' | 'front' | 'side' | 'iso';
 
 interface AppState {
-  // ... (Estados existentes) ...
   user: any | null;
-  mode: 'idle' | 'drawing_floor' | 'drawing_fence' | 'placing_item' | 'editing' | 'catalog';
+  mode: 'idle' | 'drawing_floor' | 'drawing_fence' | 'placing_item' | 'editing' | 'catalog' | 'measuring';
+  
   selectedProduct: ProductDefinition | null; 
   selectedItemId: string | null;
+  
   items: SceneItem[];
   totalPrice: number;
   gridVisible: boolean;
   budgetVisible: boolean;
   
-  // --- NUEVO: ESTADO DE ENTORNO ---
+  // Entorno
   envPanelVisible: boolean;
-  sunPosition: { azimuth: number; elevation: number }; // Grados
-  backgroundColor: string; // Hex o 'sky'
-  
+  sunPosition: { azimuth: number; elevation: number };
+  backgroundColor: string;
+
+  // Medición
+  measurementResult: number | null;
+
   cameraType: 'perspective' | 'orthographic';
   pendingView: CameraView | null;
 
   past: SceneItem[][];
   future: SceneItem[][];
 
-  // ... (Setters existentes) ...
+  // Acciones
   setMode: (mode: AppState['mode']) => void;
   setSelectedProduct: (product: ProductDefinition | null) => void; 
   selectItem: (uuid: string | null) => void;
   toggleGrid: () => void;
   toggleBudget: () => void;
-
-  // --- NUEVO: SETTERS DE ENTORNO ---
+  
+  // Acciones Entorno
   toggleEnvPanel: () => void;
   setSunPosition: (azimuth: number, elevation: number) => void;
   setBackgroundColor: (color: string) => void;
 
+  // Acciones Medición
+  setMeasurementResult: (dist: number | null) => void;
+
+  // Acciones Items
+  addItem: (item: SceneItem) => void; 
+  updateItemTransform: (uuid: string, pos: number[], rot: number[], scale: number[]) => void;
+  
+  // Acciones Suelo
+  updateFloorMaterial: (uuid: string, material: FloorMaterialType) => void;
+  updateFloorTexture: (uuid: string, url: string | undefined, scale: number, rotation: number) => void; // Nuevo
+  updateFloorPoints: (uuid: string, points: { x: number, z: number }[]) => void;
+  
+  removeItem: (uuid: string) => void;
+  duplicateItem: (uuid: string) => void; 
+  
+  // Vistas y deshacer
   setCameraType: (type: 'perspective' | 'orthographic') => void;
   triggerView: (view: CameraView) => void;
   clearPendingView: () => void;
-
-  addItem: (item: SceneItem) => void;
-  updateItemTransform: (uuid: string, pos: number[], rot: number[], scale: number[]) => void;
-  removeItem: (uuid: string) => void;
-  duplicateItem: (uuid: string) => void;
-  
   saveSnapshot: () => void;
   undo: () => void;
   redo: () => void;
@@ -87,13 +110,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   items: [],
   totalPrice: 0,
   gridVisible: false,
-  budgetVisible: false,
+  budgetVisible: false, 
   
-  // Valores iniciales del entorno
+  // Valores iniciales
   envPanelVisible: false,
   sunPosition: { azimuth: 180, elevation: 45 },
-  backgroundColor: '#111111', // Color por defecto (Oscuro)
-
+  backgroundColor: '#111111',
+  measurementResult: null,
   cameraType: 'perspective',
   pendingView: null,
 
@@ -102,6 +125,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setMode: (mode) => {
     if (mode !== 'editing') set({ selectedItemId: null });
+    // Si cambiamos de modo, reseteamos la medición
+    if (mode !== 'measuring') set({ measurementResult: null });
     set({ mode });
   },
 
@@ -122,10 +147,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   toggleGrid: () => set((state) => ({ gridVisible: !state.gridVisible })),
   toggleBudget: () => set((state) => ({ budgetVisible: !state.budgetVisible })),
 
-  // --- IMPLEMENTACIÓN NUEVA ---
+  // Entorno
   toggleEnvPanel: () => set((state) => ({ envPanelVisible: !state.envPanelVisible })),
   setSunPosition: (azimuth, elevation) => set({ sunPosition: { azimuth, elevation } }),
   setBackgroundColor: (color) => set({ backgroundColor: color }),
+
+  // Medición
+  setMeasurementResult: (dist) => set({ measurementResult: dist }),
 
   setCameraType: (type) => set({ cameraType: type }),
   triggerView: (view) => set({ pendingView: view }),
@@ -141,7 +169,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().saveSnapshot(); 
     set((state) => ({ 
       items: [...state.items, item],
-      totalPrice: state.totalPrice + item.price
+      totalPrice: state.totalPrice + item.price 
     }));
   },
 
@@ -164,14 +192,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     const state = get();
     const originalItem = state.items.find(i => i.uuid === uuid);
     if (!originalItem) return;
+
     state.saveSnapshot();
     const newItem: SceneItem = JSON.parse(JSON.stringify(originalItem));
-    newItem.uuid = THREE.MathUtils.generateUUID();
+    newItem.uuid = THREE.MathUtils.generateUUID(); 
     newItem.position = [originalItem.position[0] + 1, originalItem.position[1], originalItem.position[2] + 1];
+
     set({
       items: [...state.items, newItem],
       totalPrice: state.totalPrice + newItem.price,
-      selectedItemId: newItem.uuid,
+      selectedItemId: newItem.uuid, 
       mode: 'editing'
     });
   },
@@ -183,11 +213,31 @@ export const useAppStore = create<AppState>((set, get) => ({
     )
   })),
 
+  updateFloorMaterial: (uuid, material) => set((state) => ({
+    items: state.items.map(i => i.uuid === uuid ? { ...i, floorMaterial: material, textureUrl: undefined } : i)
+  })),
+
+  // NUEVA ACCIÓN TEXTURAS
+  updateFloorTexture: (uuid, url, scale, rotation) => set((state) => ({
+    items: state.items.map(i => i.uuid === uuid ? { 
+      ...i, 
+      textureUrl: url, 
+      textureScale: scale, 
+      textureRotation: rotation,
+      floorMaterial: undefined // Limpiamos material sólido si hay textura
+    } : i)
+  })),
+
+  updateFloorPoints: (uuid, points) => set((state) => ({
+    items: state.items.map(i => i.uuid === uuid ? { ...i, points: points } : i)
+  })),
+
   undo: () => set((state) => {
     if (state.past.length === 0) return {};
     const previous = state.past[state.past.length - 1];
     const newPast = state.past.slice(0, state.past.length - 1);
     const prevTotal = previous.reduce((sum, item) => sum + item.price, 0);
+
     return {
       items: previous,
       past: newPast,
@@ -203,6 +253,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const next = state.future[0];
     const newFuture = state.future.slice(1);
     const nextTotal = next.reduce((sum, item) => sum + item.price, 0);
+
     return {
       items: next,
       past: [...state.past, state.items],
