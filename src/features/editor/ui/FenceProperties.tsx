@@ -8,23 +8,26 @@ import { CadControl } from './CadControl';
 export const FenceProperties = () => {
   const { selectedItemId, items, mode, fenceConfig, setFenceConfig, updateItemFenceConfig } = useAppStore();
   
-  // 1. Determinar si estamos editando una existente o configurando la global
   const selectedItem = selectedItemId ? items.find(i => i.uuid === selectedItemId) : null;
   const isEditing = selectedItem && selectedItem.type === 'fence';
 
-  // Si no estamos dibujando ni editando valla, no mostramos nada
   if (mode !== 'drawing_fence' && !isEditing) return null;
 
-  // 2. Obtener la config actual (del ítem o global)
   const currentConfig = isEditing && selectedItem?.fenceConfig ? selectedItem.fenceConfig : fenceConfig;
   const currentPreset = FENCE_PRESETS[currentConfig.presetId] || FENCE_PRESETS['wood'];
 
-  // 3. Helpers para cambiar config
+  // --- LÓGICA MEJORADA: CONSERVAR COLORES ---
   const handlePresetChange = (key: string) => {
      const preset = FENCE_PRESETS[key];
+     
+     // Mezclamos los colores por defecto del nuevo preset con los que ya tienes.
+     // Esto conserva tus cambios si coinciden las propiedades (ej: post, slatA).
      const newConfig = {
          presetId: key,
-         colors: { ...preset.defaultColors } // Reset colors to preset defaults
+         colors: { 
+             ...preset.defaultColors, // Base: colores por defecto del nuevo
+             ...currentConfig.colors  // Sobrescribe con TUS colores actuales
+         }
      };
 
      if (isEditing && selectedItem) {
@@ -50,7 +53,6 @@ export const FenceProperties = () => {
   return (
     <div className="absolute top-20 right-4 bg-neutral-900/95 backdrop-blur-md border border-neutral-700 rounded-xl p-4 shadow-xl z-20 w-80 animate-in fade-in slide-in-from-right-2">
       
-      {/* Control CAD (Distancias/Ángulos) si hay selección */}
       <CadControl />
 
       <h3 className="text-white text-sm font-bold mb-4 flex items-center gap-2 border-b border-white/10 pb-2">
@@ -79,7 +81,6 @@ export const FenceProperties = () => {
              <Palette size={12} /> Personalización
          </label>
          
-         {/* Poste */}
          <div className="flex items-center justify-between">
              <span className="text-xs text-neutral-300">Postes / Estructura</span>
              <input 
@@ -90,7 +91,6 @@ export const FenceProperties = () => {
              />
          </div>
 
-         {/* Lama Principal */}
          <div className="flex items-center justify-between">
              <span className="text-xs text-neutral-300">
                 {currentPreset.isSolidPanel ? 'Panel' : 'Lamas Principales'}
@@ -103,7 +103,6 @@ export const FenceProperties = () => {
              />
          </div>
 
-         {/* Colores Extra (si el preset lo soporta) */}
          {currentPreset.multiColor && (
              <>
                 <div className="flex items-center justify-between">

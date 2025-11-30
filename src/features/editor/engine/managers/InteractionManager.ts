@@ -167,9 +167,11 @@ export class InteractionManager {
 
         if (target && target.userData?.isItem) {
             this.selectObject(target);
-            // Si es suelo, mostrar marcadores
-            if (target.userData.type === 'floor') {
+            
+            // --- CORRECCIÓN AQUÍ: Detectamos si es Floor O Fence ---
+            if (target.userData.type === 'floor' || target.userData.type === 'fence') {
                 const item = store.items.find(i => i.uuid === target!.uuid);
+                // Ambos usan 'points', así que reutilizamos la herramienta de marcadores
                 if (item && item.points) this.engine.toolsManager.showFloorEditMarkers(target.uuid, item.points);
             } else {
                 this.engine.toolsManager.clearFloorEditMarkers();
