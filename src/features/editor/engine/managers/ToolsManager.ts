@@ -12,8 +12,12 @@ export class ToolsManager {
   public floorEditMarkers: THREE.Mesh[] = [];
   public activeFloorId: string | null = null;
   
-  // CAD Selection State
-  // [0]: Referencia, [1]: Pivote, [2]: Móvil
+  // FENCE TOOLS
+  public fencePoints: THREE.Vector3[] = [];
+  private fenceMarkers: THREE.Mesh[] = [];
+  private fencePreviewLine: THREE.Line | null = null;
+
+  // CAD Selection
   private selectedMarkerIndices: number[] = [];
 
   // Measure Tools
@@ -36,6 +40,12 @@ export class ToolsManager {
     if (this.previewLine) { this.scene.remove(this.previewLine); this.previewLine = null; }
     this.floorPoints = [];
 
+    // FENCE CLEANUP
+    this.fenceMarkers.forEach(m => this.scene.remove(m));
+    this.fenceMarkers = [];
+    if (this.fencePreviewLine) { this.scene.remove(this.fencePreviewLine); this.fencePreviewLine = null; }
+    this.fencePoints = [];
+
     this.selectedMarkerIndices = [];
     useAppStore.getState().setSelectedVertices([], null, null);
 
@@ -45,7 +55,7 @@ export class ToolsManager {
     }
   }
 
-  // --- Drawing Floor Logic ---
+  // --- DRAWING FLOOR ---
   public addDraftPoint(point: THREE.Vector3) {
     const p = point.clone();
     p.y = 0.05; 
@@ -84,7 +94,64 @@ export class ToolsManager {
     useAppStore.getState().setMode('idle');
   }
 
-  // --- Edit Floor Markers ---
+  // --- DRAWING FENCE ---
+  public addFenceDraftPoint(point: THREE.Vector3) {
+    const p = point.clone();
+    p.y = 0; 
+    if (this.fencePoints.length > 0 && p.distanceTo(this.fencePoints[this.fencePoints.length - 1]) < 0.1) return;
+    
+    this.fencePoints.push(p);
+    const marker = new THREE.Mesh(new THREE.SphereGeometry(0.15), new THREE.MeshBasicMaterial({ color: 0x3b82f6 })); // Azul
+    marker.position.copy(p);
+    this.scene.add(marker);
+    this.fenceMarkers.push(marker);
+
+    if (this.fencePreviewLine) this.scene.remove(this.fencePreviewLine);
+    if (this.fencePoints.length > 1) {
+      const geometry = new THREE.BufferGeometry().setFromPoints(this.fencePoints);
+      this.fencePreviewLine = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 0x3b82f6, linewidth: 2 }));
+      this.scene.add(this.fencePreviewLine);
+    }
+  }
+
+  public createSolidFence() {
+    if (this.fencePoints.length < 2) return;
+    
+    // @ts-ignore
+    const engine = window.editorEngine; 
+    if(!engine) return;
+
+    const points2D = this.fencePoints.map(p => ({ x: p.x, z: p.z }));
+    const currentConfig = useAppStore.getState().fenceConfig;
+    
+    const fenceGroup = engine.objectManager.createFenceObject(this.fencePoints, currentConfig);
+    
+    if(fenceGroup) {
+        const uuid = THREE.MathUtils.generateUUID();
+        fenceGroup.uuid = uuid;
+        fenceGroup.userData.isItem = true;
+        fenceGroup.userData.type = 'fence';
+        engine.scene.add(fenceGroup);
+
+        useAppStore.getState().addItem({
+            uuid: uuid,
+            productId: 'fence_' + currentConfig.presetId,
+            name: 'Valla',
+            price: 100, 
+            position: [0, 0, 0],
+            rotation: [0, 0, 0],
+            scale: [1, 1, 1],
+            type: 'fence',
+            points: points2D,
+            fenceConfig: JSON.parse(JSON.stringify(currentConfig))
+        });
+    }
+
+    this.clearTools();
+    useAppStore.getState().setMode('idle');
+  }
+
+  // --- EDIT FLOOR ---
   public showFloorEditMarkers(itemUuid: string, points: {x:number, z:number}[]) {
     this.clearFloorEditMarkers();
     this.activeFloorId = itemUuid;
@@ -102,17 +169,14 @@ export class ToolsManager {
     });
   }
 
-  // --- LOGICA DE SELECCIÓN Y COLORES CAD ---
   public selectVertex(index: number, multiSelect: boolean) {
       if (!multiSelect) {
           this.selectedMarkerIndices = [index];
       } else {
-          // Toggle
           if (this.selectedMarkerIndices.includes(index)) {
               this.selectedMarkerIndices = this.selectedMarkerIndices.filter(i => i !== index);
           } else {
               this.selectedMarkerIndices.push(index);
-              // AHORA PERMITIMOS HASTA 3 PUNTOS (Para Ángulos)
               if (this.selectedMarkerIndices.length > 3) this.selectedMarkerIndices.shift(); 
           }
       }
@@ -122,29 +186,22 @@ export class ToolsManager {
   }
 
   public swapSelectionOrder() {
-      // Invertir [0] y [1] en modo distancia
       if (this.selectedMarkerIndices.length === 2) {
           this.selectedMarkerIndices.reverse(); 
           this.updateMarkerColors();
           this.calculateAndSyncData();
       }
-      // En modo ángulo (3 puntos) podríamos rotarlos, 
-      // pero es más complejo de visualizar. Dejémoslo para 2 puntos por ahora.
   }
 
   private updateMarkerColors() {
       this.floorEditMarkers.forEach(m => {
           const idx = m.userData.pointIndex;
           const mat = m.material as THREE.MeshBasicMaterial;
-
-          let color = 0x00ff00; // Verde (Normal)
-
+          let color = 0x00ff00; 
           const posInArray = this.selectedMarkerIndices.indexOf(idx);
-          
-          if (posInArray === 0) color = 0x3b82f6; // [0] AZUL (Ref / Leg 1)
-          if (posInArray === 1) color = 0xff0000; // [1] ROJO (Pivote / Esquina)
-          if (posInArray === 2) color = 0xffff00; // [2] AMARILLO (Móvil / Leg 2)
-
+          if (posInArray === 0) color = 0x3b82f6; 
+          if (posInArray === 1) color = 0xff0000; 
+          if (posInArray === 2) color = 0xffff00; 
           mat.color.setHex(color);
       });
   }
@@ -153,25 +210,20 @@ export class ToolsManager {
       let dist: number | null = null;
       let angle: number | null = null;
 
-      // MODO DISTANCIA (2 PUNTOS)
       if (this.selectedMarkerIndices.length >= 2) {
           const m0 = this.getMarker(this.selectedMarkerIndices[0]);
           const m1 = this.getMarker(this.selectedMarkerIndices[1]);
           if(m0 && m1) dist = m0.position.distanceTo(m1.position);
       }
 
-      // MODO ÁNGULO (3 PUNTOS)
       if (this.selectedMarkerIndices.length === 3) {
           const pRef = this.getMarker(this.selectedMarkerIndices[0])?.position;
           const pPiv = this.getMarker(this.selectedMarkerIndices[1])?.position;
           const pMov = this.getMarker(this.selectedMarkerIndices[2])?.position;
 
           if (pRef && pPiv && pMov) {
-              // Vectores desde el pivote
               const v1 = new THREE.Vector3().subVectors(pRef, pPiv).normalize();
               const v2 = new THREE.Vector3().subVectors(pMov, pPiv).normalize();
-              
-              // Ángulo no firmado (0 a 180)
               const angleRad = v1.angleTo(v2);
               angle = THREE.MathUtils.radToDeg(angleRad);
           }
@@ -184,7 +236,6 @@ export class ToolsManager {
       return this.floorEditMarkers.find(m => m.userData.pointIndex === index);
   }
 
-  // --- PARAMETRIZACIÓN DISTANCIA ---
   public setSegmentLength(newLength: number, indexToMove: number, indexAnchor: number) {
       const markerMove = this.getMarker(indexToMove);
       const markerAnchor = this.getMarker(indexAnchor);
@@ -202,7 +253,6 @@ export class ToolsManager {
       this.calculateAndSyncData();
   }
 
-  // --- PARAMETRIZACIÓN ÁNGULO (NUEVO) ---
   public setVertexAngle(targetAngleDeg: number) {
       if (this.selectedMarkerIndices.length !== 3) return;
 
@@ -216,33 +266,16 @@ export class ToolsManager {
 
       if (!mRef || !mPiv || !mMov) return;
 
-      // 1. Calcular ángulo actual del vector Referencia (Pivot -> Ref)
       const vecRef = new THREE.Vector3().subVectors(mRef.position, mPiv.position);
       const angleRef = Math.atan2(vecRef.z, vecRef.x);
-
-      // 2. Calcular distancia actual del brazo móvil (para no cambiar su longitud, solo rotar)
       const distMov = mPiv.position.distanceTo(mMov.position);
-
-      // 3. Calcular nuevo ángulo objetivo
-      // NOTA: Math.atan2 es sentido antihorario.
-      // Queremos que el nuevo vector esté a (angleRef + targetAngle)
-      // Probamos sumar. Si se comporta raro, restamos. En 2D suele ser relativo.
       const targetAngleRad = THREE.MathUtils.degToRad(targetAngleDeg);
-      
-      // Aplicamos rotación relativa al vector de referencia
-      // Ojo: Esto asume un sentido.
-      
-      // Enfoque más robusto para UX:
-      // Usamos el producto cruz para saber "a qué lado" está actualmente y mantenemos el lado.
-      // Pero para simplificar: Asumimos rotación positiva (CCW) desde la referencia.
-      
       const newAngleAbs = angleRef + targetAngleRad;
 
-      // 4. Calcular nueva posición (Polar a Cartesiana)
       const newX = mPiv.position.x + distMov * Math.cos(newAngleAbs);
       const newZ = mPiv.position.z + distMov * Math.sin(newAngleAbs);
 
-      mMov.position.set(newX, 0, newZ); // Y=0 siempre en suelo
+      mMov.position.set(newX, 0, newZ); 
 
       this.updateFloorFromMarkers(mMov);
       this.calculateAndSyncData();
@@ -268,7 +301,6 @@ export class ToolsManager {
   }
 
   public handleMeasurementClick(point: THREE.Vector3) {
-      // (Mismo código de siempre para medir...)
       const p = point.clone();
       p.y += 0.05;
       this.measurePoints.push(p);

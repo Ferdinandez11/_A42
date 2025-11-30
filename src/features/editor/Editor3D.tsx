@@ -4,7 +4,8 @@ import { A42Engine } from './engine/A42Engine';
 import { Toolbar } from './ui/Toolbar';
 import { BudgetPanel } from './ui/BudgetPanel';
 import { EnvironmentPanel } from './ui/EnvironmentPanel';
-import { FloorProperties } from './ui/FloorProperties'; 
+import { FloorProperties } from './ui/FloorProperties';
+import { FenceProperties } from './ui/FenceProperties'; // <--- NUEVO IMPORT
 import { useAppStore } from '../../stores/useAppStore';
 import { Euro, Move, RotateCw, Scaling, Trash2, Copy } from 'lucide-react';
 
@@ -27,7 +28,7 @@ export const Editor3D = () => {
     selectItem,
     sunPosition,
     backgroundColor,
-    measurementResult // Importamos el resultado
+    measurementResult 
   } = useAppStore();
 
   useEffect(() => {
@@ -93,9 +94,12 @@ export const Editor3D = () => {
         onContextMenu={(e) => e.preventDefault()} 
         className={`absolute inset-0 z-0 ${mode === 'placing_item' ? 'cursor-crosshair' : (mode === 'measuring' ? 'cursor-help' : 'cursor-default')}`}
       />
+      
+      {/* PANELES DE PROPIEDADES (DERECHA) */}
       <BudgetPanel />
       <EnvironmentPanel />
-      <FloorProperties /> 
+      <FloorProperties />
+      <FenceProperties /> {/* <--- NUEVO COMPONENTE DE VALLAS */}
 
       <div className="absolute bottom-6 left-6 z-20">
         <button 

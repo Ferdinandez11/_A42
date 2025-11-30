@@ -17,39 +17,26 @@ export class A42Engine {
   private animationId: number | null = null;
 
   constructor(container: HTMLElement) {
-    // 1. Setup Scene & Rendering
     this.sceneManager = new SceneManager(container);
-    
-    // 2. Setup Object Management
     this.objectManager = new ObjectManager(this.sceneManager.scene);
-    
-    // 3. Setup Tools
     this.toolsManager = new ToolsManager(this.sceneManager.scene);
-    
-    // 4. Setup Interaction
     this.interactionManager = new InteractionManager(this);
 
-    // Event Listeners Globales
     window.addEventListener('resize', this.onWindowResize);
     window.addEventListener('keydown', this.onKeyDown);
     
-    // EXPOSICIÓN GLOBAL DEL ENGINE PARA REACT
-    // Esto permite llamar a funciones del engine desde los botones de React
     // @ts-ignore
     window.editorEngine = this;
   }
 
-  // --- GETTERS ---
   public get scene() { return this.sceneManager.scene; }
   public get activeCamera() { return this.sceneManager.activeCamera; }
   public get renderer() { return this.sceneManager.renderer; }
 
-  // --- BRIDGE METHODS ---
   public onMouseDown = (event: MouseEvent) => {
       this.interactionManager.onMouseDown(event);
   }
 
-  // --- DELEGATED METHODS ---
   public setBackgroundColor(color: string) { this.sceneManager.setBackgroundColor(color); }
   public setSkyVisible(visible: boolean) { this.sceneManager.setSkyVisible(visible); }
   public setGridVisible(v: boolean) { this.sceneManager.setGridVisible(v); }
@@ -68,7 +55,6 @@ export class A42Engine {
 
   public setGizmoMode(mode: 'translate' | 'rotate' | 'scale') { this.interactionManager.setGizmoMode(mode); }
 
-  // --- SYNC LOGIC ---
   public async syncSceneFromStore(storeItems: SceneItem[]) {
     const sceneItemsMap = new Map<string, THREE.Object3D>();
     this.scene.children.forEach(child => {
@@ -78,6 +64,7 @@ export class A42Engine {
     for (const item of storeItems) {
       const sceneObj = sceneItemsMap.get(item.uuid);
       if (sceneObj) {
+        // --- SUELO ---
         if (item.type === 'floor') {
             const hasChanged = 
                 JSON.stringify(sceneObj.userData.points) !== JSON.stringify(item.points) ||
@@ -93,13 +80,29 @@ export class A42Engine {
                 continue; 
             }
         }
+        
+        // --- VALLA (NUEVO CONTROL DE CAMBIOS) ---
+        if (item.type === 'fence') {
+             const hasConfigChanged = JSON.stringify(sceneObj.userData.fenceConfig) !== JSON.stringify(item.fenceConfig);
+             const hasPointsChanged = JSON.stringify(sceneObj.userData.points) !== JSON.stringify(item.points);
+
+             if (hasConfigChanged || hasPointsChanged) {
+                 this.scene.remove(sceneObj);
+                 this.objectManager.recreateFence(item);
+                 sceneItemsMap.delete(item.uuid);
+                 continue;
+             }
+        }
+
         sceneObj.position.fromArray(item.position);
         sceneObj.rotation.fromArray(item.rotation);
         sceneObj.scale.fromArray(item.scale);
         sceneItemsMap.delete(item.uuid);
       } else {
+        // CREAR NUEVOS
         if (item.type === 'model' && item.modelUrl) await this.objectManager.recreateModel(item);
         else if (item.type === 'floor' && item.points) this.objectManager.recreateFloor(item);
+        else if (item.type === 'fence' && item.points) this.objectManager.recreateFence(item);
       }
     }
 
@@ -113,7 +116,6 @@ export class A42Engine {
     }
   }
 
-  // --- EVENTS ---
   private onKeyDown = (e: KeyboardEvent) => {
       if (useAppStore.getState().mode !== 'editing') return;
       if (e.key === 'z' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); useAppStore.getState().undo(); return; }
@@ -142,7 +144,6 @@ export class A42Engine {
       this.sceneManager.onWindowResize();
   }
 
-  // --- LIFECYCLE ---
   public init() { this.animate(); }
   
   private animate = () => { 
@@ -155,7 +156,6 @@ export class A42Engine {
       if (this.animationId) cancelAnimationFrame(this.animationId);
       window.removeEventListener('keydown', this.onKeyDown); 
       window.removeEventListener('resize', this.onWindowResize);
-      
       this.sceneManager.dispose();
   }
 }

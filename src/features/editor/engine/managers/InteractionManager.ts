@@ -30,10 +30,8 @@ export class InteractionManager {
         this.transformControl.rotationSnap = Math.PI / 12;
         this.engine.scene.add(this.transformControl);
         
-        // ESTO ES LO QUE DEBE GESTIONAR EL BLOQUEO DE CÁMARA AUTOMÁTICAMENTE
         this.transformControl.addEventListener('dragging-changed', (event: { value: boolean }) => {
           this.isDraggingGizmo = event.value;
-          // Solo bloqueamos la cámara si REALMENTE estamos arrastrando
           this.engine.sceneManager.controls.enabled = !event.value;
           
           if (event.value) {
@@ -93,6 +91,18 @@ export class InteractionManager {
       return;
     }
 
+    // --- DRAWING FENCE ---
+    if (mode === 'drawing_fence') {
+        const intersects = this.raycaster.intersectObject(this.interactionPlane);
+        if (intersects.length > 0) {
+          if (event.button === 0) this.engine.toolsManager.addFenceDraftPoint(intersects[0].point);
+          else if (event.button === 2) { 
+               this.engine.toolsManager.createSolidFence(); 
+          }
+        }
+        return;
+    }
+
     // --- MEASURING ---
     if (mode === 'measuring') {
         const intersects = this.raycaster.intersectObjects(this.engine.scene.children, true);
@@ -129,21 +139,19 @@ export class InteractionManager {
               const hitMarker = markerIntersects[0].object;
               const pointIndex = hitMarker.userData.pointIndex;
 
-              // [CAD LOGIC] Shift/Ctrl Click for Multi-Selection
+              // Shift/Ctrl Click for Multi-Selection
               if (event.shiftKey || event.ctrlKey) {
                   this.engine.toolsManager.selectVertex(pointIndex, true);
                   if (this.transformControl) this.transformControl.detach(); // Hide Gizmo
                   return; 
               }
 
-              // Normal Click (Single Select + Drag)
+              // Normal Click
               if (this.transformControl) {
                   this.engine.toolsManager.selectVertex(pointIndex, false); 
                   this.transformControl.attach(hitMarker);
                   this.transformControl.setMode('translate');
                   this.transformControl.visible = true;
-                  // CORRECCIÓN: NO DESACTIVAMOS CONTROLES AQUÍ.
-                  // Dejamos que 'dragging-changed' lo haga si el usuario arrastra.
               }
               return;
           }
@@ -159,6 +167,7 @@ export class InteractionManager {
 
         if (target && target.userData?.isItem) {
             this.selectObject(target);
+            // Si es suelo, mostrar marcadores
             if (target.userData.type === 'floor') {
                 const item = store.items.find(i => i.uuid === target!.uuid);
                 if (item && item.points) this.engine.toolsManager.showFloorEditMarkers(target.uuid, item.points);
@@ -189,7 +198,6 @@ export class InteractionManager {
     if (this.transformControl.object) { 
         this.transformControl.detach(); 
         this.transformControl.visible = false; 
-        // Aseguramos que los controles vuelvan al deseleccionar (por si acaso)
         this.engine.sceneManager.controls.enabled = true; 
     }
     
@@ -200,7 +208,6 @@ export class InteractionManager {
     
     this.transformControl.attach(object);
     this.transformControl.visible = true;
-    // CORRECCIÓN: NO DESACTIVAMOS CONTROLES AQUÍ.
     useAppStore.getState().selectItem(object.uuid);
   }
 

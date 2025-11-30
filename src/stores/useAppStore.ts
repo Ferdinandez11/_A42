@@ -1,6 +1,7 @@
 // --- START OF FILE src/stores/useAppStore.ts ---
 import { create } from 'zustand';
 import * as THREE from 'three'; 
+import { FENCE_PRESETS, type FencePreset } from '../features/editor/data/fence_presets';
 
 export interface ProductDefinition { 
   id: string;
@@ -14,6 +15,11 @@ export interface ProductDefinition {
 }
 
 export type FloorMaterialType = 'rubber_red' | 'rubber_green' | 'rubber_blue' | 'grass' | 'concrete';
+
+export interface FenceConfig {
+    presetId: string;
+    colors: { post: number; slatA: number; slatB?: number; slatC?: number };
+}
 
 export interface SceneItem {
   uuid: string;
@@ -31,6 +37,8 @@ export interface SceneItem {
   textureUrl?: string;
   textureScale?: number;
   textureRotation?: number;
+
+  fenceConfig?: FenceConfig;
 
   data?: any; 
 }
@@ -66,6 +74,9 @@ interface AppState {
   measuredDistance: number | null;
   measuredAngle: number | null;
 
+  // --- FENCE STATE (GLOBAL DEFAULT) ---
+  fenceConfig: FenceConfig;
+
   // Acciones
   setMode: (mode: AppState['mode']) => void;
   setSelectedProduct: (product: ProductDefinition | null) => void; 
@@ -85,6 +96,10 @@ interface AppState {
   updateFloorMaterial: (uuid: string, material: FloorMaterialType) => void;
   updateFloorTexture: (uuid: string, url: string | undefined, scale: number, rotation: number) => void;
   updateFloorPoints: (uuid: string, points: { x: number, z: number }[]) => void;
+
+  // Vallas
+  setFenceConfig: (config: Partial<FenceConfig>) => void; // Configuración global (para nuevas)
+  updateItemFenceConfig: (uuid: string, config: Partial<FenceConfig>) => void; // Para vallas existentes
   
   removeItem: (uuid: string) => void;
   duplicateItem: (uuid: string) => void; 
@@ -97,7 +112,6 @@ interface AppState {
   redo: () => void;
   resetScene: () => void;
 
-  // --- CAD ACTIONS ---
   setSelectedVertices: (indices: number[], distance: number | null, angle: number | null) => void;
 }
 
@@ -121,14 +135,22 @@ export const useAppStore = create<AppState>((set, get) => ({
   past: [],
   future: [],
 
-  // CAD Inicial
   selectedVertexIndices: [],
   measuredDistance: null,
   measuredAngle: null,
 
+  fenceConfig: {
+    presetId: 'wood',
+    colors: FENCE_PRESETS['wood'].defaultColors
+  },
+
   setMode: (mode) => {
     if (mode !== 'editing') set({ selectedItemId: null });
     if (mode !== 'measuring') set({ measurementResult: null });
+    
+    // @ts-ignore
+    if (window.editorEngine) window.editorEngine.clearTools();
+
     set({ mode, selectedVertexIndices: [], measuredDistance: null, measuredAngle: null });
   },
 
@@ -229,11 +251,28 @@ export const useAppStore = create<AppState>((set, get) => ({
     } : i)
   })),
 
-  // AQUÍ ESTÁ EL CAMBIO IMPORTANTE: saveSnapshot()
   updateFloorPoints: (uuid, points) => {
     get().saveSnapshot(); 
     set((state) => ({
       items: state.items.map(i => i.uuid === uuid ? { ...i, points: points } : i)
+    }));
+  },
+
+  // Acción global (para nuevas)
+  setFenceConfig: (config) => set((state) => ({
+      fenceConfig: { ...state.fenceConfig, ...config }
+  })),
+
+  // Acción específica (para editar existentes) - AQUÍ ESTÁ LO NUEVO
+  updateItemFenceConfig: (uuid, config) => {
+    get().saveSnapshot();
+    set((state) => ({
+      items: state.items.map(i => {
+         if (i.uuid === uuid && i.fenceConfig) {
+             return { ...i, fenceConfig: { ...i.fenceConfig, ...config } };
+         }
+         return i;
+      })
     }));
   },
 
@@ -280,7 +319,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     pendingView: null 
   }),
 
-  // CAD Action Implementation
   setSelectedVertices: (indices, distance, angle) => set({ 
     selectedVertexIndices: indices, 
     measuredDistance: distance,
