@@ -1,0 +1,42 @@
+/* --- START OF FILE src/index.css --- */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Mantenemos nuestro fondo oscuro y el reset básico */
+:root {
+  color-scheme: dark;
+  background-color: #111;
+  color: white;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+}
+
+#root {
+  width: 100vw;
+  height: 100vh;
+}
+
+/* Custom Scrollbar (para el catálogo) */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.05);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+/* --- END OF FILE src/index.css --- */
