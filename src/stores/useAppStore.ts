@@ -1,7 +1,8 @@
 // --- START OF FILE src/stores/useAppStore.ts ---
 import { create } from 'zustand';
-import * as THREE from 'three'; // Importamos THREE para generar UUIDs si es necesario
+import * as THREE from 'three';
 
+// ... (ProductDefinition y SceneItem se mantienen igual) ...
 export interface ProductDefinition { 
   id: string;
   name: string;
@@ -17,7 +18,7 @@ export interface SceneItem {
   uuid: string;
   productId: string;
   name?: string; 
-  price: number; // NUEVO: Guardamos el precio individual aquí
+  price: number;
   position: [number, number, number];
   rotation: [number, number, number];
   scale: [number, number, number];
@@ -30,15 +31,20 @@ export interface SceneItem {
 export type CameraView = 'top' | 'front' | 'side' | 'iso';
 
 interface AppState {
+  // ... (Estados existentes) ...
   user: any | null;
   mode: 'idle' | 'drawing_floor' | 'drawing_fence' | 'placing_item' | 'editing' | 'catalog';
   selectedProduct: ProductDefinition | null; 
   selectedItemId: string | null;
-  
   items: SceneItem[];
   totalPrice: number;
   gridVisible: boolean;
   budgetVisible: boolean;
+  
+  // --- NUEVO: ESTADO DE ENTORNO ---
+  envPanelVisible: boolean;
+  sunPosition: { azimuth: number; elevation: number }; // Grados
+  backgroundColor: string; // Hex o 'sky'
   
   cameraType: 'perspective' | 'orthographic';
   pendingView: CameraView | null;
@@ -46,25 +52,30 @@ interface AppState {
   past: SceneItem[][];
   future: SceneItem[][];
 
+  // ... (Setters existentes) ...
   setMode: (mode: AppState['mode']) => void;
   setSelectedProduct: (product: ProductDefinition | null) => void; 
   selectItem: (uuid: string | null) => void;
   toggleGrid: () => void;
   toggleBudget: () => void;
-  
+
+  // --- NUEVO: SETTERS DE ENTORNO ---
+  toggleEnvPanel: () => void;
+  setSunPosition: (azimuth: number, elevation: number) => void;
+  setBackgroundColor: (color: string) => void;
+
   setCameraType: (type: 'perspective' | 'orthographic') => void;
   triggerView: (view: CameraView) => void;
   clearPendingView: () => void;
 
-  addItem: (item: SceneItem) => void; // Ya no necesitamos pasar el precio aparte
+  addItem: (item: SceneItem) => void;
   updateItemTransform: (uuid: string, pos: number[], rot: number[], scale: number[]) => void;
   removeItem: (uuid: string) => void;
-  duplicateItem: (uuid: string) => void; // NUEVO
+  duplicateItem: (uuid: string) => void;
   
   saveSnapshot: () => void;
   undo: () => void;
   redo: () => void;
-
   resetScene: () => void;
 }
 
@@ -76,8 +87,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   items: [],
   totalPrice: 0,
   gridVisible: false,
-  budgetVisible: false, 
+  budgetVisible: false,
   
+  // Valores iniciales del entorno
+  envPanelVisible: false,
+  sunPosition: { azimuth: 180, elevation: 45 },
+  backgroundColor: '#111111', // Color por defecto (Oscuro)
+
   cameraType: 'perspective',
   pendingView: null,
 
@@ -106,6 +122,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   toggleGrid: () => set((state) => ({ gridVisible: !state.gridVisible })),
   toggleBudget: () => set((state) => ({ budgetVisible: !state.budgetVisible })),
 
+  // --- IMPLEMENTACIÓN NUEVA ---
+  toggleEnvPanel: () => set((state) => ({ envPanelVisible: !state.envPanelVisible })),
+  setSunPosition: (azimuth, elevation) => set({ sunPosition: { azimuth, elevation } }),
+  setBackgroundColor: (color) => set({ backgroundColor: color }),
+
   setCameraType: (type) => set({ cameraType: type }),
   triggerView: (view) => set({ pendingView: view }),
   clearPendingView: () => set({ pendingView: null }),
@@ -120,7 +141,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().saveSnapshot(); 
     set((state) => ({ 
       items: [...state.items, item],
-      totalPrice: state.totalPrice + item.price // Usamos el precio del item
+      totalPrice: state.totalPrice + item.price
     }));
   },
 
@@ -139,24 +160,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  // --- NUEVO: DUPLICAR ---
   duplicateItem: (uuid) => {
     const state = get();
     const originalItem = state.items.find(i => i.uuid === uuid);
     if (!originalItem) return;
-
     state.saveSnapshot();
-
-    // Creamos una copia profunda y modificamos lo necesario
     const newItem: SceneItem = JSON.parse(JSON.stringify(originalItem));
-    newItem.uuid = THREE.MathUtils.generateUUID(); // Nueva ID
-    // Desplazamos un poco para que se vea (1 metro en X y Z)
+    newItem.uuid = THREE.MathUtils.generateUUID();
     newItem.position = [originalItem.position[0] + 1, originalItem.position[1], originalItem.position[2] + 1];
-
     set({
       items: [...state.items, newItem],
       totalPrice: state.totalPrice + newItem.price,
-      selectedItemId: newItem.uuid, // Seleccionamos el nuevo
+      selectedItemId: newItem.uuid,
       mode: 'editing'
     });
   },
@@ -172,10 +187,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (state.past.length === 0) return {};
     const previous = state.past[state.past.length - 1];
     const newPast = state.past.slice(0, state.past.length - 1);
-    
-    // Recalcular precio total del estado anterior
     const prevTotal = previous.reduce((sum, item) => sum + item.price, 0);
-
     return {
       items: previous,
       past: newPast,
@@ -190,10 +202,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (state.future.length === 0) return {};
     const next = state.future[0];
     const newFuture = state.future.slice(1);
-
-    // Recalcular precio total del estado siguiente
     const nextTotal = next.reduce((sum, item) => sum + item.price, 0);
-
     return {
       items: next,
       past: [...state.past, state.items],

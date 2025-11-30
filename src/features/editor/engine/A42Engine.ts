@@ -13,10 +13,9 @@ type PlaceableProduct = ProductDefinition & { initialScale?: [number, number, nu
 export class A42Engine {
   private scene: THREE.Scene;
   
-  // Mantenemos dos cámaras
   private perspectiveCamera: THREE.PerspectiveCamera;
   private orthoCamera: THREE.OrthographicCamera;
-  private activeCamera: THREE.Camera; // Puntero a la cámara actual
+  private activeCamera: THREE.Camera;
 
   private renderer: THREE.WebGLRenderer;
   private container: HTMLElement;
@@ -31,6 +30,9 @@ export class A42Engine {
   private assetCache: { [url: string]: THREE.Group } = {};
   
   private gridHelper: THREE.GridHelper | null = null;
+  // Guardamos referencias para modificarlas luego
+  private dirLight: THREE.DirectionalLight | null = null;
+  private sky: Sky | null = null;
 
   private floorPoints: THREE.Vector3[] = [];
   private floorMarkers: THREE.Mesh[] = [];
@@ -45,15 +47,12 @@ export class A42Engine {
     const height = container.clientHeight;
     const aspect = width / height;
 
-    // 1. ESCENA Y RENDERER
     this.scene = new THREE.Scene();
 
-    // Configurar Cámara Perspectiva
     this.perspectiveCamera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000);
     this.perspectiveCamera.position.set(10, 15, 10);
 
-    // Configurar Cámara Ortográfica
-    const frustumSize = 20; // Zoom base para ortográfica
+    const frustumSize = 20;
     this.orthoCamera = new THREE.OrthographicCamera(
       frustumSize * aspect / -2,
       frustumSize * aspect / 2,
@@ -62,32 +61,28 @@ export class A42Engine {
       0.1,
       1000
     );
-    this.orthoCamera.position.set(20, 20, 20); // Posición inicial
+    this.orthoCamera.position.set(20, 20, 20);
     this.orthoCamera.lookAt(0, 0, 0);
 
-    // Cámara activa por defecto
     this.activeCamera = this.perspectiveCamera;
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true }); // preserveDrawingBuffer ayuda en snapshots a veces
     this.renderer.setSize(width, height);
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Sombras suaves
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.8;
 
     container.appendChild(this.renderer.domElement);
 
-    // 2. CONTROLES
-    // Inicializamos con la cámara activa
     this.controls = new OrbitControls(this.activeCamera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.05;
 
-    // 3. GIZMO
     try {
         this.transformControl = new TransformControls(this.activeCamera, this.renderer.domElement);
-        this.transformControl.rotationSnap = Math.PI / 12; // 15 grados
+        this.transformControl.rotationSnap = Math.PI / 12;
         this.scene.add(this.transformControl);
         
         this.transformControl.addEventListener('dragging-changed', (event: { value: boolean }) => {
@@ -119,7 +114,6 @@ export class A42Engine {
         this.transformControl = null;
     }
 
-    // 4. UTILS
     this.loader = new GLTFLoader();
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
@@ -131,14 +125,137 @@ export class A42Engine {
     window.addEventListener('keydown', this.onKeyDown);
   }
 
-  // --- NUEVO: CONTROL DEL GIZMO DESDE REACT ---
+  // --- NUEVO: GESTIÓN DE ENTORNO ---
+
+  public updateSunPosition(azimuth: number, elevation: number) {
+    if (!this.sky || !this.dirLight) return;
+
+    // Convertir coordenadas esféricas a vector 3D
+    // Azimut: rotación alrededor del eje Y (horizonte)
+    // Elevación: ángulo sobre el horizonte (90 = cenit)
+    const phi = THREE.MathUtils.degToRad(90 - elevation);
+    const theta = THREE.MathUtils.degToRad(azimuth);
+
+    const sunPosition = new THREE.Vector3();
+    sunPosition.setFromSphericalCoords(1, phi, theta);
+
+    // Actualizar Sky
+    this.sky.material.uniforms['sunPosition'].value.copy(sunPosition);
+
+    // Actualizar Luz Direccional (La movemos lejos en la dirección del sol)
+    // Multiplicamos por 50 para que esté "lejos" pero dentro de un rango razonable
+    this.dirLight.position.copy(sunPosition).multiplyScalar(50);
+  }
+
+  public setBackgroundColor(color: string) {
+    // Si es un hex, ponemos color solido. Si queremos mantener el cielo, usamos null o transparente.
+    // Para simplificar: si el color es muy oscuro o específico, quitamos la visibilidad del Sky o ajustamos el fondo.
+    
+    // NOTA: El Sky shader de Three.js cubre todo el fondo. 
+    // Si queremos ver un color sólido, tenemos que ocultar el Sky.
+    
+    if (this.sky) {
+      // Si el usuario elige un color sólido que NO sea el entorno por defecto, ocultamos el cielo
+      // Vamos a asumir que si pasa un color, quiere ese color de fondo.
+      // Si pasa 'sky' o null, mostramos el cielo procedural.
+      
+      /* Lógica simple para este ejemplo:
+         El usuario quiere cambiar el "entorno".
+         El Sky de threejs es muy dominante.
+         Si seleccionamos un color plano, ocultamos el Sky y ponemos scene.background.
+      */
+      
+      this.scene.background = new THREE.Color(color);
+      // Para que se vea el color de fondo, el Sky debe ser invisible o no estar.
+      // O podemos usar Fog para integrar el color.
+      
+      // Opción A: Color sólido puro (bueno para visualización técnica)
+      this.sky.visible = false;
+      
+      // Opción B: Si el color es "negro/gris" por defecto, mostramos el cielo?
+      // Vamos a dejarlo manual:
+    }
+  }
+
+  // Método auxiliar para reactivar el cielo si quisieras un botón "Modo Realista"
+  public setSkyVisible(visible: boolean) {
+    if (this.sky) this.sky.visible = visible;
+  }
+
+  private initEnvironment() {
+    // 1. Luz Hemisférica (Ambiente base suave)
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 0.4);
+    this.scene.add(hemiLight);
+
+    // 2. Luz Direccional (Sol)
+    this.dirLight = new THREE.DirectionalLight(0xffffff, 2);
+    this.dirLight.position.set(10, 20, 10);
+    this.dirLight.castShadow = true;
+
+    // --- CORRECCIÓN DE SOMBRAS (Shadow Clipping) ---
+    // Aumentamos el tamaño del mapa de sombras
+    this.dirLight.shadow.mapSize.width = 2048; 
+    this.dirLight.shadow.mapSize.height = 2048;
+    
+    // Aumentamos el área que cubre la cámara de sombras (Frustum)
+    const d = 50; // Área de 100x100 metros
+    this.dirLight.shadow.camera.left = -d;
+    this.dirLight.shadow.camera.right = d;
+    this.dirLight.shadow.camera.top = d;
+    this.dirLight.shadow.camera.bottom = -d;
+    
+    // Ajustamos planos de recorte de sombra
+    this.dirLight.shadow.camera.near = 0.1;
+    this.dirLight.shadow.camera.far = 200;
+    
+    // Ajuste de bias para evitar "shadow acne"
+    this.dirLight.shadow.bias = -0.0005;
+
+    this.scene.add(this.dirLight);
+
+    // 3. Cielo Procedural (Sky)
+    this.sky = new Sky();
+    this.sky.scale.setScalar(450000);
+    
+    const uniforms = this.sky.material.uniforms;
+    uniforms['turbidity'].value = 10;
+    uniforms['rayleigh'].value = 3;
+    uniforms['mieCoefficient'].value = 0.005;
+    uniforms['mieDirectionalG'].value = 0.7;
+    
+    // Posición inicial del sol
+    const sun = new THREE.Vector3();
+    const phi = THREE.MathUtils.degToRad(90 - 45); // 45 grados elevación
+    const theta = THREE.MathUtils.degToRad(180);   // sur
+    sun.setFromSphericalCoords(1, phi, theta);
+    uniforms['sunPosition'].value.copy(sun);
+    
+    this.scene.add(this.sky);
+
+    // Grid
+    this.gridHelper = new THREE.GridHelper(100, 100, 0x888888, 0x444444);
+    this.gridHelper.visible = false;
+    this.scene.add(this.gridHelper);
+
+    // Plano receptor de sombras (invisible pero captura sombras)
+    const shadowPlane = new THREE.Mesh(
+        new THREE.PlaneGeometry(500, 500), 
+        new THREE.ShadowMaterial({ opacity: 0.3, color: 0x000000 })
+    );
+    shadowPlane.rotation.x = -Math.PI / 2;
+    shadowPlane.position.y = 0.005; // Apenas por encima del 0 para evitar z-fighting con suelos
+    shadowPlane.receiveShadow = true;
+    this.scene.add(shadowPlane);
+  }
+
+  // ... (Resto de métodos: setGizmoMode, switchCamera, setView, setGridVisible, syncSceneFromStore, etc... IGUAL QUE ANTES) ...
+  
   public setGizmoMode(mode: 'translate' | 'rotate' | 'scale') {
     if (this.transformControl) {
       this.transformControl.setMode(mode);
     }
   }
 
-  // --- CAMBIO DE CÁMARA ---
   public switchCamera(type: 'perspective' | 'orthographic') {
     const oldPos = this.activeCamera.position.clone();
     const target = this.controls.target.clone();
@@ -183,7 +300,6 @@ export class A42Engine {
     }
   }
 
-  // --- SYNC ENGINE ---
   public async syncSceneFromStore(storeItems: SceneItem[]) {
     const sceneItemsMap = new Map<string, THREE.Object3D>();
     this.scene.children.forEach(child => {
@@ -256,7 +372,6 @@ export class A42Engine {
     this.scene.add(mesh);
   }
 
-  // --- INPUT HANDLER ---
   public onMouseDown = (event: MouseEvent) => {
     if (this.transformControl && this.isDraggingGizmo) return;
     
@@ -264,7 +379,6 @@ export class A42Engine {
     this.pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     this.pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
-    // IMPORTANTE: Raycaster debe usar la cámara ACTIVA
     this.raycaster.setFromCamera(this.pointer, this.activeCamera);
 
     const store = useAppStore.getState();
@@ -309,7 +423,6 @@ export class A42Engine {
     }
   }
 
-  // --- SUELO ---
   private addDraftPoint(point: THREE.Vector3) {
     const p = point.clone();
     p.y = 0.05; 
@@ -350,12 +463,11 @@ export class A42Engine {
     mesh.uuid = THREE.MathUtils.generateUUID();
     this.scene.add(mesh);
 
-    // NUEVO: Pasamos el objeto completo con precio y nombre
     useAppStore.getState().addItem({
       uuid: mesh.uuid,
       productId: 'custom_floor',
       name: 'Suelo a medida',
-      price: 100, // Precio del suelo
+      price: 100,
       position: [mesh.position.x, mesh.position.y, mesh.position.z],
       rotation: [Math.PI / 2, 0, 0], 
       scale: [1, 1, 1],
@@ -370,7 +482,6 @@ export class A42Engine {
     useAppStore.getState().setMode('idle');
   }
 
-  // --- OBJETOS ---
   public async placeObject(x: number, z: number, product: PlaceableProduct) {
     if (!product.modelUrl) return;
     const url = product.modelUrl; 
@@ -409,12 +520,11 @@ export class A42Engine {
     model.userData.type = product.type;
     model.uuid = THREE.MathUtils.generateUUID();
 
-    // NUEVO: Pasamos el objeto completo con precio y nombre
     useAppStore.getState().addItem({
       uuid: model.uuid,
       productId: product.id,
       name: product.name,
-      price: product.price, // Precio del producto
+      price: product.price,
       position: [x, model.position.y, z],
       rotation: [0, 0, 0],
       scale: [initialScale.x, initialScale.y, initialScale.z],
@@ -480,41 +590,6 @@ export class A42Engine {
     }
   }
 
-  private initEnvironment() {
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 0.4);
-    this.scene.add(hemiLight);
-    const dirLight = new THREE.DirectionalLight(0xffffff, 2);
-    dirLight.position.set(10, 20, 10);
-    dirLight.castShadow = true;
-    dirLight.shadow.mapSize.set(2048, 2048);
-    dirLight.shadow.bias = -0.001;
-    this.scene.add(dirLight);
-
-    const sky = new Sky();
-    sky.scale.setScalar(450000);
-    const sun = new THREE.Vector3();
-    const uniforms = sky.material.uniforms;
-    uniforms['turbidity'].value = 10;
-    uniforms['rayleigh'].value = 3;
-    uniforms['mieCoefficient'].value = 0.005;
-    uniforms['mieDirectionalG'].value = 0.7;
-    const phi = THREE.MathUtils.degToRad(70);
-    const theta = THREE.MathUtils.degToRad(180);
-    sun.setFromSphericalCoords(1, phi, theta);
-    uniforms['sunPosition'].value.copy(sun);
-    this.scene.add(sky);
-
-    this.gridHelper = new THREE.GridHelper(100, 100, 0x888888, 0x444444);
-    this.gridHelper.visible = false;
-    this.scene.add(this.gridHelper);
-
-    const shadowPlane = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), new THREE.ShadowMaterial({ opacity: 0.3, color: 0x000000 }));
-    shadowPlane.rotation.x = -Math.PI / 2;
-    shadowPlane.position.y = 0.005;
-    shadowPlane.receiveShadow = true;
-    this.scene.add(shadowPlane);
-  }
-
   private createInteractionPlane() {
     const geo = new THREE.PlaneGeometry(1000, 1000);
     const mat = new THREE.MeshBasicMaterial({ visible: false });
@@ -529,11 +604,9 @@ export class A42Engine {
     const width = this.container.clientWidth;
     const height = this.container.clientHeight;
     
-    // Actualizar Perspectiva
     this.perspectiveCamera.aspect = width / height;
     this.perspectiveCamera.updateProjectionMatrix();
 
-    // Actualizar Ortográfica
     const frustumSize = 20;
     const aspect = width / height;
     this.orthoCamera.left = -frustumSize * aspect / 2;

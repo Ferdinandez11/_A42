@@ -4,7 +4,7 @@ import {
   MousePointer2, Grid3X3, Component, Trees, 
   Grid, Undo2, Redo2, Settings,
   Eye, Box, ArrowUp, ArrowRight, GalleryVerticalEnd, Square,
-  ChevronUp
+  ChevronUp, Sun // Importar Sun
 } from 'lucide-react';
 import { useAppStore } from '../../../stores/useAppStore';
 import './Editor.css';
@@ -14,10 +14,10 @@ export const Toolbar = () => {
     mode, setMode, 
     gridVisible, toggleGrid, 
     undo, redo, past, future,
-    cameraType, setCameraType, triggerView 
+    cameraType, setCameraType, triggerView,
+    toggleEnvPanel, envPanelVisible // Importar control panel entorno
   } = useAppStore();
 
-  // Estado local para el menú desplegable de vistas
   const [showViews, setShowViews] = useState(false);
 
   const tools = [
@@ -30,10 +30,8 @@ export const Toolbar = () => {
   return (
     <div className="relative flex flex-col items-center">
       
-      {/* POPUP DE VISTAS (Flotante encima del botón) */}
       {showViews && (
         <div className="absolute bottom-full mb-4 glass-panel flex-row animate-in slide-in-from-bottom-2 fade-in duration-200">
-           {/* Tipo Cámara */}
            <button 
              className={`tool-btn ${cameraType === 'perspective' ? 'active' : ''}`} 
              onClick={() => setCameraType('perspective')} title="3D"
@@ -49,7 +47,6 @@ export const Toolbar = () => {
            
            <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
            
-           {/* Vistas */}
            <button className="tool-btn" onClick={() => triggerView('top')} title="Planta"><ArrowUp size={18} /></button>
            <button className="tool-btn" onClick={() => triggerView('front')} title="Alzado"><GalleryVerticalEnd size={18} /></button>
            <button className="tool-btn" onClick={() => triggerView('side')} title="Perfil"><ArrowRight size={18} /></button>
@@ -57,7 +54,6 @@ export const Toolbar = () => {
         </div>
       )}
 
-      {/* BARRA PRINCIPAL */}
       <div className="glass-panel">
         {tools.map((tool) => (
           <button
@@ -72,18 +68,25 @@ export const Toolbar = () => {
         
         <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
 
-        {/* Botón Toggle Vistas */}
         <button 
           className={`tool-btn ${showViews ? 'active' : ''}`} 
           onClick={() => setShowViews(!showViews)}
         >
           <Eye size={20} />
-          {/* Pequeño indicador si es ortográfica */}
           {cameraType === 'orthographic' && (
              <span className="absolute top-1 right-1 w-2 h-2 bg-green-400 rounded-full"></span>
           )}
           <span className="tool-label">Vistas</span>
           <ChevronUp size={12} className={`absolute top-1 right-1 transition-transform ${showViews ? 'rotate-180' : ''} opacity-50`} />
+        </button>
+
+        {/* NUEVO BOTÓN ENTORNO */}
+        <button 
+          className={`tool-btn ${envPanelVisible ? 'active' : ''}`} 
+          onClick={toggleEnvPanel}
+        >
+          <Sun size={20} />
+          <span className="tool-label">Entorno</span>
         </button>
 
         <button className={`tool-btn ${gridVisible ? 'active' : ''}`} onClick={toggleGrid}>

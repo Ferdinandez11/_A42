@@ -3,8 +3,9 @@ import React, { useEffect, useRef } from 'react';
 import { A42Engine } from './engine/A42Engine';
 import { Toolbar } from './ui/Toolbar';
 import { BudgetPanel } from './ui/BudgetPanel';
+import { EnvironmentPanel } from './ui/EnvironmentPanel'; // Importar panel
 import { useAppStore } from '../../stores/useAppStore';
-import { Euro, Move, RotateCw, Scaling, Trash2, Copy } from 'lucide-react'; // Iconos nuevos
+import { Euro, Move, RotateCw, Scaling, Trash2, Copy } from 'lucide-react';
 
 export const Editor3D = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -20,9 +21,12 @@ export const Editor3D = () => {
     totalPrice,
     toggleBudget,
     selectedItemId,
-    duplicateItem, // Importamos acción duplicar
-    removeItem,    // Importamos acción borrar
-    selectItem     // Para deseleccionar si borramos
+    duplicateItem, 
+    removeItem,    
+    selectItem,
+    // Estado de entorno
+    sunPosition,
+    backgroundColor
   } = useAppStore();
 
   useEffect(() => {
@@ -31,9 +35,18 @@ export const Editor3D = () => {
     engine.init();
     engineRef.current = engine;
     engine.setGridVisible(useAppStore.getState().gridVisible);
+    
+    // Inicializar entorno con valores del store
+    const state = useAppStore.getState();
+    engine.updateSunPosition(state.sunPosition.azimuth, state.sunPosition.elevation);
+    // Para el inicio, si es el color por defecto (oscuro #111) asumimos cielo visible
+    if (state.backgroundColor === '#111111') engine.setSkyVisible(true);
+    else engine.setBackgroundColor(state.backgroundColor);
+
     return () => engine.dispose();
   }, []);
 
+  // Sync Básico
   useEffect(() => { if (engineRef.current) engineRef.current.setGridVisible(gridVisible); }, [gridVisible]);
   useEffect(() => { if (engineRef.current) engineRef.current.syncSceneFromStore(items); }, [items]);
   useEffect(() => { if (engineRef.current) engineRef.current.switchCamera(cameraType); }, [cameraType]);
@@ -44,13 +57,30 @@ export const Editor3D = () => {
     }
   }, [pendingView, clearPendingView]);
 
+  // Sync Entorno (NUEVO)
+  useEffect(() => {
+    if (engineRef.current) {
+      engineRef.current.updateSunPosition(sunPosition.azimuth, sunPosition.elevation);
+    }
+  }, [sunPosition]);
+
+  useEffect(() => {
+    if (engineRef.current) {
+      if (backgroundColor === '#111111') {
+        // Modo "Sky" por defecto
+        engineRef.current.setSkyVisible(true);
+      } else {
+        engineRef.current.setBackgroundColor(backgroundColor);
+      }
+    }
+  }, [backgroundColor]);
+
   const handlePointerDown = (e: React.PointerEvent) => {
     if (mode === 'catalog') return;
     if ((e.target as HTMLElement).closest('button, .glass-panel, a, input, .scroll-container')) return;
     if (engineRef.current) engineRef.current.onMouseDown(e.nativeEvent);
   };
 
-  // Funciones para la barra flotante
   const handleGizmoMode = (mode: 'translate' | 'rotate' | 'scale') => {
     engineRef.current?.setGizmoMode(mode);
   };
@@ -62,7 +92,7 @@ export const Editor3D = () => {
   const handleDelete = () => {
     if (selectedItemId) {
       removeItem(selectedItemId);
-      selectItem(null); // Deseleccionar visualmente
+      selectItem(null); 
     }
   };
 
@@ -77,8 +107,9 @@ export const Editor3D = () => {
         className={`absolute inset-0 z-0 ${mode === 'placing_item' ? 'cursor-crosshair' : 'cursor-default'}`}
       />
 
-      {/* --- PANEL DE PRESUPUESTO --- */}
+      {/* PANELES FLOTANTES */}
       <BudgetPanel />
+      <EnvironmentPanel /> {/* Nuevo panel */}
 
       {/* --- BOTÓN DE PRESUPUESTO (ABAJO IZQUIERDA) --- */}
       <div className="absolute bottom-6 left-6 z-20">
@@ -99,42 +130,25 @@ export const Editor3D = () => {
       {/* --- UI CENTRAL: TOOLBAR Y MENÚ CONTEXTUAL --- */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-4">
         
-        {/* BARRA FLOTANTE CONTEXTUAL (INTERACTIVA) */}
+        {/* BARRA FLOTANTE CONTEXTUAL */}
         {selectedItemId && mode === 'editing' && (
           <div className="glass-panel px-2 py-1 flex items-center gap-1 animate-in fade-in slide-in-from-bottom-2">
-             
-             {/* MOVER */}
              <button onClick={() => handleGizmoMode('translate')} className="p-2 hover:bg-white/10 rounded text-neutral-300 hover:text-white flex items-center gap-2 transition-colors" title="Mover (T)">
                 <Move size={16} />
-                <span className="text-xs font-medium hidden sm:inline">Mover</span>
              </button>
-
-             {/* ROTAR */}
              <button onClick={() => handleGizmoMode('rotate')} className="p-2 hover:bg-white/10 rounded text-neutral-300 hover:text-white flex items-center gap-2 transition-colors" title="Rotar (R)">
                 <RotateCw size={16} />
-                <span className="text-xs font-medium hidden sm:inline">Rotar</span>
              </button>
-
-             {/* ESCALAR */}
              <button onClick={() => handleGizmoMode('scale')} className="p-2 hover:bg-white/10 rounded text-neutral-300 hover:text-white flex items-center gap-2 transition-colors" title="Escalar (E)">
                 <Scaling size={16} />
-                <span className="text-xs font-medium hidden sm:inline">Escalar</span>
              </button>
-
              <div className="w-px h-5 bg-white/20 mx-1"></div>
-
-             {/* DUPLICAR */}
              <button onClick={handleDuplicate} className="p-2 hover:bg-blue-500/20 rounded text-blue-300 hover:text-blue-100 flex items-center gap-2 transition-colors" title="Duplicar">
                 <Copy size={16} />
-                <span className="text-xs font-medium hidden sm:inline">Clonar</span>
              </button>
-
              <div className="w-px h-5 bg-white/20 mx-1"></div>
-
-             {/* BORRAR */}
              <button onClick={handleDelete} className="p-2 hover:bg-red-500/20 rounded text-red-300 hover:text-red-100 flex items-center gap-2 transition-colors" title="Borrar (Supr)">
                 <Trash2 size={16} />
-                <span className="text-xs font-medium hidden sm:inline">Borrar</span>
              </button>
           </div>
         )}
@@ -142,7 +156,6 @@ export const Editor3D = () => {
         <Toolbar />
       </div>
 
-      {/* LOGO AGUA DISCRETO */}
       <div className="absolute bottom-6 right-6 text-white/5 font-black text-4xl pointer-events-none select-none">
         A42
       </div>
