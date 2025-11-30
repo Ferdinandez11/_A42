@@ -2,9 +2,9 @@
 import React, { useEffect, useRef } from 'react';
 import { A42Engine } from './engine/A42Engine';
 import { Toolbar } from './ui/Toolbar';
-import { BudgetPanel } from './ui/BudgetPanel'; // Importamos el nuevo panel
+import { BudgetPanel } from './ui/BudgetPanel';
 import { useAppStore } from '../../stores/useAppStore';
-import { Euro, Move, RotateCw, Scaling } from 'lucide-react'; // Iconos para el hint
+import { Euro, Move, RotateCw, Scaling, Trash2, Copy } from 'lucide-react'; // Iconos nuevos
 
 export const Editor3D = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -19,7 +19,10 @@ export const Editor3D = () => {
     clearPendingView,
     totalPrice,
     toggleBudget,
-    selectedItemId 
+    selectedItemId,
+    duplicateItem, // Importamos acción duplicar
+    removeItem,    // Importamos acción borrar
+    selectItem     // Para deseleccionar si borramos
   } = useAppStore();
 
   useEffect(() => {
@@ -47,6 +50,22 @@ export const Editor3D = () => {
     if (engineRef.current) engineRef.current.onMouseDown(e.nativeEvent);
   };
 
+  // Funciones para la barra flotante
+  const handleGizmoMode = (mode: 'translate' | 'rotate' | 'scale') => {
+    engineRef.current?.setGizmoMode(mode);
+  };
+
+  const handleDuplicate = () => {
+    if (selectedItemId) duplicateItem(selectedItemId);
+  };
+
+  const handleDelete = () => {
+    if (selectedItemId) {
+      removeItem(selectedItemId);
+      selectItem(null); // Deseleccionar visualmente
+    }
+  };
+
   return (
     <div className="w-screen h-screen relative bg-neutral-900 overflow-hidden font-sans">
       
@@ -58,8 +77,11 @@ export const Editor3D = () => {
         className={`absolute inset-0 z-0 ${mode === 'placing_item' ? 'cursor-crosshair' : 'cursor-default'}`}
       />
 
-      {/* --- UI SUPERIOR IZQUIERDA: BOTÓN DE PRESUPUESTO --- */}
-      <div className="absolute top-6 left-6 z-20">
+      {/* --- PANEL DE PRESUPUESTO --- */}
+      <BudgetPanel />
+
+      {/* --- BOTÓN DE PRESUPUESTO (ABAJO IZQUIERDA) --- */}
+      <div className="absolute bottom-6 left-6 z-20">
         <button 
           onClick={toggleBudget}
           className="bg-neutral-800/90 backdrop-blur border border-neutral-600 hover:border-green-400 text-white rounded-full pl-2 pr-5 py-2 flex items-center gap-3 shadow-lg transition-all group hover:bg-neutral-800"
@@ -74,42 +96,54 @@ export const Editor3D = () => {
         </button>
       </div>
 
-      {/* PANEL DE PRESUPUESTO (Flotante) */}
-      <BudgetPanel />
-
-      {/* --- UI CENTRAL INFERIOR: TOOLBAR --- */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10">
+      {/* --- UI CENTRAL: TOOLBAR Y MENÚ CONTEXTUAL --- */}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-4">
         
-        {/* HINT FLOTANTE: SOLO SI HAY OBJETO SELECCIONADO */}
+        {/* BARRA FLOTANTE CONTEXTUAL (INTERACTIVA) */}
         {selectedItemId && mode === 'editing' && (
-          <div className="absolute bottom-full mb-4 left-1/2 -translate-x-1/2 glass-panel px-4 py-2 flex items-center gap-4 whitespace-nowrap animate-in fade-in slide-in-from-bottom-2">
-             <div className="flex items-center gap-2 text-neutral-300 text-sm">
-                <span className="bg-white/10 px-1.5 py-0.5 rounded text-white font-mono text-xs">T</span>
-                <Move size={14} /> Mover
-             </div>
-             <div className="w-px h-3 bg-white/20"></div>
-             <div className="flex items-center gap-2 text-neutral-300 text-sm">
-                <span className="bg-white/10 px-1.5 py-0.5 rounded text-white font-mono text-xs">R</span>
-                <RotateCw size={14} /> Rotar
-             </div>
-             <div className="w-px h-3 bg-white/20"></div>
-             <div className="flex items-center gap-2 text-neutral-300 text-sm">
-                <span className="bg-white/10 px-1.5 py-0.5 rounded text-white font-mono text-xs">E</span>
-                <Scaling size={14} /> Escalar
-             </div>
-             <div className="w-px h-3 bg-white/20"></div>
-             <div className="flex items-center gap-2 text-red-300 text-sm">
-                <span className="bg-red-500/20 px-1.5 py-0.5 rounded text-red-200 font-mono text-xs">Supr</span>
-                Borrar
-             </div>
+          <div className="glass-panel px-2 py-1 flex items-center gap-1 animate-in fade-in slide-in-from-bottom-2">
+             
+             {/* MOVER */}
+             <button onClick={() => handleGizmoMode('translate')} className="p-2 hover:bg-white/10 rounded text-neutral-300 hover:text-white flex items-center gap-2 transition-colors" title="Mover (T)">
+                <Move size={16} />
+                <span className="text-xs font-medium hidden sm:inline">Mover</span>
+             </button>
+
+             {/* ROTAR */}
+             <button onClick={() => handleGizmoMode('rotate')} className="p-2 hover:bg-white/10 rounded text-neutral-300 hover:text-white flex items-center gap-2 transition-colors" title="Rotar (R)">
+                <RotateCw size={16} />
+                <span className="text-xs font-medium hidden sm:inline">Rotar</span>
+             </button>
+
+             {/* ESCALAR */}
+             <button onClick={() => handleGizmoMode('scale')} className="p-2 hover:bg-white/10 rounded text-neutral-300 hover:text-white flex items-center gap-2 transition-colors" title="Escalar (E)">
+                <Scaling size={16} />
+                <span className="text-xs font-medium hidden sm:inline">Escalar</span>
+             </button>
+
+             <div className="w-px h-5 bg-white/20 mx-1"></div>
+
+             {/* DUPLICAR */}
+             <button onClick={handleDuplicate} className="p-2 hover:bg-blue-500/20 rounded text-blue-300 hover:text-blue-100 flex items-center gap-2 transition-colors" title="Duplicar">
+                <Copy size={16} />
+                <span className="text-xs font-medium hidden sm:inline">Clonar</span>
+             </button>
+
+             <div className="w-px h-5 bg-white/20 mx-1"></div>
+
+             {/* BORRAR */}
+             <button onClick={handleDelete} className="p-2 hover:bg-red-500/20 rounded text-red-300 hover:text-red-100 flex items-center gap-2 transition-colors" title="Borrar (Supr)">
+                <Trash2 size={16} />
+                <span className="text-xs font-medium hidden sm:inline">Borrar</span>
+             </button>
           </div>
         )}
 
         <Toolbar />
       </div>
 
-      {/* LOGO AGUA (OPCIONAL, ABAJO DERECHA DISCRETO) */}
-      <div className="absolute bottom-6 right-6 text-white/10 font-black text-4xl pointer-events-none select-none">
+      {/* LOGO AGUA DISCRETO */}
+      <div className="absolute bottom-6 right-6 text-white/5 font-black text-4xl pointer-events-none select-none">
         A42
       </div>
 

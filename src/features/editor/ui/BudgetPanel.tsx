@@ -36,7 +36,7 @@ export const BudgetPanel = () => {
             La escena está vacía.
           </div>
         ) : (
-          items.map((item, index) => (
+          items.map((item) => (
             <div 
               key={item.uuid} 
               className="flex justify-between items-center p-3 bg-neutral-800 rounded-lg group hover:bg-neutral-700 transition-colors border border-transparent hover:border-blue-500/30 cursor-pointer"
@@ -44,17 +44,24 @@ export const BudgetPanel = () => {
             >
               <div className="flex flex-col">
                 <span className="text-white font-medium text-sm">
-                  {item.name || item.productId}
+                  {item.name || 'Sin Nombre'}
                 </span>
-                <span className="text-xs text-neutral-500 uppercase">{item.type}</span>
+                {/* CAMBIO AQUÍ: Mostramos el ID (Referencia) en lugar del tipo */}
+                <span className="text-xs text-neutral-500 uppercase font-mono">
+                  {item.productId}
+                </span>
               </div>
-              <button 
-                onClick={(e) => { e.stopPropagation(); removeItem(item.uuid); }}
-                className="text-neutral-500 hover:text-red-400 p-2 rounded-full hover:bg-red-900/20 transition-all opacity-0 group-hover:opacity-100"
-                title="Eliminar elemento"
-              >
-                <Trash2 size={16} />
-              </button>
+              
+              <div className="flex items-center gap-3">
+                 <span className="text-sm font-bold text-neutral-400">{item.price.toLocaleString()}€</span>
+                 <button 
+                    onClick={(e) => { e.stopPropagation(); removeItem(item.uuid); }}
+                    className="text-neutral-500 hover:text-red-400 p-2 rounded-full hover:bg-red-900/20 transition-all opacity-0 group-hover:opacity-100"
+                    title="Eliminar elemento"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+              </div>
             </div>
           ))
         )}

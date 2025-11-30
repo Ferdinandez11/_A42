@@ -87,7 +87,7 @@ export class A42Engine {
     // 3. GIZMO
     try {
         this.transformControl = new TransformControls(this.activeCamera, this.renderer.domElement);
-        this.transformControl.rotationSnap = Math.PI / 12; 
+        this.transformControl.rotationSnap = Math.PI / 12; // 15 grados
         this.scene.add(this.transformControl);
         
         this.transformControl.addEventListener('dragging-changed', (event: { value: boolean }) => {
@@ -131,16 +131,20 @@ export class A42Engine {
     window.addEventListener('keydown', this.onKeyDown);
   }
 
-  // --- NUEVO: CAMBIO DE CÁMARA (Perspectiva / Ortográfica) ---
+  // --- NUEVO: CONTROL DEL GIZMO DESDE REACT ---
+  public setGizmoMode(mode: 'translate' | 'rotate' | 'scale') {
+    if (this.transformControl) {
+      this.transformControl.setMode(mode);
+    }
+  }
+
+  // --- CAMBIO DE CÁMARA ---
   public switchCamera(type: 'perspective' | 'orthographic') {
-    // Guardamos la posición y target actuales para intentar mantener el punto de vista
     const oldPos = this.activeCamera.position.clone();
     const target = this.controls.target.clone();
 
     if (type === 'orthographic') {
       this.activeCamera = this.orthoCamera;
-      // Ajustamos posición para ortográfica (a veces necesita estar más lejos o cerca)
-      // Simplemente copiamos la dirección
       this.activeCamera.position.copy(oldPos);
       this.activeCamera.lookAt(target);
     } else {
@@ -149,48 +153,26 @@ export class A42Engine {
       this.activeCamera.lookAt(target);
     }
 
-    // Actualizamos Controles
     this.controls.object = this.activeCamera;
-    
-    // Actualizamos Gizmo (crucial para que siga funcionando)
     if (this.transformControl) {
       this.transformControl.camera = this.activeCamera;
     }
   }
 
-  // --- NUEVO: SETEAR VISTA (Planta, Alzado, etc) ---
   public setView(view: CameraView) {
-    const distance = 20; // Distancia estándar para las vistas
-    const target = new THREE.Vector3(0, 0, 0); // Asumimos centro de escena
-    
-    // Si queremos mantener el target actual (donde mira el usuario), descomenta esto:
-    // target.copy(this.controls.target);
-
+    const distance = 20; 
+    const target = new THREE.Vector3(0, 0, 0); 
     let newPos = new THREE.Vector3();
 
     switch (view) {
-      case 'top': // Planta
-        newPos.set(0, distance, 0);
-        break;
-      case 'front': // Alzado
-        newPos.set(0, 0, distance);
-        break;
-      case 'side': // Perfil (Derecho)
-        newPos.set(distance, 0, 0);
-        break;
-      case 'iso': // Isométrica
-        newPos.set(distance, distance, distance);
-        break;
+      case 'top': newPos.set(0, distance, 0); break;
+      case 'front': newPos.set(0, 0, distance); break;
+      case 'side': newPos.set(distance, 0, 0); break;
+      case 'iso': newPos.set(distance, distance, distance); break;
     }
-
-    // Animación simple (Teletransporte suave)
-    // Para una animación real usaríamos TWEEN, pero por ahora hacemos un salto directo
-    // pero actualizando los controles correctamente.
     
     this.activeCamera.position.copy(newPos);
     this.activeCamera.lookAt(target);
-    
-    // Actualizamos el target de los controles para que rote sobre el centro
     this.controls.target.copy(target);
     this.controls.update();
   }
@@ -346,7 +328,7 @@ export class A42Engine {
     }
   }
 
-private createSolidFloor() {
+  private createSolidFloor() {
     if (this.floorPoints.length < 3) return;
     const floorDepth = 0.1;
     const shape = new THREE.Shape();
@@ -368,16 +350,18 @@ private createSolidFloor() {
     mesh.uuid = THREE.MathUtils.generateUUID();
     this.scene.add(mesh);
 
+    // NUEVO: Pasamos el objeto completo con precio y nombre
     useAppStore.getState().addItem({
       uuid: mesh.uuid,
       productId: 'custom_floor',
-      name: 'Suelo a medida', // <--- NUEVO
+      name: 'Suelo a medida',
+      price: 100, // Precio del suelo
       position: [mesh.position.x, mesh.position.y, mesh.position.z],
       rotation: [Math.PI / 2, 0, 0], 
       scale: [1, 1, 1],
       type: 'floor',
       points: points2D
-    }, 100);
+    });
 
     this.floorPoints = [];
     this.floorMarkers.forEach(m => this.scene.remove(m));
@@ -387,7 +371,7 @@ private createSolidFloor() {
   }
 
   // --- OBJETOS ---
-public async placeObject(x: number, z: number, product: PlaceableProduct) {
+  public async placeObject(x: number, z: number, product: PlaceableProduct) {
     if (!product.modelUrl) return;
     const url = product.modelUrl; 
     let model: THREE.Group;
@@ -425,20 +409,23 @@ public async placeObject(x: number, z: number, product: PlaceableProduct) {
     model.userData.type = product.type;
     model.uuid = THREE.MathUtils.generateUUID();
 
+    // NUEVO: Pasamos el objeto completo con precio y nombre
     useAppStore.getState().addItem({
       uuid: model.uuid,
       productId: product.id,
-      name: product.name, // <--- NUEVO
+      name: product.name,
+      price: product.price, // Precio del producto
       position: [x, model.position.y, z],
       rotation: [0, 0, 0],
       scale: [initialScale.x, initialScale.y, initialScale.z],
       type: 'model',
       modelUrl: url 
-    }, product.price);
+    });
 
     this.selectObject(model);
     useAppStore.getState().setMode('idle');
   }
+
   private adjustObjectToGround(object: THREE.Object3D) {
     object.updateMatrixWorld();
     const box = new THREE.Box3().setFromObject(object);
@@ -563,7 +550,6 @@ public async placeObject(x: number, z: number, product: PlaceableProduct) {
   private animate = () => {
     this.animationId = requestAnimationFrame(this.animate);
     this.controls.update();
-    // Renderizamos SIEMPRE la cámara activa
     this.renderer.render(this.scene, this.activeCamera);
   }
 
