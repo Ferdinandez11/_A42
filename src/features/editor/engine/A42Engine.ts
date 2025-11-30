@@ -346,7 +346,7 @@ export class A42Engine {
     }
   }
 
-  private createSolidFloor() {
+private createSolidFloor() {
     if (this.floorPoints.length < 3) return;
     const floorDepth = 0.1;
     const shape = new THREE.Shape();
@@ -371,6 +371,7 @@ export class A42Engine {
     useAppStore.getState().addItem({
       uuid: mesh.uuid,
       productId: 'custom_floor',
+      name: 'Suelo a medida', // <--- NUEVO
       position: [mesh.position.x, mesh.position.y, mesh.position.z],
       rotation: [Math.PI / 2, 0, 0], 
       scale: [1, 1, 1],
@@ -386,7 +387,7 @@ export class A42Engine {
   }
 
   // --- OBJETOS ---
-  public async placeObject(x: number, z: number, product: PlaceableProduct) {
+public async placeObject(x: number, z: number, product: PlaceableProduct) {
     if (!product.modelUrl) return;
     const url = product.modelUrl; 
     let model: THREE.Group;
@@ -427,6 +428,7 @@ export class A42Engine {
     useAppStore.getState().addItem({
       uuid: model.uuid,
       productId: product.id,
+      name: product.name, // <--- NUEVO
       position: [x, model.position.y, z],
       rotation: [0, 0, 0],
       scale: [initialScale.x, initialScale.y, initialScale.z],
@@ -437,7 +439,6 @@ export class A42Engine {
     this.selectObject(model);
     useAppStore.getState().setMode('idle');
   }
-
   private adjustObjectToGround(object: THREE.Object3D) {
     object.updateMatrixWorld();
     const box = new THREE.Box3().setFromObject(object);

@@ -1,14 +1,10 @@
 // --- START OF FILE src/features/editor/ui/Toolbar.tsx ---
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   MousePointer2, Grid3X3, Component, Trees, 
   Grid, Undo2, Redo2, Settings,
-  Box,        // Para Isométrica
-  ArrowUp,    // Para Planta
-  ArrowRight, // Para Perfil
-  GalleryVerticalEnd, // Para Alzado
-  Eye,        // Para Perspectiva
-  Square      // Para Ortográfica
+  Eye, Box, ArrowUp, ArrowRight, GalleryVerticalEnd, Square,
+  ChevronUp
 } from 'lucide-react';
 import { useAppStore } from '../../../stores/useAppStore';
 import './Editor.css';
@@ -18,9 +14,11 @@ export const Toolbar = () => {
     mode, setMode, 
     gridVisible, toggleGrid, 
     undo, redo, past, future,
-    cameraType, setCameraType,
-    triggerView 
+    cameraType, setCameraType, triggerView 
   } = useAppStore();
+
+  // Estado local para el menú desplegable de vistas
+  const [showViews, setShowViews] = useState(false);
 
   const tools = [
     { id: 'idle', icon: <MousePointer2 size={20} />, label: 'Seleccionar' },
@@ -30,14 +28,42 @@ export const Toolbar = () => {
   ];
 
   return (
-    <div className="flex flex-col gap-2 items-center">
+    <div className="relative flex flex-col items-center">
+      
+      {/* POPUP DE VISTAS (Flotante encima del botón) */}
+      {showViews && (
+        <div className="absolute bottom-full mb-4 glass-panel flex-row animate-in slide-in-from-bottom-2 fade-in duration-200">
+           {/* Tipo Cámara */}
+           <button 
+             className={`tool-btn ${cameraType === 'perspective' ? 'active' : ''}`} 
+             onClick={() => setCameraType('perspective')} title="3D"
+           >
+             <Eye size={18} />
+           </button>
+           <button 
+             className={`tool-btn ${cameraType === 'orthographic' ? 'active' : ''}`} 
+             onClick={() => setCameraType('orthographic')} title="2D"
+           >
+             <Square size={18} />
+           </button>
+           
+           <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
+           
+           {/* Vistas */}
+           <button className="tool-btn" onClick={() => triggerView('top')} title="Planta"><ArrowUp size={18} /></button>
+           <button className="tool-btn" onClick={() => triggerView('front')} title="Alzado"><GalleryVerticalEnd size={18} /></button>
+           <button className="tool-btn" onClick={() => triggerView('side')} title="Perfil"><ArrowRight size={18} /></button>
+           <button className="tool-btn" onClick={() => triggerView('iso')} title="Iso"><Box size={18} /></button>
+        </div>
+      )}
+
       {/* BARRA PRINCIPAL */}
       <div className="glass-panel">
         {tools.map((tool) => (
           <button
             key={tool.id}
             className={`tool-btn ${mode === tool.id ? 'active' : ''}`}
-            onClick={() => setMode(tool.id as any)}
+            onClick={() => { setMode(tool.id as any); setShowViews(false); }}
           >
             {tool.icon}
             <span className="tool-label">{tool.label}</span>
@@ -46,9 +72,23 @@ export const Toolbar = () => {
         
         <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
 
+        {/* Botón Toggle Vistas */}
+        <button 
+          className={`tool-btn ${showViews ? 'active' : ''}`} 
+          onClick={() => setShowViews(!showViews)}
+        >
+          <Eye size={20} />
+          {/* Pequeño indicador si es ortográfica */}
+          {cameraType === 'orthographic' && (
+             <span className="absolute top-1 right-1 w-2 h-2 bg-green-400 rounded-full"></span>
+          )}
+          <span className="tool-label">Vistas</span>
+          <ChevronUp size={12} className={`absolute top-1 right-1 transition-transform ${showViews ? 'rotate-180' : ''} opacity-50`} />
+        </button>
+
         <button className={`tool-btn ${gridVisible ? 'active' : ''}`} onClick={toggleGrid}>
           <Grid size={20} />
-          <span className="tool-label">{gridVisible ? 'Ocultar' : 'Grid'}</span>
+          <span className="tool-label">Grid</span>
         </button>
 
         <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
@@ -61,47 +101,6 @@ export const Toolbar = () => {
         <button className="tool-btn" onClick={redo} disabled={future.length === 0} style={{ opacity: future.length === 0 ? 0.3 : 1 }}>
           <Redo2 size={20} />
           <span className="tool-label">Redo</span>
-        </button>
-      </div>
-
-      {/* BARRA DE VISTAS (Debajo de la principal) */}
-      <div className="glass-panel">
-        {/* Switch Tipo de Cámara */}
-        <button 
-          className={`tool-btn ${cameraType === 'perspective' ? 'active' : ''}`} 
-          onClick={() => setCameraType('perspective')}
-          title="Vista Perspectiva"
-        >
-          <Eye size={20} />
-          <span className="tool-label">3D</span>
-        </button>
-        <button 
-          className={`tool-btn ${cameraType === 'orthographic' ? 'active' : ''}`} 
-          onClick={() => setCameraType('orthographic')}
-          title="Vista Ortográfica"
-        >
-          <Square size={20} />
-          <span className="tool-label">2D</span>
-        </button>
-
-        <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
-
-        {/* Botones de Posición */}
-        <button className="tool-btn" onClick={() => triggerView('top')} title="Planta">
-          <ArrowUp size={20} />
-          <span className="tool-label">Planta</span>
-        </button>
-        <button className="tool-btn" onClick={() => triggerView('front')} title="Alzado">
-          <GalleryVerticalEnd size={20} />
-          <span className="tool-label">Alzado</span>
-        </button>
-        <button className="tool-btn" onClick={() => triggerView('side')} title="Perfil">
-          <ArrowRight size={20} />
-          <span className="tool-label">Perfil</span>
-        </button>
-        <button className="tool-btn" onClick={() => triggerView('iso')} title="Isométrica">
-          <Box size={20} />
-          <span className="tool-label">Iso</span>
         </button>
       </div>
     </div>

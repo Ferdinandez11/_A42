@@ -15,6 +15,7 @@ export interface ProductDefinition {
 export interface SceneItem {
   uuid: string;
   productId: string;
+  name?: string; // NUEVO: Para mostrarlo en el presupuesto
   position: [number, number, number];
   rotation: [number, number, number];
   scale: [number, number, number];
@@ -24,7 +25,6 @@ export interface SceneItem {
   data?: any; 
 }
 
-// Definimos los tipos de vista posibles
 export type CameraView = 'top' | 'front' | 'side' | 'iso';
 
 interface AppState {
@@ -36,10 +36,10 @@ interface AppState {
   items: SceneItem[];
   totalPrice: number;
   gridVisible: boolean;
+  budgetVisible: boolean; // NUEVO: Estado del panel de presupuesto
   
-  // NUEVO: Control de Cámara
   cameraType: 'perspective' | 'orthographic';
-  pendingView: CameraView | null; // Usamos esto para disparar la animación de cambio de vista
+  pendingView: CameraView | null;
 
   past: SceneItem[][];
   future: SceneItem[][];
@@ -48,11 +48,11 @@ interface AppState {
   setSelectedProduct: (product: ProductDefinition | null) => void; 
   selectItem: (uuid: string | null) => void;
   toggleGrid: () => void;
+  toggleBudget: () => void; // NUEVO
   
-  // NUEVAS ACCIONES DE CÁMARA
   setCameraType: (type: 'perspective' | 'orthographic') => void;
   triggerView: (view: CameraView) => void;
-  clearPendingView: () => void; // Para limpiar la acción una vez ejecutada
+  clearPendingView: () => void;
 
   addItem: (item: SceneItem, price: number) => void;
   updateItemTransform: (uuid: string, pos: number[], rot: number[], scale: number[]) => void;
@@ -73,6 +73,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   items: [],
   totalPrice: 0,
   gridVisible: false,
+  budgetVisible: false, // Por defecto cerrado
   
   cameraType: 'perspective',
   pendingView: null,
@@ -100,8 +101,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   toggleGrid: () => set((state) => ({ gridVisible: !state.gridVisible })),
+  toggleBudget: () => set((state) => ({ budgetVisible: !state.budgetVisible })),
 
-  // --- CÁMARA ---
   setCameraType: (type) => set({ cameraType: type }),
   triggerView: (view) => set({ pendingView: view }),
   clearPendingView: () => set({ pendingView: null }),
