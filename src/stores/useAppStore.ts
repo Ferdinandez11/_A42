@@ -27,9 +27,7 @@ export interface SceneItem {
   modelUrl?: string; 
   points?: { x: number, z: number }[]; 
   
-  // Propiedades de Suelo
   floorMaterial?: FloorMaterialType;
-  // Nuevas propiedades para Texturas
   textureUrl?: string;
   textureScale?: number;
   textureRotation?: number;
@@ -51,12 +49,10 @@ interface AppState {
   gridVisible: boolean;
   budgetVisible: boolean;
   
-  // Entorno
   envPanelVisible: boolean;
   sunPosition: { azimuth: number; elevation: number };
   backgroundColor: string;
 
-  // Medición
   measurementResult: number | null;
 
   cameraType: 'perspective' | 'orthographic';
@@ -65,6 +61,11 @@ interface AppState {
   past: SceneItem[][];
   future: SceneItem[][];
 
+  // --- CAD STATE ---
+  selectedVertexIndices: number[];
+  measuredDistance: number | null;
+  measuredAngle: number | null; // <--- NUEVO PARA ÁNGULOS
+
   // Acciones
   setMode: (mode: AppState['mode']) => void;
   setSelectedProduct: (product: ProductDefinition | null) => void; 
@@ -72,27 +73,22 @@ interface AppState {
   toggleGrid: () => void;
   toggleBudget: () => void;
   
-  // Acciones Entorno
   toggleEnvPanel: () => void;
   setSunPosition: (azimuth: number, elevation: number) => void;
   setBackgroundColor: (color: string) => void;
 
-  // Acciones Medición
   setMeasurementResult: (dist: number | null) => void;
 
-  // Acciones Items
   addItem: (item: SceneItem) => void; 
   updateItemTransform: (uuid: string, pos: number[], rot: number[], scale: number[]) => void;
   
-  // Acciones Suelo
   updateFloorMaterial: (uuid: string, material: FloorMaterialType) => void;
-  updateFloorTexture: (uuid: string, url: string | undefined, scale: number, rotation: number) => void; // Nuevo
+  updateFloorTexture: (uuid: string, url: string | undefined, scale: number, rotation: number) => void;
   updateFloorPoints: (uuid: string, points: { x: number, z: number }[]) => void;
   
   removeItem: (uuid: string) => void;
   duplicateItem: (uuid: string) => void; 
   
-  // Vistas y deshacer
   setCameraType: (type: 'perspective' | 'orthographic') => void;
   triggerView: (view: CameraView) => void;
   clearPendingView: () => void;
@@ -100,6 +96,10 @@ interface AppState {
   undo: () => void;
   redo: () => void;
   resetScene: () => void;
+
+  // --- CAD ACTIONS ---
+  // Actualizado para aceptar ángulo
+  setSelectedVertices: (indices: number[], distance: number | null, angle: number | null) => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({ 
@@ -112,7 +112,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   gridVisible: false,
   budgetVisible: false, 
   
-  // Valores iniciales
   envPanelVisible: false,
   sunPosition: { azimuth: 180, elevation: 45 },
   backgroundColor: '#111111',
@@ -123,11 +122,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   past: [],
   future: [],
 
+  // CAD Inicial
+  selectedVertexIndices: [],
+  measuredDistance: null,
+  measuredAngle: null,
+
   setMode: (mode) => {
     if (mode !== 'editing') set({ selectedItemId: null });
-    // Si cambiamos de modo, reseteamos la medición
     if (mode !== 'measuring') set({ measurementResult: null });
-    set({ mode });
+    // Limpiamos selección CAD y Ángulo al cambiar modo
+    set({ mode, selectedVertexIndices: [], measuredDistance: null, measuredAngle: null });
   },
 
   setSelectedProduct: (product) => set({ 
@@ -140,19 +144,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ 
       selectedItemId: uuid, 
       selectedProduct: null, 
-      mode: uuid ? 'editing' : 'idle' 
+      mode: uuid ? 'editing' : 'idle',
+      // Reset CAD al cambiar selección
+      selectedVertexIndices: [],
+      measuredDistance: null,
+      measuredAngle: null
     });
   },
 
   toggleGrid: () => set((state) => ({ gridVisible: !state.gridVisible })),
   toggleBudget: () => set((state) => ({ budgetVisible: !state.budgetVisible })),
 
-  // Entorno
   toggleEnvPanel: () => set((state) => ({ envPanelVisible: !state.envPanelVisible })),
   setSunPosition: (azimuth, elevation) => set({ sunPosition: { azimuth, elevation } }),
   setBackgroundColor: (color) => set({ backgroundColor: color }),
 
-  // Medición
   setMeasurementResult: (dist) => set({ measurementResult: dist }),
 
   setCameraType: (type) => set({ cameraType: type }),
@@ -178,7 +184,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const itemToRemove = state.items.find(i => i.uuid === uuid);
       const priceToSubtract = itemToRemove ? itemToRemove.price : 0;
-      
       return { 
         items: state.items.filter(i => i.uuid !== uuid),
         selectedItemId: null,
@@ -217,14 +222,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     items: state.items.map(i => i.uuid === uuid ? { ...i, floorMaterial: material, textureUrl: undefined } : i)
   })),
 
-  // NUEVA ACCIÓN TEXTURAS
   updateFloorTexture: (uuid, url, scale, rotation) => set((state) => ({
     items: state.items.map(i => i.uuid === uuid ? { 
       ...i, 
       textureUrl: url, 
       textureScale: scale, 
       textureRotation: rotation,
-      floorMaterial: undefined // Limpiamos material sólido si hay textura
+      floorMaterial: undefined 
     } : i)
   })),
 
@@ -264,6 +268,22 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
   }),
 
-  resetScene: () => set({ items: [], totalPrice: 0, selectedProduct: null, mode: 'idle', selectedItemId: null, past: [], future: [], pendingView: null })
+  resetScene: () => set({ 
+    items: [], 
+    totalPrice: 0, 
+    selectedProduct: null, 
+    mode: 'idle', 
+    selectedItemId: null, 
+    past: [], 
+    future: [], 
+    pendingView: null 
+  }),
+
+  // CAD Action Implementation
+  setSelectedVertices: (indices, distance, angle) => set({ 
+    selectedVertexIndices: indices, 
+    measuredDistance: distance,
+    measuredAngle: angle
+  }),
 }));
 // --- END OF FILE src/stores/useAppStore.ts ---

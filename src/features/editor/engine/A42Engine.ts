@@ -20,37 +20,36 @@ export class A42Engine {
     // 1. Setup Scene & Rendering
     this.sceneManager = new SceneManager(container);
     
-    // 2. Setup Object Management (requires scene)
+    // 2. Setup Object Management
     this.objectManager = new ObjectManager(this.sceneManager.scene);
     
-    // 3. Setup Tools (requires scene)
+    // 3. Setup Tools
     this.toolsManager = new ToolsManager(this.sceneManager.scene);
     
-    // 4. Setup Interaction (requires Engine instance to access all others)
+    // 4. Setup Interaction
     this.interactionManager = new InteractionManager(this);
 
     // Event Listeners Globales
     window.addEventListener('resize', this.onWindowResize);
     window.addEventListener('keydown', this.onKeyDown);
     
-    // NOTA: Ya no añadimos el listener de 'mousedown' aquí manualmente.
-    // React (Editor3D.tsx) nos llamará a la función pública onMouseDown de abajo.
+    // EXPOSICIÓN GLOBAL DEL ENGINE PARA REACT
+    // Esto permite llamar a funciones del engine desde los botones de React
+    // @ts-ignore
+    window.editorEngine = this;
   }
 
-  // --- GETTERS (Proxies for convenience) ---
+  // --- GETTERS ---
   public get scene() { return this.sceneManager.scene; }
   public get activeCamera() { return this.sceneManager.activeCamera; }
   public get renderer() { return this.sceneManager.renderer; }
 
-  // --- BRIDGE METHODS (Conexión con React) ---
-  
-  // React llama a esto cuando haces clic en el Canvas
+  // --- BRIDGE METHODS ---
   public onMouseDown = (event: MouseEvent) => {
       this.interactionManager.onMouseDown(event);
   }
 
   // --- DELEGATED METHODS ---
-
   public setBackgroundColor(color: string) { this.sceneManager.setBackgroundColor(color); }
   public setSkyVisible(visible: boolean) { this.sceneManager.setSkyVisible(visible); }
   public setGridVisible(v: boolean) { this.sceneManager.setGridVisible(v); }
@@ -70,7 +69,6 @@ export class A42Engine {
   public setGizmoMode(mode: 'translate' | 'rotate' | 'scale') { this.interactionManager.setGizmoMode(mode); }
 
   // --- SYNC LOGIC ---
-
   public async syncSceneFromStore(storeItems: SceneItem[]) {
     const sceneItemsMap = new Map<string, THREE.Object3D>();
     this.scene.children.forEach(child => {
@@ -116,7 +114,6 @@ export class A42Engine {
   }
 
   // --- EVENTS ---
-
   private onKeyDown = (e: KeyboardEvent) => {
       if (useAppStore.getState().mode !== 'editing') return;
       if (e.key === 'z' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); useAppStore.getState().undo(); return; }
@@ -146,7 +143,6 @@ export class A42Engine {
   }
 
   // --- LIFECYCLE ---
-
   public init() { this.animate(); }
   
   private animate = () => { 

@@ -17,7 +17,6 @@ export class InteractionManager {
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
     
-    // Interaction Plane
     this.interactionPlane = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshBasicMaterial({ visible: false })); 
     this.interactionPlane.rotation.x = -Math.PI / 2; 
     this.engine.scene.add(this.interactionPlane);
@@ -31,9 +30,12 @@ export class InteractionManager {
         this.transformControl.rotationSnap = Math.PI / 12;
         this.engine.scene.add(this.transformControl);
         
+        // ESTO ES LO QUE DEBE GESTIONAR EL BLOQUEO DE CÁMARA AUTOMÁTICAMENTE
         this.transformControl.addEventListener('dragging-changed', (event: { value: boolean }) => {
           this.isDraggingGizmo = event.value;
+          // Solo bloqueamos la cámara si REALMENTE estamos arrastrando
           this.engine.sceneManager.controls.enabled = !event.value;
+          
           if (event.value) {
             useAppStore.getState().saveSnapshot();
           } else {
@@ -109,7 +111,7 @@ export class InteractionManager {
       const intersects = this.raycaster.intersectObject(this.interactionPlane);
       if (intersects.length > 0) {
           this.engine.objectManager.placeObject(intersects[0].point.x, intersects[0].point.z, store.selectedProduct, (uuid) => {
-             // Opcional: Auto seleccionar al poner
+             // Optional callback
           });
           useAppStore.getState().setMode('idle');
       }
@@ -120,19 +122,34 @@ export class InteractionManager {
     if (mode === 'idle' || mode === 'editing') {
       if (event.button !== 0) return;
 
+      // 1. Check Floor Markers (Vertices)
       if (this.engine.toolsManager.floorEditMarkers.length > 0) {
           const markerIntersects = this.raycaster.intersectObjects(this.engine.toolsManager.floorEditMarkers);
           if (markerIntersects.length > 0) {
+              const hitMarker = markerIntersects[0].object;
+              const pointIndex = hitMarker.userData.pointIndex;
+
+              // [CAD LOGIC] Shift/Ctrl Click for Multi-Selection
+              if (event.shiftKey || event.ctrlKey) {
+                  this.engine.toolsManager.selectVertex(pointIndex, true);
+                  if (this.transformControl) this.transformControl.detach(); // Hide Gizmo
+                  return; 
+              }
+
+              // Normal Click (Single Select + Drag)
               if (this.transformControl) {
-                  this.transformControl.attach(markerIntersects[0].object);
+                  this.engine.toolsManager.selectVertex(pointIndex, false); 
+                  this.transformControl.attach(hitMarker);
                   this.transformControl.setMode('translate');
                   this.transformControl.visible = true;
-                  this.engine.sceneManager.controls.enabled = false;
+                  // CORRECCIÓN: NO DESACTIVAMOS CONTROLES AQUÍ.
+                  // Dejamos que 'dragging-changed' lo haga si el usuario arrastra.
               }
               return;
           }
       }
 
+      // 2. Check Scene Items
       const interactables = this.engine.scene.children.filter(obj => obj.userData?.isItem && obj !== this.transformControl);
       const intersects = this.raycaster.intersectObjects(interactables, true);
 
@@ -151,6 +168,7 @@ export class InteractionManager {
             }
         }
       } else {
+        // Deselect if clicking empty space
         if (this.transformControl?.object && !this.engine.toolsManager.floorEditMarkers.includes(this.transformControl.object as THREE.Mesh)) {
             this.selectObject(null);
             this.engine.toolsManager.activeFloorId = null;
@@ -163,16 +181,15 @@ export class InteractionManager {
   public selectObject(object: THREE.Object3D | null) {
     if (!this.transformControl) { useAppStore.getState().selectItem(null); return; }
     
-    // Si ya está seleccionado, solo actualiza UI
     if (object && this.transformControl.object?.uuid === object.uuid) {
         if (useAppStore.getState().selectedItemId !== object.uuid) useAppStore.getState().selectItem(object.uuid);
         return;
     }
     
-    // Deseleccionar actual
     if (this.transformControl.object) { 
         this.transformControl.detach(); 
         this.transformControl.visible = false; 
+        // Aseguramos que los controles vuelvan al deseleccionar (por si acaso)
         this.engine.sceneManager.controls.enabled = true; 
     }
     
@@ -181,10 +198,9 @@ export class InteractionManager {
         return; 
     }
     
-    // Seleccionar nuevo
     this.transformControl.attach(object);
     this.transformControl.visible = true;
-    this.engine.sceneManager.controls.enabled = false;
+    // CORRECCIÓN: NO DESACTIVAMOS CONTROLES AQUÍ.
     useAppStore.getState().selectItem(object.uuid);
   }
 
@@ -201,3 +217,4 @@ export class InteractionManager {
       if (this.transformControl) this.transformControl.setMode(mode); 
   }
 }
+// --- END OF FILE src/features/editor/engine/managers/InteractionManager.ts ---
