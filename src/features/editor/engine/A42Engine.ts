@@ -18,6 +18,7 @@ export class A42Engine {
   public walkManager: WalkManager;
 
   private clock: THREE.Clock;
+  private savedBackground: THREE.Color | THREE.Texture | null = null; // Para guardar el color al entrar en AR
 
   constructor(container: HTMLElement) {
     this.clock = new THREE.Clock();
@@ -63,7 +64,7 @@ export class A42Engine {
 
   public setGizmoMode(mode: 'translate' | 'rotate' | 'scale') { this.interactionManager.setGizmoMode(mode); }
 
-  // --- AR SETUP (LA JAULA) ---
+  // --- AR SETUP ---
   private initAR() {
     const arBtn = ARButton.createButton(this.renderer, { 
        requiredFeatures: ['hit-test'], 
@@ -71,23 +72,36 @@ export class A42Engine {
        domOverlay: { root: document.body } 
     });
 
-    // 1. Creamos nuestra "jaula" (Contenedor)
+    // --- EVENTOS DE SESIÓN AR (SOLUCIÓN PANTALLA NEGRA) ---
+    this.renderer.xr.addEventListener('sessionstart', () => {
+        // 1. Guardamos el fondo actual (ej: gris oscuro)
+        this.savedBackground = this.scene.background;
+        // 2. Ponemos el fondo transparente para ver la cámara
+        this.scene.background = null; 
+        // 3. Ocultamos el grid si molesta en AR (opcional)
+        this.setGridVisible(false);
+    });
+
+    this.renderer.xr.addEventListener('sessionend', () => {
+        // 1. Restauramos el fondo original
+        if (this.savedBackground) this.scene.background = this.savedBackground;
+        // 2. Restauramos el grid
+        this.setGridVisible(useAppStore.getState().gridVisible);
+    });
+
+    // --- LA JAULA DEL BOTÓN ---
     const arContainer = document.createElement('div');
     arContainer.style.position = 'absolute';
     arContainer.style.bottom = '20px';
     arContainer.style.right = '20px';
-    arContainer.style.zIndex = '1000'; // Por encima de todo
+    arContainer.style.zIndex = '1000';
     arContainer.style.display = 'flex';
     arContainer.style.justifyContent = 'flex-end';
 
-    // 2. Reseteamos el botón para que sea dócil y entre en la jaula
-    // 'static' hace que ignore el 'left: 50%' que le pone Three.js
     arBtn.style.position = 'static'; 
     arBtn.style.transform = 'none'; 
     arBtn.style.left = 'auto';
     arBtn.style.bottom = 'auto';
-    
-    // Estilos visuales del botón
     arBtn.style.width = '160px';
     arBtn.style.background = 'rgba(0,0,0,0.85)';
     arBtn.style.border = '1px solid rgba(255,255,255,0.3)';
@@ -99,7 +113,6 @@ export class A42Engine {
     arBtn.style.padding = '10px 0';
     arBtn.style.cursor = 'pointer';
 
-    // 3. Metemos el botón en la jaula y la jaula en el body
     arContainer.appendChild(arBtn);
     document.body.appendChild(arContainer);
   }
