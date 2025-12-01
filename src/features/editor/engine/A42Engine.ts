@@ -20,7 +20,9 @@ export class A42Engine {
   private clock: THREE.Clock;
   private savedBackground: THREE.Color | THREE.Texture | null = null;
   private wasSkyVisible: boolean = true;
-  // HE BORRADO LA VARIABLE parentOriginalBg QUE DABA ERROR
+  
+  // Lista para guardar elementos a los que forzamos transparencia
+  private transparentElements: HTMLElement[] = [];
 
   constructor(container: HTMLElement) {
     this.clock = new THREE.Clock();
@@ -74,7 +76,7 @@ export class A42Engine {
        domOverlay: { root: document.body } 
     });
 
-    // --- SOLUCIÓN DEFINITIVA PANTALLA NEGRA ---
+    // --- SOLUCIÓN "TALADRO" PANTALLA NEGRA ---
     this.renderer.xr.addEventListener('sessionstart', () => {
         // 1. Guardar estado de Three.js
         this.savedBackground = this.scene.background;
@@ -84,17 +86,25 @@ export class A42Engine {
         this.scene.background = null; 
         this.setSkyVisible(false);
         this.setGridVisible(false);
-        this.renderer.setClearColor(0x000000, 0); // Forzar canal alpha a 0
+        this.renderer.setClearColor(0x000000, 0); 
 
-        // 3. AGUJEREAR EL HTML (Importante para React)
-        const parent = this.renderer.domElement.parentElement;
-        if (parent) {
-            // No necesitamos guardar el color, solo forzar transparencia
-            parent.style.setProperty('background-color', 'transparent', 'important');
+        // 3. FUERZA BRUTA: Recorrer hacia arriba todo el HTML y hacerlo transparente
+        this.transparentElements = [];
+        let el: HTMLElement | null = this.renderer.domElement;
+        
+        // Subimos hasta llegar al 'body'
+        while (el && el !== document.documentElement) {
+             // Guardamos referencia para restaurar luego
+             this.transparentElements.push(el);
+             // Forzamos transparencia máxima
+             el.style.setProperty('background', 'transparent', 'important');
+             el.style.setProperty('background-color', 'transparent', 'important');
+             el = el.parentElement;
         }
         
-        document.body.style.backgroundColor = 'transparent';
-        document.documentElement.style.backgroundColor = 'transparent';
+        // También aseguramos body y html
+        document.body.style.setProperty('background', 'transparent', 'important');
+        document.documentElement.style.setProperty('background', 'transparent', 'important');
     });
 
     this.renderer.xr.addEventListener('sessionend', () => {
@@ -104,13 +114,14 @@ export class A42Engine {
         this.setGridVisible(useAppStore.getState().gridVisible);
         
         // Restaurar HTML (React)
-        const parent = this.renderer.domElement.parentElement;
-        if (parent) {
-            // Al quitar la propiedad, vuelve a mandar el CSS de Tailwind (bg-neutral-900)
-            parent.style.removeProperty('background-color');
-        }
-        document.body.style.backgroundColor = '';
-        document.documentElement.style.backgroundColor = '';
+        // Eliminamos las propiedades inline para que vuelvan a mandar las clases CSS (bg-neutral-900 etc)
+        this.transparentElements.forEach(el => {
+            el.style.removeProperty('background');
+            el.style.removeProperty('background-color');
+        });
+        
+        document.body.style.removeProperty('background');
+        document.documentElement.style.removeProperty('background');
     });
 
     // --- LA JAULA DEL BOTÓN ---
