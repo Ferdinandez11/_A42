@@ -30,7 +30,7 @@ export class InteractionManager {
         this.transformControl.rotationSnap = Math.PI / 12;
         this.engine.scene.add(this.transformControl);
         
-        this.transformControl.addEventListener('dragging-changed', (event: { value: boolean }) => {
+        this.transformControl.addEventListener('dragging-changed', (event:any) => {
           this.isDraggingGizmo = event.value;
           this.engine.sceneManager.controls.enabled = !event.value;
           
@@ -120,7 +120,7 @@ export class InteractionManager {
       if (event.button !== 0) return;
       const intersects = this.raycaster.intersectObject(this.interactionPlane);
       if (intersects.length > 0) {
-          this.engine.objectManager.placeObject(intersects[0].point.x, intersects[0].point.z, store.selectedProduct, (uuid) => {
+          this.engine.objectManager.placeObject(intersects[0].point.x, intersects[0].point.z, store.selectedProduct, (_uuid) => {
              // Optional callback
           });
           useAppStore.getState().setMode('idle');

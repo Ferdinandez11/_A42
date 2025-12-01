@@ -1,7 +1,7 @@
 // --- START OF FILE src/stores/useAppStore.ts ---
 import { create } from 'zustand';
 import * as THREE from 'three'; 
-import { FENCE_PRESETS, type FencePreset } from '../features/editor/data/fence_presets';
+import { FENCE_PRESETS } from '../features/editor/data/fence_presets';
 
 export interface ProductDefinition { 
   id: string;

@@ -1,5 +1,5 @@
 // --- START OF FILE src/features/editor/ui/BudgetPanel.tsx ---
-import React from 'react';
+//import React from 'react';
 import { useAppStore } from '../../../stores/useAppStore';
 import { Trash2, X } from 'lucide-react';
 

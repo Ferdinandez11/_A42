@@ -1,7 +1,7 @@
 // --- START OF FILE src/features/editor/ui/Toolbar.tsx ---
 import React, { useState, useRef } from 'react';
 import { 
-  MousePointer2, Grid3X3, Component, Trees, Grid, Undo2, Redo2, Eye, Box, ArrowUp, ArrowRight, GalleryVerticalEnd, Square, ChevronUp, Sun, Upload, Ruler 
+  MousePointer2, Grid3X3, Component, Trees, Grid, Undo2, Redo2, Eye, Box, ArrowUp, ArrowRight, GalleryVerticalEnd, Square, Sun, Upload, Ruler 
 } from 'lucide-react';
 import { useAppStore } from '../../../stores/useAppStore';
 import './Editor.css';

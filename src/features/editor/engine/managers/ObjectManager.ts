@@ -230,7 +230,7 @@ export class ObjectManager {
       const commonMat = new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0.1 }); 
       commonMat.color.setHex(0xffffff);
 
-      for (const [key, data] of Object.entries(partsData) as any) {
+      for (const [_key, data] of Object.entries(partsData) as any) {
           const count = data.matrices.length;
           const instancedMesh = new THREE.InstancedMesh(data.geometry, commonMat, count);
           instancedMesh.castShadow = true;

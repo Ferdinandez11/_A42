@@ -1,7 +1,7 @@
 // --- START OF FILE src/features/editor/ui/FenceProperties.tsx ---
-import React from 'react';
+//import React from 'react';
 import { useAppStore } from '../../../stores/useAppStore';
-import { FENCE_PRESETS, type FencePreset } from '../data/fence_presets';
+import { FENCE_PRESETS } from '../data/fence_presets';
 import { Fence, Palette } from 'lucide-react';
 import { CadControl } from './CadControl';
 

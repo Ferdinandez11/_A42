@@ -1,5 +1,5 @@
 // --- START OF FILE src/features/editor/ui/Catalog.tsx ---
-import React, { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Search, X } from 'lucide-react'; // Importamos iconos
 import { useAppStore } from '../../../stores/useAppStore';
 import { 
@@ -73,11 +73,11 @@ export const Catalog = () => {
     setCurrentLine(null);
     setSearchTerm(''); // Limpiar búsqueda al navegar con breadcrumbs
   };
-
-  const handleBackToCategories = () => {
-    setCurrentCategory(null);
-    setSearchTerm('');
-  };
+  // *** se supone que no lo uso ya
+  //const handleBackToCategories = () => {
+    //setCurrentCategory(null);
+    //setSearchTerm('');
+  //};
 
   if (loading) {
     return (

@@ -1,5 +1,5 @@
 // --- START OF FILE src/features/editor/ui/CadControl.tsx ---
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppStore } from '../../../stores/useAppStore';
 import { ArrowLeftRight, Ruler, ScanLine } from 'lucide-react';
 

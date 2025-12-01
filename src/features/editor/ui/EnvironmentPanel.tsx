@@ -1,5 +1,5 @@
 // --- START OF FILE src/features/editor/ui/EnvironmentPanel.tsx ---
-import React from 'react';
+//import React from 'react';
 import { useAppStore } from '../../../stores/useAppStore';
 import { X, Sun, MountainSnow } from 'lucide-react';
 
