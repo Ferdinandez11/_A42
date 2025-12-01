@@ -351,6 +351,7 @@ export class ObjectManager {
           model.userData.productId = product.id;
           model.userData.type = product.type;
           model.uuid = THREE.MathUtils.generateUUID();
+          const p = product as any;
   
           useAppStore.getState().addItem({
             uuid: model.uuid,
@@ -361,7 +362,15 @@ export class ObjectManager {
             rotation: [0, 0, 0],
             scale: [initialScale.x, initialScale.y, initialScale.z],
             type: 'model',
-            modelUrl: product.modelUrl
+            modelUrl: product.modelUrl,
+
+            // --- AÑADIR ESTO PARA QUE EL PDF TENGA DATOS ---
+            url_tech: p.url_tech || p.URL_TECH,
+            url_cert: p.url_cert || p.URL_CERT,
+            url_inst: p.url_inst || p.URL_INST,
+            
+            // Y guardamos todo el objeto crudo por seguridad
+            data: p 
           });
 
           if(afterPlace) afterPlace(model.uuid);
