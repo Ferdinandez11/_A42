@@ -1,8 +1,8 @@
-// --- START OF FILE src/stores/useAppStore.ts ---
 import { create } from 'zustand';
 import * as THREE from 'three'; 
 import { FENCE_PRESETS } from '../features/editor/data/fence_presets';
 
+// ... (MANTÉN TUS INTERFACES ANTERIORES: ProductDefinition, SceneItem, etc. IGUALES) ...
 export interface ProductDefinition { 
   id: string;
   name: string;
@@ -12,8 +12,6 @@ export interface ProductDefinition {
   img_2d?: string; 
   line?: string; 
   category?: string;
-  
-  // Nuevos campos del CSV
   url_tech?: string;
   url_cert?: string;
   url_inst?: string;
@@ -37,68 +35,54 @@ export interface SceneItem {
   type: 'model' | 'floor' | 'fence';
   modelUrl?: string; 
   points?: { x: number, z: number }[]; 
-  
   floorMaterial?: FloorMaterialType;
   textureUrl?: string;
   textureScale?: number;
   textureRotation?: number;
-
   fenceConfig?: FenceConfig;
-
-  // Nuevos campos para el PDF
   url_tech?: string;
   url_cert?: string;
   url_inst?: string;
-
   data?: any; 
 }
-
-// ... (El resto del archivo, AppState y useAppStore, se mantiene IGUAL que antes)
-// Solo asegúrate de que cuando hagas 'addItem' en el futuro, pases estos datos si los tienes.
 
 export type CameraView = 'top' | 'front' | 'side' | 'iso';
 
 interface AppState {
+  // --- AUTH & PROJECT STATE (NUEVO) ---
   user: any | null;
+  currentProjectId: string | null;
+  currentProjectName: string | null;
+
+  setUser: (user: any) => void;
+  setProjectInfo: (id: string | null, name: string | null) => void;
+
+  // --- RESTO DE TU ESTADO EXISTENTE ---
   mode: 'idle' | 'drawing_floor' | 'drawing_fence' | 'placing_item' | 'editing' | 'catalog' | 'measuring';
-  
   selectedProduct: ProductDefinition | null; 
   selectedItemId: string | null;
-  
   items: SceneItem[];
   totalPrice: number;
   gridVisible: boolean;
   budgetVisible: boolean;
-  
   envPanelVisible: boolean;
   sunPosition: { azimuth: number; elevation: number };
   backgroundColor: string;
-
   measurementResult: number | null;
-
   cameraType: 'perspective' | 'orthographic';
   pendingView: CameraView | null;
-
   past: SceneItem[][];
   future: SceneItem[][];
-
-  // --- CAD STATE ---
   selectedVertexIndices: number[];
   measuredDistance: number | null;
   measuredAngle: number | null;
-
-  // --- FENCE STATE ---
   fenceConfig: FenceConfig;
-
-  // --- INPUT MODAL STATE ---
   inputModal: {
     isOpen: boolean;
     title: string;
     defaultValue: string;
     resolve: ((value: string | null) => void) | null;
   };
-
-  // --- ZONAS SEGURIDAD ---
   safetyZonesVisible: boolean;
 
   // Acciones
@@ -107,26 +91,19 @@ interface AppState {
   selectItem: (uuid: string | null) => void;
   toggleGrid: () => void;
   toggleBudget: () => void;
-  
   toggleEnvPanel: () => void;
   setSunPosition: (azimuth: number, elevation: number) => void;
   setBackgroundColor: (color: string) => void;
-
   setMeasurementResult: (dist: number | null) => void;
-
   addItem: (item: SceneItem) => void; 
   updateItemTransform: (uuid: string, pos: number[], rot: number[], scale: number[]) => void;
-  
   updateFloorMaterial: (uuid: string, material: FloorMaterialType) => void;
   updateFloorTexture: (uuid: string, url: string | undefined, scale: number, rotation: number) => void;
   updateFloorPoints: (uuid: string, points: { x: number, z: number }[]) => void;
-
   setFenceConfig: (config: Partial<FenceConfig>) => void; 
   updateItemFenceConfig: (uuid: string, config: Partial<FenceConfig>) => void; 
-  
   removeItem: (uuid: string) => void;
   duplicateItem: (uuid: string) => void; 
-  
   setCameraType: (type: 'perspective' | 'orthographic') => void;
   triggerView: (view: CameraView) => void;
   clearPendingView: () => void;
@@ -134,17 +111,22 @@ interface AppState {
   undo: () => void;
   redo: () => void;
   resetScene: () => void;
-
   setSelectedVertices: (indices: number[], distance: number | null, angle: number | null) => void;
-
   requestInput: (title: string, defaultValue?: string) => Promise<string | null>;
   closeInputModal: (value: string | null) => void;
-
   toggleSafetyZones: () => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({ 
+  // --- INITIAL STATE ---
   user: null,
+  currentProjectId: null,
+  currentProjectName: null,
+  
+  setUser: (user) => set({ user }),
+  setProjectInfo: (id, name) => set({ currentProjectId: id, currentProjectName: name }),
+
+  // ... (RESTO DE TU ESTADO INICIAL IGUAL QUE ANTES) ...
   mode: 'idle',
   selectedProduct: null,
   selectedItemId: null,
@@ -152,28 +134,22 @@ export const useAppStore = create<AppState>((set, get) => ({
   totalPrice: 0,
   gridVisible: false,
   budgetVisible: false, 
-  
   envPanelVisible: false,
   sunPosition: { azimuth: 180, elevation: 45 },
   backgroundColor: '#111111',
   measurementResult: null,
   cameraType: 'perspective',
   pendingView: null,
-
   past: [],
   future: [],
-
   selectedVertexIndices: [],
   measuredDistance: null,
   measuredAngle: null,
-
   fenceConfig: {
     presetId: 'wood',
     colors: FENCE_PRESETS['wood'].defaultColors
   },
-
   safetyZonesVisible: false,
-
   inputModal: {
     isOpen: false,
     title: '',
@@ -181,6 +157,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     resolve: null,
   },
 
+  // ... (ACTIONS - COPIA TUS ACCIONES EXISTENTES AQUÍ, requestInput, etc.) ...
   requestInput: (title: string, defaultValue = '') => {
     return new Promise((resolve) => {
       set({
@@ -231,13 +208,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   toggleGrid: () => set((state) => ({ gridVisible: !state.gridVisible })),
   toggleBudget: () => set((state) => ({ budgetVisible: !state.budgetVisible })),
-
   toggleEnvPanel: () => set((state) => ({ envPanelVisible: !state.envPanelVisible })),
   setSunPosition: (azimuth, elevation) => set({ sunPosition: { azimuth, elevation } }),
   setBackgroundColor: (color) => set({ backgroundColor: color }),
-
   setMeasurementResult: (dist) => set({ measurementResult: dist }),
-
   setCameraType: (type) => set({ cameraType: type }),
   triggerView: (view) => set({ pendingView: view }),
   clearPendingView: () => set({ pendingView: null }),
@@ -274,12 +248,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     const state = get();
     const originalItem = state.items.find(i => i.uuid === uuid);
     if (!originalItem) return;
-
     state.saveSnapshot();
     const newItem: SceneItem = JSON.parse(JSON.stringify(originalItem));
     newItem.uuid = THREE.MathUtils.generateUUID(); 
     newItem.position = [originalItem.position[0] + 1, originalItem.position[1], originalItem.position[2] + 1];
-
     set({
       items: [...state.items, newItem],
       totalPrice: state.totalPrice + newItem.price,
@@ -337,7 +309,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     const previous = state.past[state.past.length - 1];
     const newPast = state.past.slice(0, state.past.length - 1);
     const prevTotal = previous.reduce((sum, item) => sum + item.price, 0);
-
     return {
       items: previous,
       past: newPast,
@@ -353,7 +324,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     const next = state.future[0];
     const newFuture = state.future.slice(1);
     const nextTotal = next.reduce((sum, item) => sum + item.price, 0);
-
     return {
       items: next,
       past: [...state.past, state.items],
@@ -381,4 +351,3 @@ export const useAppStore = create<AppState>((set, get) => ({
     measuredAngle: angle
   }),
 }));
-// --- END OF FILE src/stores/useAppStore.ts ---
