@@ -4,7 +4,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { A42Engine } from '../A42Engine';
 import { useAppStore, type SceneItem } from '../../../../stores/useAppStore';
-import { PriceCalculator } from './PriceCalculator'; 
+import { PriceCalculator } from '../../../utils/PriceCalculator'; 
 
 export class PDFManager {
   private engine: A42Engine;
@@ -16,8 +16,7 @@ export class PDFManager {
   private savedCameraRot = new THREE.Euler();
   private savedControlsTarget = new THREE.Vector3();
   private savedBg: THREE.Color | THREE.Texture | null = null;
-  // CORRECCIÓN TIPO NIEBLA
-  private savedFog: THREE.FogBase | null = null;
+  private savedFog: THREE.Fog | THREE.FogExp2 | null = null;
   private wasGridVisible = false;
   private wasSkyVisible = false;
 
@@ -51,6 +50,7 @@ export class PDFManager {
     // 2. FOTOGRAFÍA: PORTADA (VISTA GENERAL)
     // =========================================================
     // Forzamos resolución 4:3 de alta calidad (1600x1200)
+    // Esto evita que salga cortada si tu monitor es panorámico
     this.resizeRendererInternal(1600, 1200);
     
     // Cámara en perspectiva para la portada
@@ -186,10 +186,7 @@ export class PDFManager {
       // 3. Restaurar Entorno
       this.engine.scene.background = this.savedBg;
       this.engine.scene.fog = this.savedFog;
-      
-      // CORRECCIÓN GRID: Forzar desactivado
-      this.engine.setGridVisible(false); 
-      
+      this.engine.setGridVisible(this.wasGridVisible);
       this.engine.setSkyVisible(this.wasSkyVisible);
       
       // 4. Restaurar Objetos
@@ -327,7 +324,7 @@ export class PDFManager {
       
       const m = 15; 
       const w = doc.internal.pageSize.getWidth();
-      // const h = doc.internal.pageSize.getHeight();
+      const h = doc.internal.pageSize.getHeight();
       
       // PÁGINA 1: PORTADA
       this.addHeader(doc, projectName, "Dossier del Proyecto");
@@ -400,81 +397,54 @@ export class PDFManager {
       });
       this.addFooter(doc);
 
-      // PÁGINAS DE FICHAS (DOCUMENTACIÓN CON DATOS DINÁMICOS)
+      // PÁGINAS DE FICHAS (DOCUMENTACIÓN)
       for (const [key, item] of uniqueItemsMap) {
-        doc.addPage();
-        // Casting a any para poder acceder a propiedades dinámicas del CSV
-        const anyItem = item as any;
-        const itemData = anyItem.data || {}; // Por si los datos del CSV están anidados en .data
+          doc.addPage();
+          this.addHeader(doc, item.name || "Ficha Técnica", item.productId.toUpperCase());
+          
+          if (itemImages[key]) {
+              const imgH = 100;
+              const imgW = imgH * (4/3); 
+              const xPos = (w - imgW) / 2;
+              doc.addImage(itemImages[key], 'PNG', xPos, 40, imgW, imgH);
+          }
+          
+          const yStart = 150;
+          doc.setFontSize(12);
+          doc.setTextColor(0);
+          doc.text("Descripción:", m, yStart);
+          doc.setFontSize(10);
+          doc.setTextColor(80);
+          doc.text("Elemento de alta calidad para parques infantiles. Cumple normativa EN-1176.", m, yStart + 7);
+          
+          // ENLACES CON FORMATO >> AZUL Y CLICABLE
+          let linkY = yStart + 30;
+          
+          const addLink = (label: string, url?: string) => {
+              if(!url || url === '#' || url.length < 5) return;
+              
+              doc.setTextColor(0, 0, 255); // Azul
+              doc.setFont("helvetica", "normal");
+              
+              doc.text(`>> ${label}`, m, linkY);
+              // Crear área clicable
+              doc.link(m, linkY - 5, 80, 8, { url: url });
+              
+              linkY += 10;
+          };
+          
+          // Accedemos a las URLs. NOTA: Según tu CSV, estas propiedades están en item (root) o en item.data
+          // TypeScript no sabe que existen en SceneItem si no están en la interfaz, así que usamos casting o acceso directo
+          const anyItem = item as any;
+          
+          if(anyItem.url_tech) addLink("Ficha Técnica", anyItem.url_tech);
+          if(anyItem.url_cert) addLink("Certificado", anyItem.url_cert);
+          if(anyItem.url_inst) addLink("Ficha de Montaje", anyItem.url_inst);
+          
+          this.addFooter(doc);
+      }
 
-        this.addHeader(doc, item.name || "Ficha Técnica", item.productId.toUpperCase());
-        
-        if (itemImages[key]) {
-            const imgH = 100;
-            const imgW = imgH * (4/3); 
-            const xPos = (w - imgW) / 2;
-            doc.addImage(itemImages[key], 'PNG', xPos, 40, imgW, imgH);
-        }
-        
-        const yStart = 150;
-        doc.setFontSize(12);
-        doc.setTextColor(0);
-        doc.text("Descripción:", m, yStart);
-        
-        doc.setFontSize(10);
-        doc.setTextColor(80);
-
-        // 1. LÓGICA DE DESCRIPCIÓN
-        // Buscamos la descripción en el CSV (varias mayúsculas/minúsculas posibles)
-        const csvDescription = 
-            anyItem.description || 
-            itemData.description || 
-            itemData.DESCRIPCION || 
-            itemData.Description;
-            
-        const defaultDesc = "Elemento de alta calidad para parques infantiles. Cumple normativa EN-1176.";
-        const finalDesc = csvDescription ? csvDescription : defaultDesc;
-
-        // Usamos splitTextToSize para que el texto no se salga de la hoja si es muy largo
-        const splitDesc = doc.splitTextToSize(finalDesc, w - (2*m));
-        doc.text(splitDesc, m, yStart + 7);
-        
-        // Calculamos la posición Y para los enlaces basándonos en lo que ocupó la descripción
-        let linkY = yStart + 20 + (splitDesc.length * 5);
-        
-        // Función auxiliar para crear enlaces
-        const addLink = (label: string, url?: string) => {
-            if(!url || url === '#' || url.length < 5) return;
-            
-            doc.setTextColor(0, 0, 255); // Azul
-            doc.setFont("helvetica", "normal");
-            
-            doc.text(`>> ${label}`, m, linkY);
-            // Crear área clicable
-            doc.link(m, linkY - 5, 80, 8, { url: url });
-            
-            linkY += 10;
-        };
-        
-        // 2. LÓGICA DE ENLACES (Prioridad CSV)
-        // Buscamos las URLs en el CSV usando los nombres de cabecera típicos (URL_TECH, etc.)
-        
-        // Ficha Técnica
-        const techUrl = anyItem.url_tech || itemData.URL_TECH || itemData.url_tech;
-        if (techUrl) addLink("Ficha Técnica", techUrl);
-
-        // Certificado
-        const certUrl = anyItem.url_cert || itemData.URL_CERT || itemData.url_cert;
-        if (certUrl) addLink("Certificado", certUrl);
-
-        // Ficha de Montaje
-        const instUrl = anyItem.url_inst || itemData.URL_INST || itemData.url_inst;
-        if (instUrl) addLink("Ficha de Montaje", instUrl);
-        
-        this.addFooter(doc);
-    }
-
-    doc.save(`${projectName}.pdf`);
+      doc.save(`${projectName}.pdf`);
   }
 
   private addHeader(doc: jsPDF, title: string, subtitle: string) {
