@@ -9,7 +9,7 @@ import {
   getProxiedImageUrl,
   type Product,
   type CatalogDB
-} from '../../../catalog/catalogService';
+} from '../../../services/catalogService';
 
 export const Catalog = () => {
   const { setMode, setSelectedProduct } = useAppStore();
