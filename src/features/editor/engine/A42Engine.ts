@@ -23,7 +23,6 @@ export class A42Engine {
     this.clock = new THREE.Clock();
 
     this.sceneManager = new SceneManager(container);
-    // IMPORTANTE: Habilitar XR (AR/VR) en el renderer
     this.sceneManager.renderer.xr.enabled = true;
 
     this.objectManager = new ObjectManager(this.sceneManager.scene);
@@ -64,27 +63,45 @@ export class A42Engine {
 
   public setGizmoMode(mode: 'translate' | 'rotate' | 'scale') { this.interactionManager.setGizmoMode(mode); }
 
-  // --- AR SETUP ---
+  // --- AR SETUP (LA JAULA) ---
   private initAR() {
-    // Crea el botón solo si el dispositivo soporta AR
     const arBtn = ARButton.createButton(this.renderer, { 
        requiredFeatures: ['hit-test'], 
        optionalFeatures: ['dom-overlay'],
        domOverlay: { root: document.body } 
     });
+
+    // 1. Creamos nuestra "jaula" (Contenedor)
+    const arContainer = document.createElement('div');
+    arContainer.style.position = 'absolute';
+    arContainer.style.bottom = '20px';
+    arContainer.style.right = '20px';
+    arContainer.style.zIndex = '1000'; // Por encima de todo
+    arContainer.style.display = 'flex';
+    arContainer.style.justifyContent = 'flex-end';
+
+    // 2. Reseteamos el botón para que sea dócil y entre en la jaula
+    // 'static' hace que ignore el 'left: 50%' que le pone Three.js
+    arBtn.style.position = 'static'; 
+    arBtn.style.transform = 'none'; 
+    arBtn.style.left = 'auto';
+    arBtn.style.bottom = 'auto';
     
-    // CORRECCIÓN: Botón abajo a la derecha (para no tapar el Toolbar)
-    arBtn.style.position = 'absolute';
-    arBtn.style.bottom = '20px';
-    arBtn.style.right = '20px'; // Antes era left calc...
-    arBtn.style.left = 'auto';  // Reseteamos left
-    arBtn.style.width = '120px';
-    arBtn.style.zIndex = '999';
-    arBtn.style.background = 'rgba(0,0,0,0.8)'; // Un poco más oscuro
-    arBtn.style.border = '1px solid rgba(255,255,255,0.2)';
-    arBtn.style.borderRadius = '20px';
-    
-    document.body.appendChild(arBtn);
+    // Estilos visuales del botón
+    arBtn.style.width = '160px';
+    arBtn.style.background = 'rgba(0,0,0,0.85)';
+    arBtn.style.border = '1px solid rgba(255,255,255,0.3)';
+    arBtn.style.borderRadius = '30px';
+    arBtn.style.color = '#fff';
+    arBtn.style.fontFamily = 'sans-serif';
+    arBtn.style.fontSize = '12px';
+    arBtn.style.fontWeight = 'bold';
+    arBtn.style.padding = '10px 0';
+    arBtn.style.cursor = 'pointer';
+
+    // 3. Metemos el botón en la jaula y la jaula en el body
+    arContainer.appendChild(arBtn);
+    document.body.appendChild(arContainer);
   }
 
   public async syncSceneFromStore(storeItems: SceneItem[]) {
