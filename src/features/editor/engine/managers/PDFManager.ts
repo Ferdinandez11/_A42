@@ -18,7 +18,7 @@ export class PDFManager {
   private savedBg: THREE.Color | THREE.Texture | null = null;
   // CORRECCIÓN TIPO NIEBLA
   private savedFog: THREE.FogBase | null = null;
-  private wasGridVisible = false;
+  //private wasGridVisible = false;
   private wasSkyVisible = false;
 
   constructor(engine: A42Engine) {
@@ -157,7 +157,7 @@ export class PDFManager {
       this.savedFog = this.engine.scene.fog;
       
       // Comprobar visibilidad real
-      this.wasGridVisible = this.engine.sceneManager.gridHelper?.visible || false;
+      //this.wasGridVisible = this.engine.sceneManager.gridHelper?.visible || false;
       this.wasSkyVisible = this.engine.sceneManager.sky?.visible || false;
   }
 

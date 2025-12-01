@@ -1,5 +1,5 @@
 // --- START OF FILE src/features/editor/utils/PriceCalculator.ts ---
-import type { SceneItem } from "../../../stores/useAppStore";
+import type { SceneItem } from "../../../../stores/useAppStore";
 
 // --- CONFIGURACIÓN DE PRECIOS BASE ---
 export const PRICES = {
