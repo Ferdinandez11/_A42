@@ -1,11 +1,8 @@
 // --- START OF FILE src/features/editor/engine/managers/ObjectManager.ts ---
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-
-// --- CORRECCIÓN AQUÍ: Separamos los tipos de la lógica ---
 import { useAppStore } from '../../../../stores/useAppStore';
-import type { SceneItem, ProductDefinition, FenceConfig } from '../../../../stores/useAppStore';
-
+import type { SceneItem, ProductDefinition, FenceConfig, FloorMaterialType } from '../../../../stores/useAppStore';
 import { FENCE_PRESETS } from '../../data/fence_presets';
 
 type PlaceableProduct = ProductDefinition & { initialScale?: [number, number, number] };
@@ -13,13 +10,27 @@ type PlaceableProduct = ProductDefinition & { initialScale?: [number, number, nu
 export class ObjectManager {
   private scene: THREE.Scene;
   private loader: GLTFLoader;
+  private textureLoader: THREE.TextureLoader;
   private assetCache: { [url: string]: THREE.Group } = {};
+  
+  // Materiales de suelo predefinidos para no crearlos cada vez
+  private floorMaterials: Record<FloorMaterialType, THREE.Material>;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
     this.loader = new GLTFLoader();
+    this.textureLoader = new THREE.TextureLoader();
+
+    this.floorMaterials = {
+        'rubber_red': new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.9 }),
+        'rubber_green': new THREE.MeshStandardMaterial({ color: 0x006400, roughness: 0.9 }),
+        'rubber_blue': new THREE.MeshStandardMaterial({ color: 0x00008b, roughness: 0.9 }),
+        'grass': new THREE.MeshStandardMaterial({ color: 0x4caf50, roughness: 1 }),
+        'concrete': new THREE.MeshStandardMaterial({ color: 0x808080, roughness: 0.8 }),
+    };
   }
 
+  // --- CARGA DE MODELOS (CON CACHÉ) ---
   public async loadModel(url: string): Promise<THREE.Group> {
       if (this.assetCache[url]) {
           return this.assetCache[url].clone();
@@ -29,22 +40,57 @@ export class ObjectManager {
       return gltf.scene.clone();
   }
 
+  // --- RECREAR MODELO DESDE STORE ---
   public async recreateModel(item: SceneItem) {
     if (!item.modelUrl) return;
     try {
       const model = await this.loadModel(item.modelUrl);
+      
+      // Configuración básica
       model.uuid = item.uuid; 
       model.position.fromArray(item.position);
       model.rotation.fromArray(item.rotation);
       model.scale.fromArray(item.scale);
-      model.userData.isItem = true;
-      model.userData.productId = item.productId;
-      model.userData.type = item.type;
-      model.traverse((child) => { if ((child as THREE.Mesh).isMesh) { child.castShadow = true; child.receiveShadow = true; }});
+      model.userData = { isItem: true, type: 'model', uuid: item.uuid, productId: item.productId };
+
+      // --- LÓGICA DE ZONAS DE SEGURIDAD ---
+      const safetyZoneMat = new THREE.MeshBasicMaterial({ 
+          color: 0xff0000, 
+          transparent: true, 
+          opacity: 0.3, 
+          depthWrite: false,
+          side: THREE.DoubleSide
+      });
+      const isZonesVisible = useAppStore.getState().safetyZonesVisible;
+
+      model.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) {
+              const mesh = child as THREE.Mesh;
+              mesh.castShadow = true;
+              mesh.receiveShadow = true;
+
+              // Detectar si es una zona de seguridad por nombre
+              const name = mesh.name.toLowerCase();
+              const matName = (mesh.material as THREE.Material).name?.toLowerCase() || '';
+
+              if (name.includes('zona') || name.includes('seguridad') || name.includes('safety') ||
+                  matName.includes('zona') || matName.includes('seguridad') || matName.includes('safety')) {
+                  
+                  mesh.material = safetyZoneMat.clone();
+                  mesh.userData.isSafetyZone = true;
+                  mesh.castShadow = false;
+                  mesh.receiveShadow = false;
+                  mesh.visible = isZonesVisible; // Inicializar según estado del botón
+              }
+          }
+      });
+      // -------------------------------------
+
       this.scene.add(model);
     } catch (e) { console.error(e); }
   }
 
+  // --- RECREAR SUELO ---
   public recreateFloor(item: SceneItem) {
     if (!item.points || item.points.length < 3) return;
     
@@ -53,17 +99,14 @@ export class ObjectManager {
     for (let i = 1; i < item.points.length; i++) {
         shape.lineTo(item.points[i].x, -item.points[i].z);
     }
-    shape.lineTo(item.points[0].x, -item.points[0].z);
+    shape.lineTo(item.points[0].x, -item.points[0].z); // Cerrar
     
-    const floorDepth = 0.05;
-    const geometry = new THREE.ExtrudeGeometry(shape, { depth: floorDepth, bevelEnabled: false });
+    const geometry = new THREE.ExtrudeGeometry(shape, { depth: 0.05, bevelEnabled: false });
+    geometry.rotateX(-Math.PI / 2); // Poner plano en el suelo
 
-    geometry.rotateX(-Math.PI / 2);
-    geometry.translate(0, 0, 0); 
-
+    // Mapeo UV para texturas
     const posAttribute = geometry.attributes.position;
     const uvAttribute = geometry.attributes.uv;
-    
     const scale = item.textureScale || 1;
     const rotationRad = THREE.MathUtils.degToRad(item.textureRotation || 0);
     const cosR = Math.cos(rotationRad);
@@ -79,42 +122,34 @@ export class ObjectManager {
 
     let material: THREE.Material;
     if (item.textureUrl) {
-        const texLoader = new THREE.TextureLoader();
-        const texture = texLoader.load(item.textureUrl);
+        const texture = this.textureLoader.load(item.textureUrl);
         texture.wrapS = THREE.RepeatWrapping;
         texture.wrapT = THREE.RepeatWrapping;
         material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.8, side: THREE.DoubleSide });
     } else {
-        let matColor = 0xA04040;
-        switch (item.floorMaterial) {
-            case 'rubber_green': matColor = 0x22c55e; break;
-            case 'rubber_blue': matColor = 0x3b82f6; break;
-            case 'grass': matColor = 0x4ade80; break; 
-            case 'concrete': matColor = 0x9ca3af; break;
-            default: matColor = 0xA04040; break;
-        }
-        material = new THREE.MeshStandardMaterial({ color: matColor, roughness: 0.8, side: THREE.DoubleSide });
+        material = this.floorMaterials[item.floorMaterial || 'concrete'];
     }
 
     const mesh = new THREE.Mesh(geometry, material);
     mesh.uuid = item.uuid;
     mesh.position.set(0, 0, 0); 
-    mesh.rotation.set(0, 0, 0);
     mesh.receiveShadow = true;
     
-    mesh.userData.isItem = true;
-    mesh.userData.type = 'floor';
-    mesh.userData.productId = item.productId;
-    mesh.userData.points = item.points; 
-    mesh.userData.floorMaterial = item.floorMaterial;
-    mesh.userData.textureUrl = item.textureUrl;
-    mesh.userData.textureScale = item.textureScale;
-    mesh.userData.textureRotation = item.textureRotation;
+    mesh.userData = { 
+        isItem: true, 
+        type: 'floor', 
+        uuid: item.uuid, 
+        points: item.points, 
+        floorMaterial: item.floorMaterial,
+        textureUrl: item.textureUrl,
+        textureScale: item.textureScale,
+        textureRotation: item.textureRotation
+    };
 
     this.scene.add(mesh);
   }
 
-  // --- LÓGICA VALLA ---
+  // --- RECREAR VALLA (Geometría Instanciada) ---
   public createFenceObject(points: THREE.Vector3[], config: FenceConfig): THREE.Group | null {
       if (!points || points.length < 2) return null;
 
@@ -138,9 +173,7 @@ export class ObjectManager {
           partsData[key].colors.push(col.r, col.g, col.b);
       };
 
-      let totalLength = 0;
-
-      // GEOMETRÍAS REUTILIZABLES
+      // --- CONSTRUCCIÓN PROCEDURAL ---
       let postGeo: THREE.BufferGeometry;
       if (preset.postType === "round") postGeo = new THREE.CylinderGeometry(preset.postRadius, preset.postRadius, preset.postHeight, 12);
       else postGeo = new THREE.BoxGeometry(preset.postWidth, preset.postHeight, preset.postWidth);
@@ -163,7 +196,6 @@ export class ObjectManager {
           const start = points[i];
           const end = points[i+1];
           const dist = start.distanceTo(end);
-          totalLength += dist;
           
           const dir = new THREE.Vector3().subVectors(end, start).normalize();
           const angle = Math.atan2(dir.x, dir.z);
@@ -178,10 +210,10 @@ export class ObjectManager {
               const modEnd = new THREE.Vector3().lerpVectors(start, end, tEnd);
               const modCenter = new THREE.Vector3().lerpVectors(modStart, modEnd, 0.5);
 
-              // 1. POSTE
+              // POSTE
               registerPart('post', postGeo, modStart, new THREE.Euler(0,0,0), {}, colors.post);
 
-              // 2. LARGUEROS
+              // RIELES Y LAMAS
               const postThickness = (preset.postType==='round' ? (preset.postRadius || 0.05)*2 : (preset.postWidth || 0.1));
               const railLen = actualModuleLen - postThickness + 0.02;
 
@@ -190,7 +222,7 @@ export class ObjectManager {
                   registerPart('rail', railGeo, new THREE.Vector3(modCenter.x, botRailY, modCenter.z), new THREE.Euler(0, angle, 0), {x:1, y:1, z: railLen}, colors.post);
               }
 
-              // 3. RELLENO
+              // LAMAS
               if (preset.isSolidPanel) {
                   const pWidth = railLen - 0.02;
                   registerPart('slat', slatGeo, new THREE.Vector3(modCenter.x, slatCenterY, modCenter.z), new THREE.Euler(0, angle, 0), {x:1, y:slatHeight, z: pWidth/preset.slatWidth}, slatColors[0]);
@@ -224,6 +256,7 @@ export class ObjectManager {
           }
       }
       
+      // Poste final
       registerPart('post', postGeo, points[points.length-1], new THREE.Euler(0,0,0), {}, colors.post);
 
       const fenceGroup = new THREE.Group();
@@ -257,24 +290,52 @@ export class ObjectManager {
           fence.userData.isItem = true;
           fence.userData.type = 'fence';
           fence.userData.productId = item.productId;
+          // Guardamos datos originales para exportación DXF
+          fence.userData.points = item.points;
+          fence.userData.fenceConfig = item.fenceConfig;
           this.scene.add(fence);
       }
   }
 
+  // --- COLOCAR OBJETO NUEVO ---
   public async placeObject(x: number, z: number, product: PlaceableProduct, afterPlace?: (uuid: string) => void) {
       if (!product.modelUrl) return;
       try {
           const model = await this.loadModel(product.modelUrl);
           model.position.set(x, 0, z);
+          
           const initialScale = product.initialScale ? new THREE.Vector3(...product.initialScale) : new THREE.Vector3(1, 1, 1);
           model.scale.copy(initialScale);
           model.updateMatrixWorld(true);
           
           this.adjustObjectToGround(model);
           
-          model.traverse((child) => { if ((child as THREE.Mesh).isMesh) { child.castShadow = true; child.receiveShadow = true; }});
+          // Configuración inicial de sombras y zonas
+          const safetyZoneMat = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide });
+          const isZonesVisible = useAppStore.getState().safetyZonesVisible;
+
+          model.traverse((child) => { 
+              if ((child as THREE.Mesh).isMesh) { 
+                  const mesh = child as THREE.Mesh;
+                  mesh.castShadow = true; 
+                  mesh.receiveShadow = true; 
+
+                  // Check Zonas
+                  const name = mesh.name.toLowerCase();
+                  const matName = (mesh.material as THREE.Material).name?.toLowerCase() || '';
+                  if (name.includes('zona') || name.includes('seguridad') || name.includes('safety') ||
+                      matName.includes('zona') || matName.includes('seguridad') || matName.includes('safety')) {
+                      mesh.material = safetyZoneMat.clone();
+                      mesh.userData.isSafetyZone = true;
+                      mesh.castShadow = false;
+                      mesh.visible = isZonesVisible;
+                  }
+              }
+          });
+
           this.scene.add(model);
           
+          // Animación de entrada (Pop)
           const targetScale = model.scale.clone();
           model.scale.set(0, 0, 0);
           let t = 0;
@@ -285,6 +346,7 @@ export class ObjectManager {
           };
           animateEntry();
           
+          // Guardar en Store
           model.userData.isItem = true;
           model.userData.productId = product.id;
           model.userData.type = product.type;

@@ -10,7 +10,7 @@ import { ToolsManager } from './managers/ToolsManager';
 import { InteractionManager } from './managers/InteractionManager';
 import { WalkManager } from './managers/WalkManager';
 import { RecorderManager } from './managers/RecorderManager';
-import { ExportManager } from './managers/ExportManager'; // <--- IMPORT NUEVO
+import { ExportManager } from './managers/ExportManager';
 
 export class A42Engine {
   public sceneManager: SceneManager;
@@ -19,7 +19,7 @@ export class A42Engine {
   public interactionManager: InteractionManager;
   public walkManager: WalkManager;
   public recorderManager: RecorderManager;
-  public exportManager: ExportManager; // <--- PROPIEDAD NUEVA
+  public exportManager: ExportManager;
 
   private clock: THREE.Clock;
   private savedBackground: THREE.Color | THREE.Texture | null = null;
@@ -37,7 +37,7 @@ export class A42Engine {
     this.interactionManager = new InteractionManager(this);
     this.walkManager = new WalkManager(this);
     this.recorderManager = new RecorderManager(this);
-    this.exportManager = new ExportManager(this); // <--- INICIALIZAR
+    this.exportManager = new ExportManager(this);
 
     window.addEventListener('resize', this.onWindowResize);
     window.addEventListener('keydown', this.onKeyDown);
@@ -72,17 +72,109 @@ export class A42Engine {
 
   public setGizmoMode(mode: 'translate' | 'rotate' | 'scale') { this.interactionManager.setGizmoMode(mode); }
 
-  // --- AR SETUP ---
+  // --- GESTIÓN DE ZONAS DE SEGURIDAD ---
+  public updateSafetyZones(visible: boolean) {
+      this.scene.traverse((obj) => {
+          if (obj.userData?.isSafetyZone) {
+              obj.visible = visible;
+          }
+      });
+  }
+
+  // Visualizador de colisiones (Pone rojo si chocan)
+  public checkSafetyCollisions() {
+      if (!useAppStore.getState().safetyZonesVisible) return;
+
+      const zones: THREE.Mesh[] = [];
+      const boxes: THREE.Box3[] = [];
+
+      this.scene.traverse((obj) => {
+          if (obj.userData?.isSafetyZone && obj.visible) {
+              zones.push(obj as THREE.Mesh);
+              boxes.push(new THREE.Box3().setFromObject(obj));
+              
+              // Reset visual
+              (obj as THREE.Mesh).material = new THREE.MeshBasicMaterial({ 
+                  color: 0xff0000, 
+                  transparent: true, 
+                  opacity: 0.3, 
+                  depthWrite: false,
+                  side: THREE.DoubleSide
+              });
+          }
+      });
+
+      for (let i = 0; i < zones.length; i++) {
+          for (let j = i + 1; j < zones.length; j++) {
+              if (boxes[i].intersectsBox(boxes[j])) {
+                  const alertMat = new THREE.MeshBasicMaterial({ 
+                      color: 0xff0000, 
+                      transparent: true, 
+                      opacity: 0.8, 
+                      depthWrite: false,
+                      side: THREE.DoubleSide
+                  });
+                  zones[i].material = alertMat;
+                  zones[j].material = alertMat;
+              }
+          }
+      }
+  }
+
+  // --- NUEVO: DETECTOR DE COLISIÓN PARA UN OBJETO ESPECÍFICO ---
+  // Devuelve true si el objeto 'target' está chocando con algo inválido
+  public isObjectColliding(target: THREE.Object3D): boolean {
+      // Si las zonas están apagadas, no hay reglas de colisión
+      if (!useAppStore.getState().safetyZonesVisible) return false;
+
+      // 1. Buscamos las zonas de seguridad DENTRO del objeto que movemos
+      const targetZones: THREE.Box3[] = [];
+      target.traverse((child) => {
+          if (child.userData?.isSafetyZone) {
+              targetZones.push(new THREE.Box3().setFromObject(child));
+          }
+      });
+
+      if (targetZones.length === 0) return false; // El objeto no tiene zona de seguridad
+
+      // 2. Buscamos TODAS las otras zonas de la escena (que no sean del objeto que muevo)
+      const otherZones: THREE.Box3[] = [];
+      this.scene.traverse((obj) => {
+          if (obj.userData?.isSafetyZone && obj.visible) {
+              // Verificamos que este 'obj' no sea hijo del 'target' que estamos moviendo
+              let isChildOfTarget = false;
+              let parent = obj.parent;
+              while(parent) {
+                  if (parent === target) { isChildOfTarget = true; break; }
+                  parent = parent.parent;
+              }
+
+              if (!isChildOfTarget) {
+                  otherZones.push(new THREE.Box3().setFromObject(obj));
+              }
+          }
+      });
+
+      // 3. Comprobamos choques
+      for (const tBox of targetZones) {
+          for (const oBox of otherZones) {
+              if (tBox.intersectsBox(oBox)) {
+                  return true; // ¡Colisión detectada!
+              }
+          }
+      }
+
+      return false; // Todo limpio
+  }
+  // -------------------------------------------------------------
+
   private async initAR() {
     if (!('xr' in navigator)) return; 
-    
     try {
         // @ts-ignore
         const isSupported = await navigator.xr.isSessionSupported('immersive-ar');
         if (!isSupported) return; 
-    } catch (e) {
-        return; 
-    }
+    } catch (e) { return; }
 
     const arBtn = ARButton.createButton(this.renderer, { 
        requiredFeatures: ['hit-test'], 
@@ -93,22 +185,18 @@ export class A42Engine {
     this.renderer.xr.addEventListener('sessionstart', () => {
         this.savedBackground = this.scene.background;
         this.wasSkyVisible = this.sceneManager.sky ? this.sceneManager.sky.visible : false;
-
         this.scene.background = null; 
         this.setSkyVisible(false);
         this.setGridVisible(false);
         this.renderer.setClearColor(0x000000, 0); 
-
         this.transparentElements = [];
         let el: HTMLElement | null = this.renderer.domElement;
-        
         while (el && el !== document.documentElement) {
              this.transparentElements.push(el);
              el.style.setProperty('background', 'transparent', 'important');
              el.style.setProperty('background-color', 'transparent', 'important');
              el = el.parentElement;
         }
-        
         document.body.style.setProperty('background', 'transparent', 'important');
         document.documentElement.style.setProperty('background', 'transparent', 'important');
     });
@@ -117,12 +205,10 @@ export class A42Engine {
         if (this.savedBackground) this.scene.background = this.savedBackground;
         if (this.wasSkyVisible) this.setSkyVisible(true);
         this.setGridVisible(useAppStore.getState().gridVisible);
-        
         this.transparentElements.forEach(el => {
             el.style.removeProperty('background');
             el.style.removeProperty('background-color');
         });
-        
         document.body.style.removeProperty('background');
         document.documentElement.style.removeProperty('background');
     });
@@ -180,11 +266,9 @@ export class A42Engine {
                 continue; 
             }
         }
-        
         if (item.type === 'fence') {
              const hasConfigChanged = JSON.stringify(sceneObj.userData.fenceConfig) !== JSON.stringify(item.fenceConfig);
              const hasPointsChanged = JSON.stringify(sceneObj.userData.points) !== JSON.stringify(item.points);
-
              if (hasConfigChanged || hasPointsChanged) {
                  this.scene.remove(sceneObj);
                  this.objectManager.recreateFence(item);
@@ -192,7 +276,6 @@ export class A42Engine {
                  continue;
              }
         }
-
         sceneObj.position.fromArray(item.position);
         sceneObj.rotation.fromArray(item.rotation);
         sceneObj.scale.fromArray(item.scale);
@@ -216,7 +299,6 @@ export class A42Engine {
 
   private onKeyDown = (e: KeyboardEvent) => {
       if (this.walkManager.isEnabled) return;
-
       if (useAppStore.getState().mode !== 'editing') return;
       if (e.key === 'z' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); useAppStore.getState().undo(); return; }
       
@@ -251,14 +333,14 @@ export class A42Engine {
   
   private render = () => { 
       const delta = this.clock.getDelta();
-      
       this.walkManager.update(delta);
       this.recorderManager.update(delta);
+      
+      this.checkSafetyCollisions();
 
       if (!this.walkManager.isEnabled) {
         this.sceneManager.controls.update(); 
       }
-
       this.sceneManager.renderer.render(this.scene, this.activeCamera); 
   }
 

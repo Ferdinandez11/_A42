@@ -1,13 +1,13 @@
 // --- START OF FILE src/features/editor/ui/Toolbar.tsx ---
 import React, { useState, useRef } from 'react';
 import { 
-  MousePointer2, Grid3X3, Component, Trees, Grid, Undo2, Redo2, Eye, Box, ArrowUp, ArrowRight, GalleryVerticalEnd, Square, Sun, Upload, Ruler, Footprints, Video, Camera, Film, Download, FileText
+  MousePointer2, Grid3X3, Component, Trees, Grid, Undo2, Redo2, Eye, Box, ArrowUp, ArrowRight, GalleryVerticalEnd, Square, Sun, Upload, Ruler, Footprints, Video, Camera, Film, Download, FileText, ShieldAlert
 } from 'lucide-react';
 import { useAppStore } from '../../../stores/useAppStore';
 import './Editor.css';
 
 export const Toolbar = () => {
-  const { mode, setMode, gridVisible, toggleGrid, undo, redo, past, future, cameraType, setCameraType, triggerView, toggleEnvPanel, envPanelVisible, setMeasurementResult, addItem } = useAppStore();
+  const { mode, setMode, gridVisible, toggleGrid, undo, redo, past, future, cameraType, setCameraType, triggerView, toggleEnvPanel, envPanelVisible, setMeasurementResult, addItem, safetyZonesVisible, toggleSafetyZones } = useAppStore();
   const [showViews, setShowViews] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -37,7 +37,6 @@ export const Toolbar = () => {
     window.editorEngine?.walkManager.enable();
   };
 
-  // --- ACCIONES MEDIA Y EXPORTACIÓN ---
   const takePhoto = () => {
     // @ts-ignore
     window.editorEngine?.recorderManager.takeScreenshot();
@@ -108,6 +107,12 @@ export const Toolbar = () => {
         <button className={`tool-btn ${mode === 'measuring' ? 'active' : ''}`} onClick={toggleMeasureMode} title="Medir">
             <Ruler size={20} /> <span className="tool-label">Medir</span>
         </button>
+        
+        {/* BOTÓN ZONAS DE SEGURIDAD (ESCUDO) */}
+        <button className={`tool-btn ${safetyZonesVisible ? 'active text-red-400' : ''}`} onClick={toggleSafetyZones} title="Zonas de Seguridad">
+            <ShieldAlert size={20} /> <span className="tool-label">Zonas</span>
+        </button>
+
         <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
         
         {/* BOTONES MEDIA */}

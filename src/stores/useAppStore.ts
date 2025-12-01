@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import * as THREE from 'three'; 
 import { FENCE_PRESETS } from '../features/editor/data/fence_presets';
 
+// ... (Tipos e interfaces anteriores se mantienen igual)
 export interface ProductDefinition { 
   id: string;
   name: string;
@@ -69,15 +70,15 @@ interface AppState {
   past: SceneItem[][];
   future: SceneItem[][];
 
-  // --- CAD STATE ---
   selectedVertexIndices: number[];
   measuredDistance: number | null;
   measuredAngle: number | null;
 
-  // --- FENCE STATE ---
   fenceConfig: FenceConfig;
 
-  // --- NUEVO: INPUT MODAL STATE ---
+  // --- NUEVO: ZONAS DE SEGURIDAD ---
+  safetyZonesVisible: boolean; // Estado del botón
+
   inputModal: {
     isOpen: boolean;
     title: string;
@@ -121,9 +122,11 @@ interface AppState {
 
   setSelectedVertices: (indices: number[], distance: number | null, angle: number | null) => void;
 
-  // --- NUEVO: INPUT MODAL ACTIONS ---
   requestInput: (title: string, defaultValue?: string) => Promise<string | null>;
   closeInputModal: (value: string | null) => void;
+
+  // --- NUEVO: ACCIÓN TOGGLE ZONAS ---
+  toggleSafetyZones: () => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({ 
@@ -155,7 +158,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     colors: FENCE_PRESETS['wood'].defaultColors
   },
 
-  // --- IMPLEMENTACIÓN DEL MODAL ---
+  // Estado inicial Zonas
+  safetyZonesVisible: false,
+
   inputModal: {
     isOpen: false,
     title: '',
@@ -183,7 +188,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       inputModal: { isOpen: false, title: '', defaultValue: '', resolve: null },
     });
   },
-  // -------------------------------
+
+  // Acción Toggle
+  toggleSafetyZones: () => set((state) => ({ safetyZonesVisible: !state.safetyZonesVisible })),
 
   setMode: (mode) => {
     if (mode !== 'editing') set({ selectedItemId: null });

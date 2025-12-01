@@ -12,6 +12,9 @@ export class InteractionManager {
   private interactionPlane: THREE.Mesh; 
   public isDraggingGizmo = false;
 
+  // NUEVO: Guardar posición inicial antes de mover para poder "rebotar"
+  private dragStartPosition = new THREE.Vector3();
+
   constructor(engine: A42Engine) {
     this.engine = engine;
     this.raycaster = new THREE.Raycaster();
@@ -26,19 +29,29 @@ export class InteractionManager {
 
   private initTransformControls() {
     try {
-        this.transformControl = new TransformControls(this.engine.activeCamera, this.engine.renderer.domElement);
+        this.transformControl = new TransformControls(this.engine.activeCamera as THREE.Camera, this.engine.renderer.domElement);
         this.transformControl.rotationSnap = Math.PI / 12;
         this.engine.scene.add(this.transformControl);
         
-        this.transformControl.addEventListener('dragging-changed', (event:any) => {
+        // --- LOGICA DE ARRASTRE Y REBOTE ---
+        this.transformControl.addEventListener('dragging-changed', (event: any) => {
           this.isDraggingGizmo = event.value;
           this.engine.sceneManager.controls.enabled = !event.value;
           
+          const obj = this.transformControl?.object;
+          if (!obj) return;
+
           if (event.value) {
+            // AL EMPEZAR: Guardar posición segura
+            this.dragStartPosition.copy(obj.position);
             useAppStore.getState().saveSnapshot();
           } else {
-            const obj = this.transformControl?.object;
-            if (obj) {
+            // AL SOLTAR: Comprobar colisión
+            if (this.engine.isObjectColliding(obj)) {
+                // ¡COLISIÓN! -> REBOTAR
+                this.animateRevert(obj, this.dragStartPosition);
+            } else {
+                // TODO OK -> GUARDAR
                 if (obj.userData.isFloorMarker) {
                     this.engine.toolsManager.updateFloorFromMarkers(obj);
                 } else if (obj.userData.isItem) {
@@ -64,6 +77,27 @@ export class InteractionManager {
     }
   }
 
+  // --- ANIMACIÓN DE REBOTE (MUELLE) ---
+  private animateRevert(obj: THREE.Object3D, targetPos: THREE.Vector3) {
+      const startPos = obj.position.clone();
+      let t = 0;
+      
+      const animate = () => {
+          t += 0.1; // Velocidad del rebote
+          if (t >= 1) {
+              obj.position.copy(targetPos);
+              // Forzamos actualización visual final para que no queden rastros rojos
+              this.engine.checkSafetyCollisions(); 
+              return;
+          }
+          // Lerp simple
+          obj.position.lerpVectors(startPos, targetPos, t);
+          this.engine.checkSafetyCollisions(); // Actualizar colores mientras se mueve
+          requestAnimationFrame(animate);
+      };
+      animate();
+  }
+
   public updateCamera(camera: THREE.Camera) {
       if(this.transformControl) this.transformControl.camera = camera;
   }
@@ -79,7 +113,6 @@ export class InteractionManager {
     const store = useAppStore.getState();
     const mode = store.mode;
 
-    // --- DRAWING FLOOR ---
     if (mode === 'drawing_floor') {
       const intersects = this.raycaster.intersectObject(this.interactionPlane);
       if (intersects.length > 0) {
@@ -91,7 +124,6 @@ export class InteractionManager {
       return;
     }
 
-    // --- DRAWING FENCE ---
     if (mode === 'drawing_fence') {
         const intersects = this.raycaster.intersectObject(this.interactionPlane);
         if (intersects.length > 0) {
@@ -103,7 +135,6 @@ export class InteractionManager {
         return;
     }
 
-    // --- MEASURING ---
     if (mode === 'measuring') {
         const intersects = this.raycaster.intersectObjects(this.engine.scene.children, true);
         const hit = intersects.find(i => i.object.visible && (i.object.userData.isItem || i.object === this.interactionPlane));
@@ -115,38 +146,35 @@ export class InteractionManager {
         return;
     }
 
-    // --- PLACING ITEM ---
     if (mode === 'placing_item' && store.selectedProduct) {
       if (event.button !== 0) return;
       const intersects = this.raycaster.intersectObject(this.interactionPlane);
       if (intersects.length > 0) {
+          // --- VERIFICACIÓN DE COLISIÓN AL COLOCAR ---
+          // Podríamos implementarla aquí, pero es complejo porque el objeto aún no existe en escena.
+          // Dejamos que se coloque y si choca, el usuario tendrá que moverlo.
           this.engine.objectManager.placeObject(intersects[0].point.x, intersects[0].point.z, store.selectedProduct, (_uuid) => {
-             // Optional callback
           });
           useAppStore.getState().setMode('idle');
       }
       return;
     }
 
-    // --- SELECTING / EDITING ---
     if (mode === 'idle' || mode === 'editing') {
       if (event.button !== 0) return;
 
-      // 1. Check Floor Markers (Vertices)
       if (this.engine.toolsManager.floorEditMarkers.length > 0) {
           const markerIntersects = this.raycaster.intersectObjects(this.engine.toolsManager.floorEditMarkers);
           if (markerIntersects.length > 0) {
               const hitMarker = markerIntersects[0].object;
               const pointIndex = hitMarker.userData.pointIndex;
 
-              // Shift/Ctrl Click for Multi-Selection
               if (event.shiftKey || event.ctrlKey) {
                   this.engine.toolsManager.selectVertex(pointIndex, true);
-                  if (this.transformControl) this.transformControl.detach(); // Hide Gizmo
+                  if (this.transformControl) this.transformControl.detach();
                   return; 
               }
 
-              // Normal Click
               if (this.transformControl) {
                   this.engine.toolsManager.selectVertex(pointIndex, false); 
                   this.transformControl.attach(hitMarker);
@@ -157,7 +185,6 @@ export class InteractionManager {
           }
       }
 
-      // 2. Check Scene Items
       const interactables = this.engine.scene.children.filter(obj => obj.userData?.isItem && obj !== this.transformControl);
       const intersects = this.raycaster.intersectObjects(interactables, true);
 
@@ -168,10 +195,8 @@ export class InteractionManager {
         if (target && target.userData?.isItem) {
             this.selectObject(target);
             
-            // --- CORRECCIÓN AQUÍ: Detectamos si es Floor O Fence ---
             if (target.userData.type === 'floor' || target.userData.type === 'fence') {
                 const item = store.items.find(i => i.uuid === target!.uuid);
-                // Ambos usan 'points', así que reutilizamos la herramienta de marcadores
                 if (item && item.points) this.engine.toolsManager.showFloorEditMarkers(target.uuid, item.points);
             } else {
                 this.engine.toolsManager.clearFloorEditMarkers();
@@ -179,7 +204,6 @@ export class InteractionManager {
             }
         }
       } else {
-        // Deselect if clicking empty space
         if (this.transformControl?.object && !this.engine.toolsManager.floorEditMarkers.includes(this.transformControl.object as THREE.Mesh)) {
             this.selectObject(null);
             this.engine.toolsManager.activeFloorId = null;

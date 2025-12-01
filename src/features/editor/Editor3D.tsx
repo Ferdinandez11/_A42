@@ -29,7 +29,8 @@ export const Editor3D = () => {
     selectItem,
     sunPosition,
     backgroundColor,
-    measurementResult 
+    measurementResult,
+    safetyZonesVisible // <--- NUEVO
   } = useAppStore();
 
   useEffect(() => {
@@ -52,7 +53,11 @@ export const Editor3D = () => {
   useEffect(() => { if (engineRef.current) engineRef.current.syncSceneFromStore(items); }, [items]);
   useEffect(() => { if (engineRef.current) engineRef.current.switchCamera(cameraType); }, [cameraType]);
   
-  // Limpieza automática
+  // NUEVO: Sync Seguridad
+  useEffect(() => { 
+      if (engineRef.current) engineRef.current.updateSafetyZones(safetyZonesVisible); 
+  }, [safetyZonesVisible]);
+
   useEffect(() => {
     if (engineRef.current) {
         engineRef.current.clearTools(); 
@@ -144,7 +149,6 @@ export const Editor3D = () => {
         </div>
       )}
 
-      {/* AQUÍ ESTÁ LA MAGIA: EL MODAL */}
       <InputModal />
 
       <div className="absolute bottom-6 right-6 text-white/5 font-black text-4xl pointer-events-none select-none">A42</div>
