@@ -1,7 +1,7 @@
 // --- START OF FILE src/features/editor/ui/Toolbar.tsx ---
 import React, { useState, useRef } from 'react';
 import { 
-  MousePointer2, Grid3X3, Component, Trees, Grid, Undo2, Redo2, Eye, Box, ArrowUp, ArrowRight, GalleryVerticalEnd, Square, Sun, Upload, Ruler 
+  MousePointer2, Grid3X3, Component, Trees, Grid, Undo2, Redo2, Eye, Box, ArrowUp, ArrowRight, GalleryVerticalEnd, Square, Sun, Upload, Ruler, Footprints 
 } from 'lucide-react';
 import { useAppStore } from '../../../stores/useAppStore';
 import './Editor.css';
@@ -29,6 +29,12 @@ export const Toolbar = () => {
   const toggleMeasureMode = () => {
     if (mode === 'measuring') { setMode('idle'); setMeasurementResult(null); } 
     else { setMode('measuring'); setShowViews(false); }
+  };
+
+  const activateWalkMode = () => {
+    // Accedemos al motor globalmente para activar el PointerLock
+    // @ts-ignore
+    window.editorEngine?.walkManager.enable();
   };
 
   return (
@@ -67,6 +73,13 @@ export const Toolbar = () => {
         <button className={`tool-btn ${mode === 'measuring' ? 'active' : ''}`} onClick={toggleMeasureMode} title="Medir">
             <Ruler size={20} /> <span className="tool-label">Medir</span>
         </button>
+        <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
+        
+        {/* BOTÓN MODO PASEO */}
+        <button className="tool-btn" onClick={activateWalkMode} title="Paseo (WASD)">
+            <Footprints size={20} /> <span className="tool-label">Paseo</span>
+        </button>
+        
         <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
         <button className={`tool-btn ${gridVisible ? 'active' : ''}`} onClick={toggleGrid}>
           <Grid size={20} /> <span className="tool-label">Grid</span>
