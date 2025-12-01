@@ -9,7 +9,8 @@ import { ObjectManager } from './managers/ObjectManager';
 import { ToolsManager } from './managers/ToolsManager';
 import { InteractionManager } from './managers/InteractionManager';
 import { WalkManager } from './managers/WalkManager';
-import { RecorderManager } from './managers/RecorderManager'; // <--- IMPORT NUEVO
+import { RecorderManager } from './managers/RecorderManager';
+import { ExportManager } from './managers/ExportManager'; // <--- IMPORT NUEVO
 
 export class A42Engine {
   public sceneManager: SceneManager;
@@ -17,7 +18,8 @@ export class A42Engine {
   public toolsManager: ToolsManager;
   public interactionManager: InteractionManager;
   public walkManager: WalkManager;
-  public recorderManager: RecorderManager; // <--- PROPIEDAD NUEVA
+  public recorderManager: RecorderManager;
+  public exportManager: ExportManager; // <--- PROPIEDAD NUEVA
 
   private clock: THREE.Clock;
   private savedBackground: THREE.Color | THREE.Texture | null = null;
@@ -34,7 +36,8 @@ export class A42Engine {
     this.toolsManager = new ToolsManager(this.sceneManager.scene);
     this.interactionManager = new InteractionManager(this);
     this.walkManager = new WalkManager(this);
-    this.recorderManager = new RecorderManager(this); // <--- INICIALIZAR
+    this.recorderManager = new RecorderManager(this);
+    this.exportManager = new ExportManager(this); // <--- INICIALIZAR
 
     window.addEventListener('resize', this.onWindowResize);
     window.addEventListener('keydown', this.onKeyDown);
@@ -71,17 +74,14 @@ export class A42Engine {
 
   // --- AR SETUP ---
   private async initAR() {
-
-        // 1. COMPROBACIÓN INTELIGENTE
-    // Si el navegador no tiene WebXR o no soporta AR inmersiva, NO hacemos nada.
     if (!('xr' in navigator)) return; 
     
     try {
         // @ts-ignore
         const isSupported = await navigator.xr.isSessionSupported('immersive-ar');
-        if (!isSupported) return; // Si no hay AR, nos vamos y no ensuciamos la pantalla
+        if (!isSupported) return; 
     } catch (e) {
-        return; // Si da error al comprobar, tampoco mostramos nada
+        return; 
     }
 
     const arBtn = ARButton.createButton(this.renderer, { 
@@ -127,7 +127,6 @@ export class A42Engine {
         document.documentElement.style.removeProperty('background');
     });
 
-    // --- LA JAULA DEL BOTÓN ---
     const arContainer = document.createElement('div');
     arContainer.style.position = 'absolute';
     arContainer.style.bottom = '20px';
@@ -252,11 +251,14 @@ export class A42Engine {
   
   private render = () => { 
       const delta = this.clock.getDelta();
+      
       this.walkManager.update(delta);
       this.recorderManager.update(delta);
+
       if (!this.walkManager.isEnabled) {
         this.sceneManager.controls.update(); 
       }
+
       this.sceneManager.renderer.render(this.scene, this.activeCamera); 
   }
 

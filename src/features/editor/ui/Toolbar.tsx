@@ -1,7 +1,7 @@
 // --- START OF FILE src/features/editor/ui/Toolbar.tsx ---
 import React, { useState, useRef } from 'react';
 import { 
-  MousePointer2, Grid3X3, Component, Trees, Grid, Undo2, Redo2, Eye, Box, ArrowUp, ArrowRight, GalleryVerticalEnd, Square, Sun, Upload, Ruler, Footprints, Video, Camera, Film
+  MousePointer2, Grid3X3, Component, Trees, Grid, Undo2, Redo2, Eye, Box, ArrowUp, ArrowRight, GalleryVerticalEnd, Square, Sun, Upload, Ruler, Footprints, Video, Camera, Film, Download, FileText
 } from 'lucide-react';
 import { useAppStore } from '../../../stores/useAppStore';
 import './Editor.css';
@@ -37,7 +37,7 @@ export const Toolbar = () => {
     window.editorEngine?.walkManager.enable();
   };
 
-  // --- ACCIONES MEDIA ---
+  // --- ACCIONES MEDIA Y EXPORTACIÓN ---
   const takePhoto = () => {
     // @ts-ignore
     window.editorEngine?.recorderManager.takeScreenshot();
@@ -46,6 +46,16 @@ export const Toolbar = () => {
   const start360Video = () => {
     // @ts-ignore
     window.editorEngine?.recorderManager.startOrbitAnimation();
+  };
+
+  const exportGLB = () => {
+    // @ts-ignore
+    window.editorEngine?.exportManager.exportGLB();
+  };
+
+  const exportDXF = () => {
+    // @ts-ignore
+    window.editorEngine?.exportManager.exportDXF();
   };
 
   const toggleRecording = () => {
@@ -108,6 +118,16 @@ export const Toolbar = () => {
         <button className="tool-btn" onClick={start360Video} title="Video 360 Auto (8s)">
             <Film size={20} /> <span className="tool-label">360º</span>
         </button>
+
+        {/* BOTONES EXPORTAR */}
+        <button className="tool-btn" onClick={exportGLB} title="Exportar 3D (.glb)">
+            <Download size={20} /> <span className="tool-label">3D</span>
+        </button>
+        <button className="tool-btn" onClick={exportDXF} title="Exportar Plano (.dxf)">
+            <FileText size={20} /> <span className="tool-label">CAD</span>
+        </button>
+
+        <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
 
         <button className="tool-btn" onClick={activateWalkMode} title="Paseo (WASD)">
             <Footprints size={20} /> <span className="tool-label">Paseo</span>
