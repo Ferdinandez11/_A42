@@ -9,10 +9,14 @@ import { FenceProperties } from './ui/FenceProperties';
 import { useAppStore } from '../../stores/useAppStore';
 import { Euro, Move, RotateCw, Scaling, Trash2, Copy } from 'lucide-react';
 import { InputModal } from './ui/InputModal';
+import { QrCode } from 'lucide-react'; 
+import { QRModal } from './ui/QRModal';
+import { useState } from 'react'; // Necesitamos estado local
 
 export const Editor3D = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<A42Engine | null>(null);
+  const [isQRVisible, setQRVisible] = useState(false);
   
   const { 
     mode, 
@@ -137,6 +141,18 @@ export const Editor3D = () => {
         <Toolbar />
       </div>
 
+      {/* BOTÓN QR - Lo ponemos arriba a la derecha, junto a los paneles o donde prefieras */}
+      <div className="absolute top-6 right-6 z-20 flex gap-3">
+          {/* Aquí supongo que tienes botones de usuario o algo, añadimos el del QR */}
+          <button 
+            onClick={() => setQRVisible(true)}
+            className="bg-neutral-800/90 hover:bg-neutral-700 text-white p-3 rounded-full border border-neutral-600 shadow-lg transition-all group"
+            title="Ver en móvil (AR)"
+          >
+            <QrCode size={20} className="group-hover:text-blue-400 transition-colors" />
+          </button>
+      </div>
+
       {/* RESULTADO DE LA MEDICIÓN */}
       {mode === 'measuring' && (
         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
@@ -150,7 +166,7 @@ export const Editor3D = () => {
       )}
 
       <InputModal />
-
+      <QRModal isOpen={isQRVisible} onClose={() => setQRVisible(false)} />
       <div className="absolute bottom-6 right-6 text-white/5 font-black text-4xl pointer-events-none select-none">A42</div>
     </div>
   );
