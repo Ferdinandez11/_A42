@@ -1,7 +1,7 @@
 // --- START OF FILE src/features/editor/ui/Toolbar.tsx ---
 import React, { useState, useRef } from 'react';
 import { 
-  MousePointer2, Grid3X3, Component, Trees, Grid, Undo2, Redo2, Eye, Box, ArrowUp, ArrowRight, GalleryVerticalEnd, Square, Sun, Upload, Ruler, Footprints, Video, Camera, Film, Download, FileText, ShieldAlert
+  MousePointer2, Grid3X3, Component, Trees, Grid, Undo2, Redo2, Eye, Box, ArrowUp, ArrowRight, GalleryVerticalEnd, Square, Sun, Upload, Ruler, Footprints, Video, Camera, Film, Download, FileText, ShieldAlert, FileDown
 } from 'lucide-react';
 import { useAppStore } from '../../../stores/useAppStore';
 import './Editor.css';
@@ -17,6 +17,12 @@ export const Toolbar = () => {
     { id: 'drawing_fence', icon: <Component size={20} />, label: 'Valla' },
     { id: 'catalog', icon: <Trees size={20} />, label: 'Catálogo' },
   ];
+  
+  // --- ACCIÓN PDF ---
+  const generatePDF = () => {
+    // @ts-ignore
+    window.editorEngine?.pdfManager.generatePDF();
+  };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -130,6 +136,11 @@ export const Toolbar = () => {
         </button>
         <button className="tool-btn" onClick={exportDXF} title="Exportar Plano (.dxf)">
             <FileText size={20} /> <span className="tool-label">CAD</span>
+        </button>
+
+                {/* BOTÓN PDF */}
+        <button className="tool-btn" onClick={generatePDF} title="Generar Dossier PDF">
+            <FileDown size={20} /> <span className="tool-label">PDF</span>
         </button>
 
         <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />

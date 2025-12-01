@@ -3,7 +3,6 @@ import { create } from 'zustand';
 import * as THREE from 'three'; 
 import { FENCE_PRESETS } from '../features/editor/data/fence_presets';
 
-// ... (Tipos e interfaces anteriores se mantienen igual)
 export interface ProductDefinition { 
   id: string;
   name: string;
@@ -12,7 +11,12 @@ export interface ProductDefinition {
   modelUrl?: string; 
   img_2d?: string; 
   line?: string; 
-  category?: string; 
+  category?: string;
+  
+  // Nuevos campos del CSV
+  url_tech?: string;
+  url_cert?: string;
+  url_inst?: string;
 }
 
 export type FloorMaterialType = 'rubber_red' | 'rubber_green' | 'rubber_blue' | 'grass' | 'concrete';
@@ -41,8 +45,16 @@ export interface SceneItem {
 
   fenceConfig?: FenceConfig;
 
+  // Nuevos campos para el PDF
+  url_tech?: string;
+  url_cert?: string;
+  url_inst?: string;
+
   data?: any; 
 }
+
+// ... (El resto del archivo, AppState y useAppStore, se mantiene IGUAL que antes)
+// Solo asegúrate de que cuando hagas 'addItem' en el futuro, pases estos datos si los tienes.
 
 export type CameraView = 'top' | 'front' | 'side' | 'iso';
 
@@ -70,21 +82,24 @@ interface AppState {
   past: SceneItem[][];
   future: SceneItem[][];
 
+  // --- CAD STATE ---
   selectedVertexIndices: number[];
   measuredDistance: number | null;
   measuredAngle: number | null;
 
+  // --- FENCE STATE ---
   fenceConfig: FenceConfig;
 
-  // --- NUEVO: ZONAS DE SEGURIDAD ---
-  safetyZonesVisible: boolean; // Estado del botón
-
+  // --- INPUT MODAL STATE ---
   inputModal: {
     isOpen: boolean;
     title: string;
     defaultValue: string;
     resolve: ((value: string | null) => void) | null;
   };
+
+  // --- ZONAS SEGURIDAD ---
+  safetyZonesVisible: boolean;
 
   // Acciones
   setMode: (mode: AppState['mode']) => void;
@@ -125,7 +140,6 @@ interface AppState {
   requestInput: (title: string, defaultValue?: string) => Promise<string | null>;
   closeInputModal: (value: string | null) => void;
 
-  // --- NUEVO: ACCIÓN TOGGLE ZONAS ---
   toggleSafetyZones: () => void;
 }
 
@@ -158,7 +172,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     colors: FENCE_PRESETS['wood'].defaultColors
   },
 
-  // Estado inicial Zonas
   safetyZonesVisible: false,
 
   inputModal: {
@@ -189,7 +202,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  // Acción Toggle
   toggleSafetyZones: () => set((state) => ({ safetyZonesVisible: !state.safetyZonesVisible })),
 
   setMode: (mode) => {

@@ -11,7 +11,12 @@ export interface ProductDefinition {
   modelUrl?: string; 
   img_2d?: string; 
   line?: string; 
-  category?: string; 
+  category?: string;
+  
+  // Nuevos campos del CSV
+  url_tech?: string;
+  url_cert?: string;
+  url_inst?: string;
 }
 
 export type FloorMaterialType = 'rubber_red' | 'rubber_green' | 'rubber_blue' | 'grass' | 'concrete';
@@ -40,8 +45,16 @@ export interface SceneItem {
 
   fenceConfig?: FenceConfig;
 
+  // Nuevos campos para el PDF
+  url_tech?: string;
+  url_cert?: string;
+  url_inst?: string;
+
   data?: any; 
 }
+
+// ... (El resto del archivo, AppState y useAppStore, se mantiene IGUAL que antes)
+// Solo asegúrate de que cuando hagas 'addItem' en el futuro, pases estos datos si los tienes.
 
 export type CameraView = 'top' | 'front' | 'side' | 'iso';
 
@@ -74,8 +87,19 @@ interface AppState {
   measuredDistance: number | null;
   measuredAngle: number | null;
 
-  // --- FENCE STATE (GLOBAL DEFAULT) ---
+  // --- FENCE STATE ---
   fenceConfig: FenceConfig;
+
+  // --- INPUT MODAL STATE ---
+  inputModal: {
+    isOpen: boolean;
+    title: string;
+    defaultValue: string;
+    resolve: ((value: string | null) => void) | null;
+  };
+
+  // --- ZONAS SEGURIDAD ---
+  safetyZonesVisible: boolean;
 
   // Acciones
   setMode: (mode: AppState['mode']) => void;
@@ -97,9 +121,8 @@ interface AppState {
   updateFloorTexture: (uuid: string, url: string | undefined, scale: number, rotation: number) => void;
   updateFloorPoints: (uuid: string, points: { x: number, z: number }[]) => void;
 
-  // Vallas
-  setFenceConfig: (config: Partial<FenceConfig>) => void; // Configuración global (para nuevas)
-  updateItemFenceConfig: (uuid: string, config: Partial<FenceConfig>) => void; // Para vallas existentes
+  setFenceConfig: (config: Partial<FenceConfig>) => void; 
+  updateItemFenceConfig: (uuid: string, config: Partial<FenceConfig>) => void; 
   
   removeItem: (uuid: string) => void;
   duplicateItem: (uuid: string) => void; 
@@ -113,6 +136,11 @@ interface AppState {
   resetScene: () => void;
 
   setSelectedVertices: (indices: number[], distance: number | null, angle: number | null) => void;
+
+  requestInput: (title: string, defaultValue?: string) => Promise<string | null>;
+  closeInputModal: (value: string | null) => void;
+
+  toggleSafetyZones: () => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({ 
@@ -144,13 +172,43 @@ export const useAppStore = create<AppState>((set, get) => ({
     colors: FENCE_PRESETS['wood'].defaultColors
   },
 
+  safetyZonesVisible: false,
+
+  inputModal: {
+    isOpen: false,
+    title: '',
+    defaultValue: '',
+    resolve: null,
+  },
+
+  requestInput: (title: string, defaultValue = '') => {
+    return new Promise((resolve) => {
+      set({
+        inputModal: {
+          isOpen: true,
+          title,
+          defaultValue,
+          resolve, 
+        },
+      });
+    });
+  },
+
+  closeInputModal: (value: string | null) => {
+    const { resolve } = get().inputModal;
+    if (resolve) resolve(value); 
+    set({
+      inputModal: { isOpen: false, title: '', defaultValue: '', resolve: null },
+    });
+  },
+
+  toggleSafetyZones: () => set((state) => ({ safetyZonesVisible: !state.safetyZonesVisible })),
+
   setMode: (mode) => {
     if (mode !== 'editing') set({ selectedItemId: null });
     if (mode !== 'measuring') set({ measurementResult: null });
-    
     // @ts-ignore
     if (window.editorEngine) window.editorEngine.clearTools();
-
     set({ mode, selectedVertexIndices: [], measuredDistance: null, measuredAngle: null });
   },
 
@@ -258,12 +316,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     }));
   },
 
-  // Acción global (para nuevas)
   setFenceConfig: (config) => set((state) => ({
       fenceConfig: { ...state.fenceConfig, ...config }
   })),
 
-  // Acción específica (para editar existentes) - AQUÍ ESTÁ LO NUEVO
   updateItemFenceConfig: (uuid, config) => {
     get().saveSnapshot();
     set((state) => ({

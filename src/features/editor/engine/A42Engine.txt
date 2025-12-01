@@ -62,11 +62,6 @@ export class A42Engine {
   public setGridVisible(v: boolean) { this.sceneManager.setGridVisible(v); }
   public updateSunPosition(azimuth: number, elevation: number) { this.sceneManager.updateSunPosition(azimuth, elevation); }
   
-  // NUEVO: Método para mostrar/ocultar el marco de la portada
-  public togglePDFFraming(visible: boolean) {
-      this.sceneManager.setFrameVisible(visible);
-  }
-
   public switchCamera(type: 'perspective' | 'orthographic') { 
       this.sceneManager.switchCamera(type);
       this.interactionManager.updateCamera(this.sceneManager.activeCamera);
@@ -80,6 +75,7 @@ export class A42Engine {
 
   public setGizmoMode(mode: 'translate' | 'rotate' | 'scale') { this.interactionManager.setGizmoMode(mode); }
 
+  // --- GESTIÓN DE ZONAS DE SEGURIDAD ---
   public updateSafetyZones(visible: boolean) {
       this.scene.traverse((obj) => {
           if (obj.userData?.isSafetyZone) {
@@ -88,6 +84,7 @@ export class A42Engine {
       });
   }
 
+  // Visualizador de colisiones (Pone rojo si chocan)
   public checkSafetyCollisions() {
       if (!useAppStore.getState().safetyZonesVisible) return;
 
@@ -99,6 +96,7 @@ export class A42Engine {
               zones.push(obj as THREE.Mesh);
               boxes.push(new THREE.Box3().setFromObject(obj));
               
+              // Reset visual
               (obj as THREE.Mesh).material = new THREE.MeshBasicMaterial({ 
                   color: 0xff0000, 
                   transparent: true, 
@@ -126,9 +124,13 @@ export class A42Engine {
       }
   }
 
+  // --- NUEVO: DETECTOR DE COLISIÓN PARA UN OBJETO ESPECÍFICO ---
+  // Devuelve true si el objeto 'target' está chocando con algo inválido
   public isObjectColliding(target: THREE.Object3D): boolean {
+      // Si las zonas están apagadas, no hay reglas de colisión
       if (!useAppStore.getState().safetyZonesVisible) return false;
 
+      // 1. Buscamos las zonas de seguridad DENTRO del objeto que movemos
       const targetZones: THREE.Box3[] = [];
       target.traverse((child) => {
           if (child.userData?.isSafetyZone) {
@@ -136,11 +138,13 @@ export class A42Engine {
           }
       });
 
-      if (targetZones.length === 0) return false; 
+      if (targetZones.length === 0) return false; // El objeto no tiene zona de seguridad
 
+      // 2. Buscamos TODAS las otras zonas de la escena (que no sean del objeto que muevo)
       const otherZones: THREE.Box3[] = [];
       this.scene.traverse((obj) => {
           if (obj.userData?.isSafetyZone && obj.visible) {
+              // Verificamos que este 'obj' no sea hijo del 'target' que estamos moviendo
               let isChildOfTarget = false;
               let parent = obj.parent;
               while(parent) {
@@ -154,16 +158,18 @@ export class A42Engine {
           }
       });
 
+      // 3. Comprobamos choques
       for (const tBox of targetZones) {
           for (const oBox of otherZones) {
               if (tBox.intersectsBox(oBox)) {
-                  return true; 
+                  return true; // ¡Colisión detectada!
               }
           }
       }
 
-      return false; 
+      return false; // Todo limpio
   }
+  // -------------------------------------------------------------
 
   private async initAR() {
     if (!('xr' in navigator)) return; 

@@ -14,7 +14,9 @@ export class SceneManager {
   public gridHelper: THREE.GridHelper | null = null;
   public dirLight: THREE.DirectionalLight | null = null;
   public sky: Sky | null = null;
+  
   private container: HTMLElement;
+  private frameOverlay: HTMLElement | null = null;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -24,15 +26,17 @@ export class SceneManager {
 
     // Escena
     this.scene = new THREE.Scene();
+    // Fondo de seguridad inicial (Gris oscuro elegante en lugar de negro vacío)
+    this.scene.background = new THREE.Color(0x222222);
 
     // Cámaras
-    this.perspectiveCamera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000);
+    this.perspectiveCamera = new THREE.PerspectiveCamera(45, aspect, 0.1, 10000);
     this.perspectiveCamera.position.set(10, 15, 10);
 
     const frustumSize = 20;
     this.orthoCamera = new THREE.OrthographicCamera(
       frustumSize * aspect / -2, frustumSize * aspect / 2,
-      frustumSize / 2, frustumSize / -2, 0.1, 1000
+      frustumSize / 2, frustumSize / -2, 0.1, 10000
     );
     this.orthoCamera.position.set(20, 20, 20);
     this.orthoCamera.lookAt(0, 0, 0);
@@ -40,13 +44,20 @@ export class SceneManager {
     this.activeCamera = this.perspectiveCamera;
 
     // Renderer
-    this.renderer = new THREE.WebGLRenderer({antialias: true, alpha: true, preserveDrawingBuffer: true });
+    // CAMBIO IMPORTANTE: alpha: false para evitar transparencias accidentales con el HTML
+    this.renderer = new THREE.WebGLRenderer({
+        antialias: true, 
+        alpha: false, 
+        preserveDrawingBuffer: true,
+        powerPreference: "high-performance"
+    });
     this.renderer.setSize(width, height);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Calidad nítida
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 0.8;
+    this.renderer.toneMappingExposure = 1.0;
 
     container.appendChild(this.renderer.domElement);
 
@@ -54,32 +65,111 @@ export class SceneManager {
     this.controls = new OrbitControls(this.activeCamera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.05;
+    this.controls.screenSpacePanning = false;
+    this.controls.minDistance = 1;
+    this.controls.maxDistance = 500;
+    this.controls.maxPolarAngle = Math.PI / 2 - 0.05; // Evitar que la cámara pase bajo el suelo
 
     this.initEnvironment();
+    this.initFrameOverlay();
     
-    // Shadow Plane
-    const shadowPlane = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), new THREE.ShadowMaterial({ opacity: 0.3, color: 0x000000 }));
+    // Shadow Plane (Suelo que recibe sombras)
+    const shadowPlane = new THREE.Mesh(
+        new THREE.PlaneGeometry(2000, 2000), 
+        new THREE.ShadowMaterial({ opacity: 0.3, color: 0x000000 })
+    );
     shadowPlane.rotation.x = -Math.PI / 2;
-    shadowPlane.position.y = 0.005;
+    shadowPlane.position.y = 0.001; // Ligeramente elevado para evitar z-fighting
     shadowPlane.receiveShadow = true;
+    shadowPlane.name = "ShadowPlane";
     this.scene.add(shadowPlane);
   }
 
+  // --- LÓGICA DEL MARCO DE ENCUADRE (Para PDF) ---
+  private initFrameOverlay() {
+      this.frameOverlay = document.createElement('div');
+      
+      this.frameOverlay.style.position = 'absolute';
+      this.frameOverlay.style.border = '2px dashed rgba(255, 255, 255, 0.9)';
+      this.frameOverlay.style.boxShadow = '0 0 0 9999px rgba(0, 0, 0, 0.7)'; // Más oscuro fuera
+      this.frameOverlay.style.pointerEvents = 'none';
+      this.frameOverlay.style.zIndex = '100';
+      this.frameOverlay.style.display = 'none';
+      this.frameOverlay.style.left = '50%';
+      this.frameOverlay.style.top = '50%';
+      this.frameOverlay.style.transform = 'translate(-50%, -50%)';
+
+      const label = document.createElement('div');
+      label.innerText = 'ÁREA PDF PORTADA';
+      label.style.position = 'absolute';
+      label.style.bottom = '-25px';
+      label.style.left = '50%';
+      label.style.transform = 'translateX(-50%)';
+      label.style.color = 'white';
+      label.style.fontWeight = 'bold';
+      label.style.fontFamily = 'sans-serif';
+      label.style.fontSize = '12px';
+      
+      this.frameOverlay.appendChild(label);
+      
+      // Asegurar posición relativa en el contenedor padre
+      if (getComputedStyle(this.container).position === 'static') {
+          this.container.style.position = 'relative';
+      }
+      this.container.appendChild(this.frameOverlay);
+  }
+
+  public setFrameVisible(visible: boolean) {
+      if (this.frameOverlay) {
+          this.frameOverlay.style.display = visible ? 'block' : 'none';
+          if (visible) this.updateFrameDimensions();
+      }
+  }
+
+  public updateFrameDimensions() {
+      if (!this.frameOverlay || this.frameOverlay.style.display === 'none') return;
+
+      const containerW = this.container.clientWidth;
+      const containerH = this.container.clientHeight;
+      
+      // 170mm / 120mm = ~1.416
+      const targetAspect = 170 / 120;
+      const screenAspect = containerW / containerH;
+
+      let frameW, frameH;
+
+      if (screenAspect > targetAspect) {
+          frameH = containerH * 0.85; 
+          frameW = frameH * targetAspect;
+      } else {
+          frameW = containerW * 0.85; 
+          frameH = frameW / targetAspect;
+      }
+
+      this.frameOverlay.style.width = `${frameW}px`;
+      this.frameOverlay.style.height = `${frameH}px`;
+  }
+
   private initEnvironment() {
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 0.4);
+    // Luz ambiental
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 0.6);
     this.scene.add(hemiLight);
 
-    this.dirLight = new THREE.DirectionalLight(0xffffff, 2);
-    this.dirLight.position.set(10, 20, 10);
+    // Sol
+    this.dirLight = new THREE.DirectionalLight(0xffffff, 2.5);
+    this.dirLight.position.set(50, 80, 50);
     this.dirLight.castShadow = true;
-    this.dirLight.shadow.mapSize.set(2048, 2048);
-    this.dirLight.shadow.camera.left = -50;
-    this.dirLight.shadow.camera.right = 50;
-    this.dirLight.shadow.camera.top = 50;
-    this.dirLight.shadow.camera.bottom = -50;
-    this.dirLight.shadow.bias = -0.0005;
+    this.dirLight.shadow.mapSize.width = 2048;
+    this.dirLight.shadow.mapSize.height = 2048;
+    const d = 50;
+    this.dirLight.shadow.camera.left = -d;
+    this.dirLight.shadow.camera.right = d;
+    this.dirLight.shadow.camera.top = d;
+    this.dirLight.shadow.camera.bottom = -d;
+    this.dirLight.shadow.bias = -0.0001;
     this.scene.add(this.dirLight);
 
+    // Cielo
     this.sky = new Sky();
     this.sky.scale.setScalar(450000);
     const uniforms = this.sky.material.uniforms;
@@ -87,13 +177,16 @@ export class SceneManager {
     uniforms['rayleigh'].value = 3;
     uniforms['mieCoefficient'].value = 0.005;
     uniforms['mieDirectionalG'].value = 0.7;
-    const sun = new THREE.Vector3();
-    sun.setFromSphericalCoords(1, THREE.MathUtils.degToRad(45), THREE.MathUtils.degToRad(180));
-    uniforms['sunPosition'].value.copy(sun);
+    
+    // Posición inicial del sol
+    this.updateSunPosition(180, 45); // Sur, 45 grados
     this.scene.add(this.sky);
 
+    // Rejilla (GRID)
+    // CAMBIO IMPORTANTE: Visible por defecto para que no veas "la nada"
     this.gridHelper = new THREE.GridHelper(100, 100, 0x888888, 0x444444);
-    this.gridHelper.visible = false;
+    this.gridHelper.visible = true; 
+    this.gridHelper.position.y = 0.002;
     this.scene.add(this.gridHelper);
   }
 
@@ -103,8 +196,9 @@ export class SceneManager {
     const theta = THREE.MathUtils.degToRad(azimuth);
     const sunPosition = new THREE.Vector3();
     sunPosition.setFromSphericalCoords(1, phi, theta);
+    
     this.sky.material.uniforms['sunPosition'].value.copy(sunPosition);
-    this.dirLight.position.copy(sunPosition).multiplyScalar(50);
+    this.dirLight.position.copy(sunPosition).multiplyScalar(100);
   }
 
   public setBackgroundColor(color: string) {
@@ -115,7 +209,8 @@ export class SceneManager {
   public setSkyVisible(visible: boolean) {
     if (this.sky) { 
         this.sky.visible = visible; 
-        this.scene.background = null; 
+        // Si activamos el cielo, quitamos el color sólido de fondo
+        if (visible) this.scene.background = null; 
     }
   }
 
@@ -129,13 +224,19 @@ export class SceneManager {
     
     if (type === 'orthographic') { 
         this.activeCamera = this.orthoCamera; 
+        // Ajustar zoom ortográfico si es necesario
+        this.orthoCamera.zoom = 1; 
+        this.orthoCamera.updateProjectionMatrix();
     } else { 
         this.activeCamera = this.perspectiveCamera; 
     }
     
+    // Intentar mantener la posición relativa
     this.activeCamera.position.copy(oldPos);
     this.activeCamera.lookAt(target);
+    
     this.controls.object = this.activeCamera;
+    this.controls.update();
   }
 
   public setView(view: CameraView) {
@@ -169,10 +270,16 @@ export class SceneManager {
     this.orthoCamera.updateProjectionMatrix();
     
     this.renderer.setSize(w, h);
+    
+    this.updateFrameDimensions();
   }
 
   public dispose() {
-    try { this.container.removeChild(this.renderer.domElement); } catch (e) {}
+    try { 
+        this.container.removeChild(this.renderer.domElement); 
+        if(this.frameOverlay) this.container.removeChild(this.frameOverlay);
+    } catch (e) {}
     this.renderer.dispose();
   }
 }
+// --- END OF FILE src/features/editor/engine/managers/SceneManager.ts ---
