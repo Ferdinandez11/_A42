@@ -74,16 +74,8 @@ interface AppState {
   measuredDistance: number | null;
   measuredAngle: number | null;
 
-  // --- FENCE STATE ---
+  // --- FENCE STATE (GLOBAL DEFAULT) ---
   fenceConfig: FenceConfig;
-
-  // --- NUEVO: INPUT MODAL STATE ---
-  inputModal: {
-    isOpen: boolean;
-    title: string;
-    defaultValue: string;
-    resolve: ((value: string | null) => void) | null;
-  };
 
   // Acciones
   setMode: (mode: AppState['mode']) => void;
@@ -105,8 +97,9 @@ interface AppState {
   updateFloorTexture: (uuid: string, url: string | undefined, scale: number, rotation: number) => void;
   updateFloorPoints: (uuid: string, points: { x: number, z: number }[]) => void;
 
-  setFenceConfig: (config: Partial<FenceConfig>) => void; 
-  updateItemFenceConfig: (uuid: string, config: Partial<FenceConfig>) => void; 
+  // Vallas
+  setFenceConfig: (config: Partial<FenceConfig>) => void; // Configuración global (para nuevas)
+  updateItemFenceConfig: (uuid: string, config: Partial<FenceConfig>) => void; // Para vallas existentes
   
   removeItem: (uuid: string) => void;
   duplicateItem: (uuid: string) => void; 
@@ -120,10 +113,6 @@ interface AppState {
   resetScene: () => void;
 
   setSelectedVertices: (indices: number[], distance: number | null, angle: number | null) => void;
-
-  // --- NUEVO: INPUT MODAL ACTIONS ---
-  requestInput: (title: string, defaultValue?: string) => Promise<string | null>;
-  closeInputModal: (value: string | null) => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({ 
@@ -155,41 +144,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     colors: FENCE_PRESETS['wood'].defaultColors
   },
 
-  // --- IMPLEMENTACIÓN DEL MODAL ---
-  inputModal: {
-    isOpen: false,
-    title: '',
-    defaultValue: '',
-    resolve: null,
-  },
-
-  requestInput: (title: string, defaultValue = '') => {
-    return new Promise((resolve) => {
-      set({
-        inputModal: {
-          isOpen: true,
-          title,
-          defaultValue,
-          resolve, 
-        },
-      });
-    });
-  },
-
-  closeInputModal: (value: string | null) => {
-    const { resolve } = get().inputModal;
-    if (resolve) resolve(value); 
-    set({
-      inputModal: { isOpen: false, title: '', defaultValue: '', resolve: null },
-    });
-  },
-  // -------------------------------
-
   setMode: (mode) => {
     if (mode !== 'editing') set({ selectedItemId: null });
     if (mode !== 'measuring') set({ measurementResult: null });
+    
     // @ts-ignore
     if (window.editorEngine) window.editorEngine.clearTools();
+
     set({ mode, selectedVertexIndices: [], measuredDistance: null, measuredAngle: null });
   },
 
@@ -297,10 +258,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     }));
   },
 
+  // Acción global (para nuevas)
   setFenceConfig: (config) => set((state) => ({
       fenceConfig: { ...state.fenceConfig, ...config }
   })),
 
+  // Acción específica (para editar existentes) - AQUÍ ESTÁ LO NUEVO
   updateItemFenceConfig: (uuid, config) => {
     get().saveSnapshot();
     set((state) => ({

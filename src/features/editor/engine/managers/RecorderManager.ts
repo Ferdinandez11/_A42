@@ -1,6 +1,7 @@
 // --- START OF FILE src/features/editor/engine/managers/RecorderManager.ts ---
 import * as THREE from 'three';
 import type { A42Engine } from '../A42Engine';
+import { useAppStore } from '../../../../stores/useAppStore';
 
 export class RecorderManager {
   private engine: A42Engine;
@@ -14,9 +15,10 @@ export class RecorderManager {
   private orbitCenter = new THREE.Vector3();
   private orbitRadius = 10;
   private orbitHeight = 10;
-  // HE BORRADO orbitAngle PORQUE NO SE USABA
-  private orbitDuration = 8.0; // Segundos
+  private orbitDuration = 8.0; 
   private orbitTimeElapsed = 0;
+  
+  private pendingFileName: string = '';
 
   constructor(engine: A42Engine) {
     this.engine = engine;
@@ -53,57 +55,56 @@ export class RecorderManager {
     document.body.appendChild(this.recIndicator);
   }
 
-  // --- 1. FUNCIÓN FOTO INSTANTÁNEA ---
-  public takeScreenshot() {
+  // --- 1. FOTO ---
+  public async takeScreenshot() {
+    const name = await useAppStore.getState().requestInput("Nombre de la foto:", "captura");
+    if (name === null) return;
+
     this.engine.renderer.render(this.engine.scene, this.engine.activeCamera);
     const dataURL = this.engine.renderer.domElement.toDataURL('image/png');
     
     const a = document.createElement('a');
     a.href = dataURL;
-    a.download = `foto-a42-${new Date().getTime()}.png`;
+    a.download = `${name}.png`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
   }
 
-  // --- 2. FUNCIÓN ORBITAL 360 ---
-  public startOrbitAnimation() {
+  // --- 2. ORBIT 360 ---
+  public async startOrbitAnimation() {
     if (this.isRecording || this.isOrbiting) return;
 
-    // 1. Calcular el centro de todos los objetos (Bounding Box)
+    const name = await useAppStore.getState().requestInput("Nombre del video 360:", "video-360");
+    if (name === null) return;
+    
+    this.pendingFileName = name;
+
     const box = new THREE.Box3();
     let hasItems = false;
-    
     this.engine.scene.traverse((obj) => {
         if (obj.userData?.isItem) {
             box.expandByObject(obj);
             hasItems = true;
         }
     });
-
     if (!hasItems) {
-        alert("Añade objetos a la escena para hacer el vídeo.");
+        alert("Añade objetos a la escena.");
         return;
     }
 
-    // 2. Configurar parámetros de órbita
     box.getCenter(this.orbitCenter);
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.z);
     
-    // --- AJUSTES DE CÁMARA ---
     this.orbitRadius = maxDim * 0.85 + 2; 
     this.orbitHeight = maxDim * 0.4 + 1;       
-
     this.orbitTimeElapsed = 0;
 
-    // 3. Preparar cámara y controles
     this.engine.switchCamera('perspective'); 
     this.engine.sceneManager.controls.enabled = false; 
     
     this.isOrbiting = true;
-
-    // 4. Empezar a grabar
     this.startRecording();
   }
 
@@ -111,11 +112,7 @@ export class RecorderManager {
     if (!this.isOrbiting) return;
 
     this.orbitTimeElapsed += delta;
-
-    // Calcular progreso (0 a 1)
     const progress = this.orbitTimeElapsed / this.orbitDuration;
-
-    // Mover cámara en círculo
     const angle = progress * Math.PI * 2; 
 
     const camX = this.orbitCenter.x + Math.cos(angle) * this.orbitRadius;
@@ -124,7 +121,6 @@ export class RecorderManager {
     this.engine.activeCamera.position.set(camX, this.orbitCenter.y + this.orbitHeight, camZ);
     this.engine.activeCamera.lookAt(this.orbitCenter);
 
-    // Finalizar cuando pasen los 8 segundos
     if (this.orbitTimeElapsed >= this.orbitDuration) {
         this.stopOrbitAnimation();
     }
@@ -133,20 +129,23 @@ export class RecorderManager {
   private stopOrbitAnimation() {
     this.isOrbiting = false;
     this.stopRecording();
-    this.engine.sceneManager.controls.enabled = true; // Devolver control al usuario
+    this.engine.sceneManager.controls.enabled = true; 
   }
 
-  // --- GRABACIÓN ESTÁNDAR ---
+  // --- GRABACIÓN GENÉRICA ---
   public startRecording() {
     if (this.isRecording) return; 
+    
+    if (!this.isOrbiting) {
+        this.pendingFileName = '';
+    }
 
     const canvas = this.engine.renderer.domElement;
     const stream = canvas.captureStream(30);
     
     let mimeType = 'video/webm;codecs=vp9';
-    if (!MediaRecorder.isTypeSupported(mimeType)) {
-      mimeType = 'video/webm'; 
-    }
+    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm'; 
+    
     const options: MediaRecorderOptions = { mimeType: mimeType };
 
     try {
@@ -178,19 +177,33 @@ export class RecorderManager {
     console.log("🛑 Grabación detenida.");
   }
 
-  private saveVideo = () => {
+  private saveVideo = async () => {
+    let fileName = this.pendingFileName;
+    if (!fileName) {
+        // Pedimos nombre tras la grabación manual
+        setTimeout(async () => {
+             const result = await useAppStore.getState().requestInput("Nombre del recorrido:", "paseo-virtual");
+             if (result === null) return; 
+             this.downloadBlob(result);
+        }, 50);
+    } else {
+        this.downloadBlob(fileName);
+    }
+  };
+
+  private downloadBlob(filename: string) {
     const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.style.display = 'none';
     a.href = url;
-    a.download = `video-360-${new Date().getTime()}.webm`;
+    a.download = `${filename}.webm`;
     document.body.appendChild(a);
     a.click();
     setTimeout(() => {
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     }, 100);
-  };
+  }
 }
 // --- END OF FILE src/features/editor/engine/managers/RecorderManager.ts ---

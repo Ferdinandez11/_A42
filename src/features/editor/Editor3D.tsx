@@ -5,9 +5,10 @@ import { Toolbar } from './ui/Toolbar';
 import { BudgetPanel } from './ui/BudgetPanel';
 import { EnvironmentPanel } from './ui/EnvironmentPanel';
 import { FloorProperties } from './ui/FloorProperties';
-import { FenceProperties } from './ui/FenceProperties'; // <--- NUEVO IMPORT
+import { FenceProperties } from './ui/FenceProperties';
 import { useAppStore } from '../../stores/useAppStore';
 import { Euro, Move, RotateCw, Scaling, Trash2, Copy } from 'lucide-react';
+import { InputModal } from './ui/InputModal';
 
 export const Editor3D = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -99,7 +100,7 @@ export const Editor3D = () => {
       <BudgetPanel />
       <EnvironmentPanel />
       <FloorProperties />
-      <FenceProperties /> {/* <--- NUEVO COMPONENTE DE VALLAS */}
+      <FenceProperties />
 
       <div className="absolute bottom-6 left-6 z-20">
         <button 
@@ -131,7 +132,7 @@ export const Editor3D = () => {
         <Toolbar />
       </div>
 
-      {/* AQUÍ ESTÁ EL RESULTADO DE LA MEDICIÓN (FIJO ARRIBA) */}
+      {/* RESULTADO DE LA MEDICIÓN */}
       {mode === 'measuring' && (
         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
             <div className="bg-black/80 backdrop-blur-md text-white px-6 py-3 rounded-full border border-white/20 shadow-2xl font-mono text-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4">
@@ -142,6 +143,9 @@ export const Editor3D = () => {
             </div>
         </div>
       )}
+
+      {/* AQUÍ ESTÁ LA MAGIA: EL MODAL */}
+      <InputModal />
 
       <div className="absolute bottom-6 right-6 text-white/5 font-black text-4xl pointer-events-none select-none">A42</div>
     </div>
