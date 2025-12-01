@@ -7,6 +7,7 @@ import { Editor3D } from './features/editor/Editor3D';
 import { Catalog } from './features/editor/ui/Catalog';
 import { useAppStore } from './stores/useAppStore';
 import { CrmDashboard } from './features/crm/pages/CrmDashboard';
+import { ClientDashboard } from './features/crm/pages/ClientDashboard';
 
 // --- ESTILOS COMPARTIDOS (DARK MODE) ---
 
@@ -80,8 +81,9 @@ const ClientPortalLayout = () => {
       <header style={{ background: '#1e1e1e', borderBottom: '1px solid #333', padding: '15px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h3 style={{ margin: 0, color: '#fff' }}>Portal del Cliente 👋</h3>
         <nav style={{ display: 'flex', gap: '20px', alignItems:'center' }}>
-          <Link to="/portal/quotes" style={{ color: '#fff', textDecoration: 'none' }}>Mis Presupuestos</Link>
-          <Link to="/portal/orders" style={{ color: '#bbb', textDecoration: 'none' }}>Mis Pedidos</Link>
+          {/* CAMBIO: Ahora usamos ?tab=... */}
+          <Link to="/portal?tab=projects" style={{ color: '#fff', textDecoration: 'none' }}>Mis Proyectos</Link>
+          <Link to="/portal?tab=orders" style={{ color: '#bbb', textDecoration: 'none' }}>Mis Pedidos</Link>
           <Link to="/" style={{ ...badgeStyle, fontSize: '12px', padding: '6px 12px' }}>+ Nuevo Proyecto 3D</Link>
           <button onClick={async () => { await supabase.auth.signOut(); navigate('/'); }} style={{background:'none', border:'none', color:'#666', cursor:'pointer'}}>Salir</button>
         </nav>
@@ -283,7 +285,7 @@ function App() {
         
         {/* ZONA EMPLEADOS */}
         <Route path="/admin" element={<EmployeeLayout />}>
-          <Route index element={<h2 style={{color:'white', padding:'20px'}}>Bienvenido al Panel de Control</h2>} />
+          <Route index element={<ClientDashboard />} />
           <Route path="crm" element={<CrmDashboard />} />
           <Route path="erp" element={<h2 style={{color:'white', padding:'20px'}}>Módulo ERP (En construcción)</h2>} />
           <Route path="purchases" element={<h2 style={{color:'white', padding:'20px'}}>Módulo Compras (En construcción)</h2>} />
@@ -291,9 +293,8 @@ function App() {
 
         {/* ZONA CLIENTES */}
         <Route path="/portal" element={<ClientPortalLayout />}>
-           <Route index element={<h2 style={{color:'white'}}>Bienvenido a tu área personal</h2>} />
-           <Route path="quotes" element={<h2 style={{color:'white'}}>Historial de Presupuestos</h2>} />
-           <Route path="orders" element={<h2 style={{color:'white'}}>Seguimiento de Pedidos</h2>} />
+           {/* Solo dejamos el index, que es el Dashboard inteligente */}
+           <Route index element={<ClientDashboard />} />
         </Route>
       </Routes>
     </BrowserRouter>
