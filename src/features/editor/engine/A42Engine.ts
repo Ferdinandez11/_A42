@@ -19,7 +19,8 @@ export class A42Engine {
 
   private clock: THREE.Clock;
   private savedBackground: THREE.Color | THREE.Texture | null = null;
-  private wasSkyVisible: boolean = true; // Para recordar si había cielo antes de entrar en AR
+  private wasSkyVisible: boolean = true;
+  private parentOriginalBg: string = ''; // Para guardar el color del div de React
 
   constructor(container: HTMLElement) {
     this.clock = new THREE.Clock();
@@ -73,28 +74,46 @@ export class A42Engine {
        domOverlay: { root: document.body } 
     });
 
-    // --- SOLUCIÓN PANTALLA NEGRA ---
+    // --- SOLUCIÓN DEFINITIVA PANTALLA NEGRA ---
     this.renderer.xr.addEventListener('sessionstart', () => {
-        // 1. Guardar estado actual
+        // 1. Guardar estado de Three.js
         this.savedBackground = this.scene.background;
         this.wasSkyVisible = this.sceneManager.sky ? this.sceneManager.sky.visible : false;
 
-        // 2. Limpiar todo lo que tape la cámara
+        // 2. Limpiar Three.js
         this.scene.background = null; 
-        this.setSkyVisible(false); // <--- IMPORTANTE: Ocultar la esfera del cielo
+        this.setSkyVisible(false);
         this.setGridVisible(false);
+        this.renderer.setClearColor(0x000000, 0); // Forzar canal alpha a 0
 
-        // 3. Asegurar que el HTML no tenga color de fondo
+        // 3. AGUJEREAR EL HTML (Importante para React)
+        // Buscamos el contenedor padre donde está metido el Canvas (tu div con bg-neutral-900)
+        const parent = this.renderer.domElement.parentElement;
+        if (parent) {
+            this.parentOriginalBg = parent.style.backgroundColor;
+            // Forzamos transparencia con !important para vencer a Tailwind/CSS
+            parent.style.setProperty('background-color', 'transparent', 'important');
+        }
+        
+        // También limpiamos body y html por si acaso
         document.body.style.backgroundColor = 'transparent';
+        document.documentElement.style.backgroundColor = 'transparent';
     });
 
     this.renderer.xr.addEventListener('sessionend', () => {
-        // Restaurar estado original
+        // Restaurar Three.js
         if (this.savedBackground) this.scene.background = this.savedBackground;
         if (this.wasSkyVisible) this.setSkyVisible(true);
-        
         this.setGridVisible(useAppStore.getState().gridVisible);
-        document.body.style.backgroundColor = ''; // Restaurar CSS
+        
+        // Restaurar HTML (React)
+        const parent = this.renderer.domElement.parentElement;
+        if (parent) {
+            // Quitamos el estilo forzado para que vuelva a mandar la clase CSS (bg-neutral-900)
+            parent.style.removeProperty('background-color');
+        }
+        document.body.style.backgroundColor = '';
+        document.documentElement.style.backgroundColor = '';
     });
 
     // --- LA JAULA DEL BOTÓN ---
@@ -105,6 +124,7 @@ export class A42Engine {
     arContainer.style.zIndex = '1000';
     arContainer.style.display = 'flex';
     arContainer.style.justifyContent = 'flex-end';
+    arContainer.style.pointerEvents = 'none'; // Para que no bloquee clicks alrededor
 
     arBtn.style.position = 'static'; 
     arBtn.style.transform = 'none'; 
@@ -120,6 +140,7 @@ export class A42Engine {
     arBtn.style.fontWeight = 'bold';
     arBtn.style.padding = '10px 0';
     arBtn.style.cursor = 'pointer';
+    arBtn.style.pointerEvents = 'auto'; // Reactivar clicks solo en el botón
 
     arContainer.appendChild(arBtn);
     document.body.appendChild(arContainer);
