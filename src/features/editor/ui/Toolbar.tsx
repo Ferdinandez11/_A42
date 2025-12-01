@@ -1,7 +1,7 @@
 // --- START OF FILE src/features/editor/ui/Toolbar.tsx ---
 import React, { useState, useRef } from 'react';
 import { 
-  MousePointer2, Grid3X3, Component, Trees, Grid, Undo2, Redo2, Eye, Box, ArrowUp, ArrowRight, GalleryVerticalEnd, Square, Sun, Upload, Ruler, Footprints 
+  MousePointer2, Grid3X3, Component, Trees, Grid, Undo2, Redo2, Eye, Box, ArrowUp, ArrowRight, GalleryVerticalEnd, Square, Sun, Upload, Ruler, Footprints, Video, Camera, Film
 } from 'lucide-react';
 import { useAppStore } from '../../../stores/useAppStore';
 import './Editor.css';
@@ -9,6 +9,7 @@ import './Editor.css';
 export const Toolbar = () => {
   const { mode, setMode, gridVisible, toggleGrid, undo, redo, past, future, cameraType, setCameraType, triggerView, toggleEnvPanel, envPanelVisible, setMeasurementResult, addItem } = useAppStore();
   const [showViews, setShowViews] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const tools = [
     { id: 'idle', icon: <MousePointer2 size={20} />, label: 'Seleccionar' },
@@ -32,9 +33,33 @@ export const Toolbar = () => {
   };
 
   const activateWalkMode = () => {
-    // Accedemos al motor globalmente para activar el PointerLock
     // @ts-ignore
     window.editorEngine?.walkManager.enable();
+  };
+
+  // --- ACCIONES MEDIA ---
+  const takePhoto = () => {
+    // @ts-ignore
+    window.editorEngine?.recorderManager.takeScreenshot();
+  };
+
+  const start360Video = () => {
+    // @ts-ignore
+    window.editorEngine?.recorderManager.startOrbitAnimation();
+  };
+
+  const toggleRecording = () => {
+    // @ts-ignore
+    const manager = window.editorEngine?.recorderManager;
+    if (!manager) return;
+
+    if (isRecording) {
+      manager.stopRecording();
+      setIsRecording(false);
+    } else {
+      manager.startRecording();
+      setIsRecording(true);
+    }
   };
 
   return (
@@ -75,9 +100,26 @@ export const Toolbar = () => {
         </button>
         <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
         
-        {/* BOTÓN MODO PASEO */}
+        {/* BOTONES MEDIA */}
+        <button className="tool-btn" onClick={takePhoto} title="Hacer Foto">
+            <Camera size={20} /> <span className="tool-label">Foto</span>
+        </button>
+
+        <button className="tool-btn" onClick={start360Video} title="Video 360 Auto (8s)">
+            <Film size={20} /> <span className="tool-label">360º</span>
+        </button>
+
         <button className="tool-btn" onClick={activateWalkMode} title="Paseo (WASD)">
             <Footprints size={20} /> <span className="tool-label">Paseo</span>
+        </button>
+
+        <button 
+          className={`tool-btn ${isRecording ? 'text-red-500 hover:text-red-400' : ''}`} 
+          onClick={toggleRecording} 
+          title={isRecording ? "Detener Grabación" : "Grabar Recorrido Manual"}
+        >
+            <Video size={20} />
+            <span className="tool-label">{isRecording ? "Stop" : "Rec"}</span>
         </button>
         
         <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />

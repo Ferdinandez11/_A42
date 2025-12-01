@@ -9,6 +9,7 @@ import { ObjectManager } from './managers/ObjectManager';
 import { ToolsManager } from './managers/ToolsManager';
 import { InteractionManager } from './managers/InteractionManager';
 import { WalkManager } from './managers/WalkManager';
+import { RecorderManager } from './managers/RecorderManager'; // <--- IMPORT NUEVO
 
 export class A42Engine {
   public sceneManager: SceneManager;
@@ -16,12 +17,11 @@ export class A42Engine {
   public toolsManager: ToolsManager;
   public interactionManager: InteractionManager;
   public walkManager: WalkManager;
+  public recorderManager: RecorderManager; // <--- PROPIEDAD NUEVA
 
   private clock: THREE.Clock;
   private savedBackground: THREE.Color | THREE.Texture | null = null;
   private wasSkyVisible: boolean = true;
-  
-  // Lista para guardar elementos a los que forzamos transparencia
   private transparentElements: HTMLElement[] = [];
 
   constructor(container: HTMLElement) {
@@ -34,6 +34,7 @@ export class A42Engine {
     this.toolsManager = new ToolsManager(this.sceneManager.scene);
     this.interactionManager = new InteractionManager(this);
     this.walkManager = new WalkManager(this);
+    this.recorderManager = new RecorderManager(this); // <--- INICIALIZAR
 
     window.addEventListener('resize', this.onWindowResize);
     window.addEventListener('keydown', this.onKeyDown);
@@ -76,45 +77,34 @@ export class A42Engine {
        domOverlay: { root: document.body } 
     });
 
-    // --- SOLUCIÓN "TALADRO" PANTALLA NEGRA ---
     this.renderer.xr.addEventListener('sessionstart', () => {
-        // 1. Guardar estado de Three.js
         this.savedBackground = this.scene.background;
         this.wasSkyVisible = this.sceneManager.sky ? this.sceneManager.sky.visible : false;
 
-        // 2. Limpiar Three.js
         this.scene.background = null; 
         this.setSkyVisible(false);
         this.setGridVisible(false);
         this.renderer.setClearColor(0x000000, 0); 
 
-        // 3. FUERZA BRUTA: Recorrer hacia arriba todo el HTML y hacerlo transparente
         this.transparentElements = [];
         let el: HTMLElement | null = this.renderer.domElement;
         
-        // Subimos hasta llegar al 'body'
         while (el && el !== document.documentElement) {
-             // Guardamos referencia para restaurar luego
              this.transparentElements.push(el);
-             // Forzamos transparencia máxima
              el.style.setProperty('background', 'transparent', 'important');
              el.style.setProperty('background-color', 'transparent', 'important');
              el = el.parentElement;
         }
         
-        // También aseguramos body y html
         document.body.style.setProperty('background', 'transparent', 'important');
         document.documentElement.style.setProperty('background', 'transparent', 'important');
     });
 
     this.renderer.xr.addEventListener('sessionend', () => {
-        // Restaurar Three.js
         if (this.savedBackground) this.scene.background = this.savedBackground;
         if (this.wasSkyVisible) this.setSkyVisible(true);
         this.setGridVisible(useAppStore.getState().gridVisible);
         
-        // Restaurar HTML (React)
-        // Eliminamos las propiedades inline para que vuelvan a mandar las clases CSS (bg-neutral-900 etc)
         this.transparentElements.forEach(el => {
             el.style.removeProperty('background');
             el.style.removeProperty('background-color');
@@ -249,13 +239,11 @@ export class A42Engine {
   
   private render = () => { 
       const delta = this.clock.getDelta();
-      
       this.walkManager.update(delta);
-
+      this.recorderManager.update(delta);
       if (!this.walkManager.isEnabled) {
         this.sceneManager.controls.update(); 
       }
-
       this.sceneManager.renderer.render(this.scene, this.activeCamera); 
   }
 

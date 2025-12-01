@@ -7,38 +7,41 @@ export class WalkManager {
   private engine: A42Engine;
   private controls: PointerLockControls;
   
+  // Elemento HTML para las instrucciones
+  private instructions: HTMLElement | null = null;
+  
   // Estado de teclas
   private moveForward = false;
   private moveBackward = false;
   private moveLeft = false;
   private moveRight = false;
-  private moveUp = false;   // Tecla E
-  private moveDown = false; // Tecla Q
-  private isSlow = false;   // Tecla Espacio (Modo precisión)
+  private moveUp = false;   
+  private moveDown = false; 
+  private isSlow = false;   
 
   private velocity = new THREE.Vector3();
   private direction = new THREE.Vector3();
   
-  // CONFIGURACIÓN
-  private baseSpeed = 80.0; // Velocidad normal
-  private slowMultiplier = 0.15; // Velocidad reducida (al pulsar espacio)
+  private baseSpeed = 80.0; 
+  private slowMultiplier = 0.2; 
 
   constructor(engine: A42Engine) {
     this.engine = engine;
     
     this.controls = new PointerLockControls(this.engine.activeCamera, this.engine.renderer.domElement);
+    this.controls.pointerSpeed = 0.15; 
     
-    // --- AJUSTE DE SENSIBILIDAD DEL RATÓN ---
-    // 1.0 es la normal. Bajamos a 0.3 para que sea más suave y cinemático.
-    this.controls.pointerSpeed = 0.3; 
+    // Crear el cartel de instrucciones (oculto al inicio)
+    this.createInstructions();
 
-    this.controls.addEventListener('lock', () => {
-      // Opcional: Ocultar UI si quisieras
+    // Eventos de entrar/salir
+    this.controls.addEventListener('lock', () => { 
+        if (this.instructions) this.instructions.style.display = 'block';
     });
-
-    this.controls.addEventListener('unlock', () => {
-      // Al salir, reseteamos teclas por si se quedó alguna 'pegada'
-      this.resetKeys();
+    
+    this.controls.addEventListener('unlock', () => { 
+        this.resetKeys(); 
+        if (this.instructions) this.instructions.style.display = 'none';
     });
 
     document.addEventListener('keydown', this.onKeyDown);
@@ -47,17 +50,46 @@ export class WalkManager {
     this.engine.scene.add(this.controls.getObject());
   }
 
-  public enable() {
-    this.controls.lock();
+  private createInstructions() {
+    this.instructions = document.createElement('div');
+    this.instructions.innerHTML = `
+        <div style="font-size: 14px; font-weight: bold; margin-bottom: 5px;">MODO PASEO</div>
+        <div style="font-size: 12px; opacity: 0.8;">
+            <span style="margin-right: 15px;">🖱️ Mueve para mirar</span>
+            <span style="margin-right: 15px;">⌨️ <b>WASD</b> Moverse</span>
+            <span style="margin-right: 15px;">🐢 <b>Espacio</b> Lento</span>
+            <span style="margin-right: 15px;">↕️ <b>Q / E</b> Altura</span>
+            <br/>
+            <span style="color: #ff6b6b; font-weight: bold;">🔴 TECLA 'R' PARA GRABAR</span>
+            <span style="margin-left: 15px;">❌ <b>ESC</b> Salir</span>
+        </div>
+    `;
+    
+    // Estilos del cartel
+    Object.assign(this.instructions.style, {
+        position: 'absolute',
+        bottom: '100px', // Un poco arriba del toolbar
+        left: '50%',
+        transform: 'translateX(-50%)',
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        color: 'white',
+        padding: '15px 25px',
+        borderRadius: '30px',
+        textAlign: 'center',
+        fontFamily: 'sans-serif',
+        pointerEvents: 'none', // Para que no bloquee clicks
+        display: 'none', // Oculto por defecto
+        zIndex: '2000',
+        backdropFilter: 'blur(5px)',
+        border: '1px solid rgba(255,255,255,0.2)'
+    });
+
+    document.body.appendChild(this.instructions);
   }
 
-  public disable() {
-    this.controls.unlock();
-  }
-
-  public get isEnabled() {
-    return this.controls.isLocked;
-  }
+  public enable() { this.controls.lock(); }
+  public disable() { this.controls.unlock(); }
+  public get isEnabled() { return this.controls.isLocked; }
 
   private resetKeys() {
       this.moveForward = false; this.moveBackward = false; 
@@ -67,6 +99,8 @@ export class WalkManager {
   }
 
   private onKeyDown = (event: KeyboardEvent) => {
+    if (document.activeElement?.tagName === 'INPUT') return;
+
     switch (event.code) {
       case 'ArrowUp':
       case 'KeyW': this.moveForward = true; break;
@@ -78,7 +112,15 @@ export class WalkManager {
       case 'KeyD': this.moveRight = true; break;
       case 'KeyE': this.moveUp = true; break;
       case 'KeyQ': this.moveDown = true; break;
-      case 'Space': this.isSlow = true; break; // Activar modo lento
+      case 'Space': this.isSlow = true; break;
+      
+      case 'KeyR': 
+        if (this.isEnabled) {
+            const recorder = this.engine.recorderManager;
+            if (recorder.isRecording) recorder.stopRecording();
+            else recorder.startRecording();
+        }
+        break;
     }
   };
 
@@ -94,14 +136,13 @@ export class WalkManager {
       case 'KeyD': this.moveRight = false; break;
       case 'KeyE': this.moveUp = false; break;
       case 'KeyQ': this.moveDown = false; break;
-      case 'Space': this.isSlow = false; break; // Desactivar modo lento
+      case 'Space': this.isSlow = false; break; 
     }
   };
 
   public update(delta: number) {
     if (!this.controls.isLocked) return;
 
-    // Fricción (frenado)
     this.velocity.x -= this.velocity.x * 10.0 * delta;
     this.velocity.z -= this.velocity.z * 10.0 * delta;
     this.velocity.y -= this.velocity.y * 10.0 * delta;
@@ -111,7 +152,6 @@ export class WalkManager {
     this.direction.y = Number(this.moveUp) - Number(this.moveDown);
     this.direction.normalize();
 
-    // Calcular velocidad actual (Rápida o Lenta)
     const currentSpeed = this.isSlow ? (this.baseSpeed * this.slowMultiplier) : this.baseSpeed;
 
     if (this.moveForward || this.moveBackward) this.velocity.z -= this.direction.z * currentSpeed * delta;
