@@ -18,7 +18,8 @@ export class A42Engine {
   public walkManager: WalkManager;
 
   private clock: THREE.Clock;
-  private savedBackground: THREE.Color | THREE.Texture | null = null; // Para guardar el color al entrar en AR
+  private savedBackground: THREE.Color | THREE.Texture | null = null;
+  private wasSkyVisible: boolean = true; // Para recordar si había cielo antes de entrar en AR
 
   constructor(container: HTMLElement) {
     this.clock = new THREE.Clock();
@@ -72,21 +73,28 @@ export class A42Engine {
        domOverlay: { root: document.body } 
     });
 
-    // --- EVENTOS DE SESIÓN AR (SOLUCIÓN PANTALLA NEGRA) ---
+    // --- SOLUCIÓN PANTALLA NEGRA ---
     this.renderer.xr.addEventListener('sessionstart', () => {
-        // 1. Guardamos el fondo actual (ej: gris oscuro)
+        // 1. Guardar estado actual
         this.savedBackground = this.scene.background;
-        // 2. Ponemos el fondo transparente para ver la cámara
+        this.wasSkyVisible = this.sceneManager.sky ? this.sceneManager.sky.visible : false;
+
+        // 2. Limpiar todo lo que tape la cámara
         this.scene.background = null; 
-        // 3. Ocultamos el grid si molesta en AR (opcional)
+        this.setSkyVisible(false); // <--- IMPORTANTE: Ocultar la esfera del cielo
         this.setGridVisible(false);
+
+        // 3. Asegurar que el HTML no tenga color de fondo
+        document.body.style.backgroundColor = 'transparent';
     });
 
     this.renderer.xr.addEventListener('sessionend', () => {
-        // 1. Restauramos el fondo original
+        // Restaurar estado original
         if (this.savedBackground) this.scene.background = this.savedBackground;
-        // 2. Restauramos el grid
+        if (this.wasSkyVisible) this.setSkyVisible(true);
+        
         this.setGridVisible(useAppStore.getState().gridVisible);
+        document.body.style.backgroundColor = ''; // Restaurar CSS
     });
 
     // --- LA JAULA DEL BOTÓN ---
