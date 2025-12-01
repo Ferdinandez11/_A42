@@ -20,7 +20,7 @@ export class A42Engine {
   private clock: THREE.Clock;
   private savedBackground: THREE.Color | THREE.Texture | null = null;
   private wasSkyVisible: boolean = true;
-  private parentOriginalBg: string = ''; // Para guardar el color del div de React
+  // HE BORRADO LA VARIABLE parentOriginalBg QUE DABA ERROR
 
   constructor(container: HTMLElement) {
     this.clock = new THREE.Clock();
@@ -87,15 +87,12 @@ export class A42Engine {
         this.renderer.setClearColor(0x000000, 0); // Forzar canal alpha a 0
 
         // 3. AGUJEREAR EL HTML (Importante para React)
-        // Buscamos el contenedor padre donde está metido el Canvas (tu div con bg-neutral-900)
         const parent = this.renderer.domElement.parentElement;
         if (parent) {
-            this.parentOriginalBg = parent.style.backgroundColor;
-            // Forzamos transparencia con !important para vencer a Tailwind/CSS
+            // No necesitamos guardar el color, solo forzar transparencia
             parent.style.setProperty('background-color', 'transparent', 'important');
         }
         
-        // También limpiamos body y html por si acaso
         document.body.style.backgroundColor = 'transparent';
         document.documentElement.style.backgroundColor = 'transparent';
     });
@@ -109,7 +106,7 @@ export class A42Engine {
         // Restaurar HTML (React)
         const parent = this.renderer.domElement.parentElement;
         if (parent) {
-            // Quitamos el estilo forzado para que vuelva a mandar la clase CSS (bg-neutral-900)
+            // Al quitar la propiedad, vuelve a mandar el CSS de Tailwind (bg-neutral-900)
             parent.style.removeProperty('background-color');
         }
         document.body.style.backgroundColor = '';
@@ -124,7 +121,7 @@ export class A42Engine {
     arContainer.style.zIndex = '1000';
     arContainer.style.display = 'flex';
     arContainer.style.justifyContent = 'flex-end';
-    arContainer.style.pointerEvents = 'none'; // Para que no bloquee clicks alrededor
+    arContainer.style.pointerEvents = 'none';
 
     arBtn.style.position = 'static'; 
     arBtn.style.transform = 'none'; 
@@ -140,7 +137,7 @@ export class A42Engine {
     arBtn.style.fontWeight = 'bold';
     arBtn.style.padding = '10px 0';
     arBtn.style.cursor = 'pointer';
-    arBtn.style.pointerEvents = 'auto'; // Reactivar clicks solo en el botón
+    arBtn.style.pointerEvents = 'auto';
 
     arContainer.appendChild(arBtn);
     document.body.appendChild(arContainer);
