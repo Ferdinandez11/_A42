@@ -26,7 +26,6 @@ export class SceneManager {
 
     // Escena
     this.scene = new THREE.Scene();
-    // Fondo de seguridad inicial (Gris oscuro elegante en lugar de negro vacío)
     this.scene.background = new THREE.Color(0x222222);
 
     // Cámaras
@@ -43,8 +42,7 @@ export class SceneManager {
 
     this.activeCamera = this.perspectiveCamera;
 
-    // Renderer
-    // CAMBIO IMPORTANTE: alpha: false para evitar transparencias accidentales con el HTML
+    // Renderer (Importante preserveDrawingBuffer: true para el PDF)
     this.renderer = new THREE.WebGLRenderer({
         antialias: true, 
         alpha: false, 
@@ -52,7 +50,7 @@ export class SceneManager {
         powerPreference: "high-performance"
     });
     this.renderer.setSize(width, height);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Calidad nítida
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -61,25 +59,37 @@ export class SceneManager {
 
     container.appendChild(this.renderer.domElement);
 
-    // Controls
+    // --- CONTROLES (CONFIGURACIÓN ESTÁNDAR) ---
     this.controls = new OrbitControls(this.activeCamera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.05;
-    this.controls.screenSpacePanning = false;
+    
+    // ESTO ES LO QUE ARREGLA LA SENSACIÓN "RARA":
+    // true = Mueve la cámara arriba/abajo/izq/der siguiendo el ratón (tipo CAD/Maps)
+    // false = Bloquea el movimiento al plano del suelo (bueno para FPS, malo para edición)
+    this.controls.screenSpacePanning = true; 
+
     this.controls.minDistance = 1;
     this.controls.maxDistance = 500;
-    this.controls.maxPolarAngle = Math.PI / 2 - 0.05; // Evitar que la cámara pase bajo el suelo
+    this.controls.maxPolarAngle = Math.PI / 2 - 0.02; // Evita meterse bajo el suelo
+
+    // Mapeo de botones estándar
+    this.controls.mouseButtons = {
+        LEFT: THREE.MOUSE.ROTATE,  // Izquierdo: Rotar
+        MIDDLE: THREE.MOUSE.DOLLY, // Rueda pulsada: Zoom
+        RIGHT: THREE.MOUSE.PAN     // Derecho: Moverse
+    };
 
     this.initEnvironment();
     this.initFrameOverlay();
     
-    // Shadow Plane (Suelo que recibe sombras)
+    // Plano de sombras
     const shadowPlane = new THREE.Mesh(
         new THREE.PlaneGeometry(2000, 2000), 
         new THREE.ShadowMaterial({ opacity: 0.3, color: 0x000000 })
     );
     shadowPlane.rotation.x = -Math.PI / 2;
-    shadowPlane.position.y = 0.001; // Ligeramente elevado para evitar z-fighting
+    shadowPlane.position.y = 0.001; 
     shadowPlane.receiveShadow = true;
     shadowPlane.name = "ShadowPlane";
     this.scene.add(shadowPlane);
@@ -91,7 +101,7 @@ export class SceneManager {
       
       this.frameOverlay.style.position = 'absolute';
       this.frameOverlay.style.border = '2px dashed rgba(255, 255, 255, 0.9)';
-      this.frameOverlay.style.boxShadow = '0 0 0 9999px rgba(0, 0, 0, 0.7)'; // Más oscuro fuera
+      this.frameOverlay.style.boxShadow = '0 0 0 9999px rgba(0, 0, 0, 0.7)'; 
       this.frameOverlay.style.pointerEvents = 'none';
       this.frameOverlay.style.zIndex = '100';
       this.frameOverlay.style.display = 'none';
@@ -112,7 +122,6 @@ export class SceneManager {
       
       this.frameOverlay.appendChild(label);
       
-      // Asegurar posición relativa en el contenedor padre
       if (getComputedStyle(this.container).position === 'static') {
           this.container.style.position = 'relative';
       }
@@ -132,7 +141,7 @@ export class SceneManager {
       const containerW = this.container.clientWidth;
       const containerH = this.container.clientHeight;
       
-      // 170mm / 120mm = ~1.416
+      // Aspect ratio objetivo para la portada del PDF (aprox 4:3 o 1.41)
       const targetAspect = 170 / 120;
       const screenAspect = containerW / containerH;
 
@@ -178,12 +187,10 @@ export class SceneManager {
     uniforms['mieCoefficient'].value = 0.005;
     uniforms['mieDirectionalG'].value = 0.7;
     
-    // Posición inicial del sol
-    this.updateSunPosition(180, 45); // Sur, 45 grados
+    this.updateSunPosition(180, 45); 
     this.scene.add(this.sky);
 
     // Rejilla (GRID)
-    // CAMBIO IMPORTANTE: Visible por defecto para que no veas "la nada"
     this.gridHelper = new THREE.GridHelper(100, 100, 0x888888, 0x444444);
     this.gridHelper.visible = true; 
     this.gridHelper.position.y = 0.002;
@@ -209,7 +216,6 @@ export class SceneManager {
   public setSkyVisible(visible: boolean) {
     if (this.sky) { 
         this.sky.visible = visible; 
-        // Si activamos el cielo, quitamos el color sólido de fondo
         if (visible) this.scene.background = null; 
     }
   }
@@ -224,14 +230,12 @@ export class SceneManager {
     
     if (type === 'orthographic') { 
         this.activeCamera = this.orthoCamera; 
-        // Ajustar zoom ortográfico si es necesario
         this.orthoCamera.zoom = 1; 
         this.orthoCamera.updateProjectionMatrix();
     } else { 
         this.activeCamera = this.perspectiveCamera; 
     }
     
-    // Intentar mantener la posición relativa
     this.activeCamera.position.copy(oldPos);
     this.activeCamera.lookAt(target);
     
@@ -279,6 +283,7 @@ export class SceneManager {
         this.container.removeChild(this.renderer.domElement); 
         if(this.frameOverlay) this.container.removeChild(this.frameOverlay);
     } catch (e) {}
+    this.controls.dispose(); // Importante limpiar controles también
     this.renderer.dispose();
   }
 }
