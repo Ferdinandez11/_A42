@@ -70,7 +70,20 @@ export class A42Engine {
   public setGizmoMode(mode: 'translate' | 'rotate' | 'scale') { this.interactionManager.setGizmoMode(mode); }
 
   // --- AR SETUP ---
-  private initAR() {
+  private async initAR() {
+
+        // 1. COMPROBACIÓN INTELIGENTE
+    // Si el navegador no tiene WebXR o no soporta AR inmersiva, NO hacemos nada.
+    if (!('xr' in navigator)) return; 
+    
+    try {
+        // @ts-ignore
+        const isSupported = await navigator.xr.isSessionSupported('immersive-ar');
+        if (!isSupported) return; // Si no hay AR, nos vamos y no ensuciamos la pantalla
+    } catch (e) {
+        return; // Si da error al comprobar, tampoco mostramos nada
+    }
+
     const arBtn = ARButton.createButton(this.renderer, { 
        requiredFeatures: ['hit-test'], 
        optionalFeatures: ['dom-overlay'],
