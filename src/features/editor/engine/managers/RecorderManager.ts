@@ -14,7 +14,7 @@ export class RecorderManager {
   private orbitCenter = new THREE.Vector3();
   private orbitRadius = 10;
   private orbitHeight = 10;
-  private orbitAngle = 0;
+  // HE BORRADO orbitAngle PORQUE NO SE USABA
   private orbitDuration = 8.0; // Segundos
   private orbitTimeElapsed = 0;
 
@@ -91,15 +91,10 @@ export class RecorderManager {
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.z);
     
-    // --- AJUSTES DE CÁMARA AQUÍ ---
-    // Radio (Distancia): Antes era * 1.5. Ahora * 0.85 para acercar mucho más.
+    // --- AJUSTES DE CÁMARA ---
     this.orbitRadius = maxDim * 0.85 + 2; 
-    
-    // Altura (Inclinación): Antes era igual al ancho. Ahora * 0.4 para bajarla.
-    // Esto dará un ángulo más "a ras de suelo" pero viendo la parte superior.
     this.orbitHeight = maxDim * 0.4 + 1;       
 
-    this.orbitAngle = 0;
     this.orbitTimeElapsed = 0;
 
     // 3. Preparar cámara y controles
