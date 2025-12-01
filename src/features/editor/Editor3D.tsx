@@ -1,5 +1,5 @@
 // --- START OF FILE src/features/editor/Editor3D.tsx ---
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { A42Engine } from './engine/A42Engine';
 import { Toolbar } from './ui/Toolbar';
 import { BudgetPanel } from './ui/BudgetPanel';
@@ -7,15 +7,15 @@ import { EnvironmentPanel } from './ui/EnvironmentPanel';
 import { FloorProperties } from './ui/FloorProperties';
 import { FenceProperties } from './ui/FenceProperties';
 import { useAppStore } from '../../stores/useAppStore';
-import { Euro, Move, RotateCw, Scaling, Trash2, Copy } from 'lucide-react';
+import { Euro, Move, RotateCw, Scaling, Trash2, Copy, QrCode } from 'lucide-react';
 import { InputModal } from './ui/InputModal';
-import { QrCode } from 'lucide-react'; 
 import { QRModal } from './ui/QRModal';
-import { useState } from 'react'; // Necesitamos estado local
 
 export const Editor3D = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<A42Engine | null>(null);
+  
+  // Estado local para el Modal QR
   const [isQRVisible, setQRVisible] = useState(false);
   
   const { 
@@ -34,9 +34,36 @@ export const Editor3D = () => {
     sunPosition,
     backgroundColor,
     measurementResult,
-    safetyZonesVisible // <--- NUEVO
+    safetyZonesVisible
   } = useAppStore();
 
+  // --- 1. CARGA DE ESCENA DESDE URL (Para el móvil) ---
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sceneData = params.get('scene');
+
+    if (sceneData) {
+      try {
+        // Decodificar Base64 de forma segura con caracteres especiales
+        const json = decodeURIComponent(escape(window.atob(sceneData)));
+        const loadedItems = JSON.parse(json);
+
+        if (Array.isArray(loadedItems) && loadedItems.length > 0) {
+            console.log("[Editor3D] Cargando escena desde URL...", loadedItems.length, "items");
+            
+            // Inyectar en el store
+            useAppStore.setState({ items: loadedItems });
+            
+            // Limpiar la URL para que quede limpia
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      } catch (e) {
+        console.error("[Editor3D] Error al cargar escena desde URL:", e);
+      }
+    }
+  }, []);
+
+  // --- 2. INICIALIZACIÓN DEL MOTOR ---
   useEffect(() => {
     if (!containerRef.current) return;
     const engine = new A42Engine(containerRef.current);
@@ -52,22 +79,24 @@ export const Editor3D = () => {
     return () => engine.dispose();
   }, []);
 
-  // Sync Engine <-> Store
+  // --- 3. SINCRONIZACIÓN STORE -> ENGINE ---
   useEffect(() => { if (engineRef.current) engineRef.current.setGridVisible(gridVisible); }, [gridVisible]);
   useEffect(() => { if (engineRef.current) engineRef.current.syncSceneFromStore(items); }, [items]);
   useEffect(() => { if (engineRef.current) engineRef.current.switchCamera(cameraType); }, [cameraType]);
   
-  // NUEVO: Sync Seguridad
+  // Sync Seguridad
   useEffect(() => { 
       if (engineRef.current) engineRef.current.updateSafetyZones(safetyZonesVisible); 
   }, [safetyZonesVisible]);
 
+  // Limpiar herramientas al cambiar de modo
   useEffect(() => {
     if (engineRef.current) {
         engineRef.current.clearTools(); 
     }
   }, [mode]);
 
+  // Vistas de cámara (Top, Front, etc)
   useEffect(() => {
     if (pendingView && engineRef.current) {
       engineRef.current.setView(pendingView);
@@ -75,6 +104,7 @@ export const Editor3D = () => {
     }
   }, [pendingView, clearPendingView]);
 
+  // Sol y Fondo
   useEffect(() => {
     if (engineRef.current) engineRef.current.updateSunPosition(sunPosition.azimuth, sunPosition.elevation);
   }, [sunPosition]);
@@ -86,6 +116,7 @@ export const Editor3D = () => {
     }
   }, [backgroundColor]);
 
+  // --- 4. HANDLERS ---
   const handlePointerDown = (e: React.PointerEvent) => {
     if (mode === 'catalog') return;
     if ((e.target as HTMLElement).closest('button, .glass-panel, a, input, .scroll-container')) return;
@@ -111,6 +142,18 @@ export const Editor3D = () => {
       <FloorProperties />
       <FenceProperties />
 
+      {/* BOTÓN QR (ARRIBA DERECHA) */}
+      <div className="absolute top-6 right-6 z-20">
+        <button 
+            onClick={() => setQRVisible(true)}
+            className="bg-neutral-800/90 hover:bg-neutral-700 text-white p-3 rounded-full border border-neutral-600 shadow-lg transition-all group"
+            title="Ver en móvil (AR)"
+        >
+            <QrCode size={20} className="group-hover:text-blue-400 transition-colors" />
+        </button>
+      </div>
+
+      {/* BOTÓN PRESUPUESTO (ABAJO IZQUIERDA) */}
       <div className="absolute bottom-6 left-6 z-20">
         <button 
           onClick={toggleBudget}
@@ -126,6 +169,7 @@ export const Editor3D = () => {
         </button>
       </div>
 
+      {/* GIZMOS Y TOOLBAR (ABAJO CENTRO) */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-4">
         {selectedItemId && mode === 'editing' && (
           <div className="glass-panel px-2 py-1 flex items-center gap-1 animate-in fade-in slide-in-from-bottom-2">
@@ -141,18 +185,6 @@ export const Editor3D = () => {
         <Toolbar />
       </div>
 
-      {/* BOTÓN QR - Lo ponemos arriba a la derecha, junto a los paneles o donde prefieras */}
-      <div className="absolute top-6 right-6 z-20 flex gap-3">
-          {/* Aquí supongo que tienes botones de usuario o algo, añadimos el del QR */}
-          <button 
-            onClick={() => setQRVisible(true)}
-            className="bg-neutral-800/90 hover:bg-neutral-700 text-white p-3 rounded-full border border-neutral-600 shadow-lg transition-all group"
-            title="Ver en móvil (AR)"
-          >
-            <QrCode size={20} className="group-hover:text-blue-400 transition-colors" />
-          </button>
-      </div>
-
       {/* RESULTADO DE LA MEDICIÓN */}
       {mode === 'measuring' && (
         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
@@ -165,10 +197,11 @@ export const Editor3D = () => {
         </div>
       )}
 
+      {/* MODALES */}
       <InputModal />
       <QRModal isOpen={isQRVisible} onClose={() => setQRVisible(false)} />
+
       <div className="absolute bottom-6 right-6 text-white/5 font-black text-4xl pointer-events-none select-none">A42</div>
     </div>
   );
 };
-// --- END OF FILE src/features/editor/Editor3D.tsx ---
