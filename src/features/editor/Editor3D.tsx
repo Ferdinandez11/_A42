@@ -20,7 +20,7 @@ export const Editor3D = () => {
     mode, gridVisible, items, cameraType, pendingView, clearPendingView,
     totalPrice, toggleBudget, selectedItemId, duplicateItem, removeItem, selectItem,
     sunPosition, backgroundColor, measurementResult, safetyZonesVisible,
-    setUser, setProjectInfo 
+    setUser, setProjectInfo, user // <--- AÑADIDO 'user' AQUÍ
   } = useAppStore();
 
   // --- CARGA DE DATOS Y USUARIO ---
@@ -166,17 +166,20 @@ export const Editor3D = () => {
         </button>
       </div>
 
-      <div className="absolute bottom-6 left-6 z-20">
-        <button onClick={toggleBudget} className="bg-neutral-800/90 backdrop-blur border border-neutral-600 hover:border-green-400 text-white rounded-full pl-2 pr-5 py-2 flex items-center gap-3 shadow-lg transition-all group hover:bg-neutral-800">
-          <div className="w-8 h-8 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center group-hover:bg-green-500 group-hover:text-white transition-colors">
-            <Euro size={18} />
-          </div>
-          <div className="flex flex-col items-start leading-none">
-            <span className="text-xs text-neutral-400 uppercase font-bold tracking-wider">Total</span>
-            <span className="text-lg font-bold">{totalPrice.toLocaleString()} €</span>
-          </div>
-        </button>
-      </div>
+      {/* --- PRECIO: SOLO VISIBLE SI HAY USUARIO --- */}
+      {user && (
+        <div className="absolute bottom-6 left-6 z-20">
+            <button onClick={toggleBudget} className="bg-neutral-800/90 backdrop-blur border border-neutral-600 hover:border-green-400 text-white rounded-full pl-2 pr-5 py-2 flex items-center gap-3 shadow-lg transition-all group hover:bg-neutral-800">
+            <div className="w-8 h-8 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center group-hover:bg-green-500 group-hover:text-white transition-colors">
+                <Euro size={18} />
+            </div>
+            <div className="flex flex-col items-start leading-none">
+                <span className="text-xs text-neutral-400 uppercase font-bold tracking-wider">Total</span>
+                <span className="text-lg font-bold">{totalPrice.toLocaleString()} €</span>
+            </div>
+            </button>
+        </div>
+      )}
 
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-4">
         {selectedItemId && mode === 'editing' && (

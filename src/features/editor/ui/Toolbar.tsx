@@ -33,7 +33,6 @@ export const Toolbar = () => {
     if (!user) return alert("Debes iniciar sesión para guardar.");
 
     // 1. Captura de pantalla (Miniatura)
-    // Usamos (window as any) para evitar el error de TypeScript
     const engine = (window as any).editorEngine;
     
     if (!engine || !engine.renderer) {
@@ -159,7 +158,7 @@ export const Toolbar = () => {
         
         {/* NUEVO: Botón DASHBOARD (Solo si logueado) */}
         {user && (
-           <button className="tool-btn text-blue-400 hover:text-blue-300" onClick={() => navigate(user.email.includes('admin') || user.email.includes('levipark') ? '/admin/crm' : '/portal?tab=projects')} title="Ir a Mis Proyectos">
+           <button className="tool-btn text-blue-400 hover:text-blue-300" onClick={() => navigate(user.email?.includes('admin') || user.email?.includes('levipark') ? '/admin/crm' : '/portal?tab=projects')} title="Ir a Mis Proyectos">
              <LayoutDashboard size={20} /> <span className="tool-label">Portal</span>
            </button>
         )}
@@ -215,12 +214,19 @@ export const Toolbar = () => {
         <button className="tool-btn" onClick={start360Video} title="Video 360 Auto">
             <Film size={20} /> <span className="tool-label">360º</span>
         </button>
-        <button className="tool-btn" onClick={exportGLB} title="Exportar 3D (.glb)">
-            <Download size={20} /> <span className="tool-label">3D</span>
-        </button>
-        <button className="tool-btn" onClick={exportDXF} title="Exportar Plano (.dxf)">
-            <FileText size={20} /> <span className="tool-label">CAD</span>
-        </button>
+
+        {/* --- SOLO SI ESTÁ REGISTRADO: DESCARGAS 3D Y CAD --- */}
+        {user && (
+          <>
+            <button className="tool-btn" onClick={exportGLB} title="Exportar 3D (.glb)">
+                <Download size={20} /> <span className="tool-label">3D</span>
+            </button>
+            <button className="tool-btn" onClick={exportDXF} title="Exportar Plano (.dxf)">
+                <FileText size={20} /> <span className="tool-label">CAD</span>
+            </button>
+          </>
+        )}
+
         <button className="tool-btn" onClick={generatePDF} title="Generar Dossier PDF">
             <FileDown size={20} /> <span className="tool-label">PDF</span>
         </button>

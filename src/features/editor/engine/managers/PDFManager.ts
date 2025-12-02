@@ -1,4 +1,3 @@
-// --- START OF FILE src/features/editor/engine/managers/PDFManager.ts ---
 import * as THREE from 'three';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -26,6 +25,7 @@ export class PDFManager {
   public async generatePDF() {
     const store = useAppStore.getState();
     const items = store.items;
+    const user = store.user; // <--- OBTENEMOS EL USUARIO
 
     const projectName = await store.requestInput("Nombre del Proyecto:", "Levipark21");
     if (!projectName) return;
@@ -116,8 +116,8 @@ export class PDFManager {
     // 3. RESTAURAR
     this.restoreSceneState();
 
-    // 4. GENERAR PDF
-    this.generatePDFDocument(doc, projectName, coverImg, views, items, uniqueItemsMap, itemImages);
+    // 4. GENERAR PDF (Pasamos el user)
+    this.generatePDFDocument(doc, projectName, coverImg, views, items, uniqueItemsMap, itemImages, user);
   }
 
   // --------------------------------------------------------------------------
@@ -277,7 +277,8 @@ export class PDFManager {
       views: any, 
       items: SceneItem[], 
       uniqueItemsMap: Map<string, SceneItem>,
-      itemImages: Record<string, {img: string, width: number, height: number}>
+      itemImages: Record<string, {img: string, width: number, height: number}>,
+      user: any
     ) {
       
       const m = 15; 
@@ -307,42 +308,43 @@ export class PDFManager {
       if (views.iso) this.drawImageProp(doc, views.iso, m + gw + m, yRow2, gw, gh);
       this.addFooter(doc);
 
-      // --- PRESUPUESTO ---
-      doc.addPage();
-      this.addHeader(doc, "Presupuesto", "");
-      let total = 0;
-      const tableData = items.map(item => {
-        const price = PriceCalculator.getItemPrice(item);
-        total += price;
-        return [
-            item.name || "Elemento",
-            item.productId.substring(0, 15).toUpperCase(),
-            PriceCalculator.getItemDimensions(item),
-            price.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })
-        ];
-      });
-      const iva = total * 0.21;
-      autoTable(doc, {
-          head: [['Concepto', 'Ref', 'Ud/Dim', 'Precio']],
-          body: tableData,
-          startY: 40,
-          theme: 'striped',
-          headStyles: { fillColor: [41, 128, 185] },
-          foot: [
-              ['', '', 'Base Imponible', total.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })],
-              ['', '', 'IVA 21%', iva.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })],
-              ['', '', 'TOTAL', (total + iva).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })]
-          ],
-          footStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold', halign: 'right' },
-          columnStyles: { 3: { halign: 'right' } }
-      });
-      this.addFooter(doc);
+      // --- PRESUPUESTO (SOLO SI USER) ---
+      if (user) {
+        doc.addPage();
+        this.addHeader(doc, "Presupuesto", "");
+        let total = 0;
+        const tableData = items.map(item => {
+            const price = PriceCalculator.getItemPrice(item);
+            total += price;
+            return [
+                item.name || "Elemento",
+                item.productId.substring(0, 15).toUpperCase(),
+                PriceCalculator.getItemDimensions(item),
+                price.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })
+            ];
+        });
+        const iva = total * 0.21;
+        autoTable(doc, {
+            head: [['Concepto', 'Ref', 'Ud/Dim', 'Precio']],
+            body: tableData,
+            startY: 40,
+            theme: 'striped',
+            headStyles: { fillColor: [41, 128, 185] },
+            foot: [
+                ['', '', 'Base Imponible', total.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })],
+                ['', '', 'IVA 21%', iva.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })],
+                ['', '', 'TOTAL', (total + iva).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })]
+            ],
+            footStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold', halign: 'right' },
+            columnStyles: { 3: { halign: 'right' } }
+        });
+        this.addFooter(doc);
+      }
 
       // --- FICHAS ---
       for (const [key, item] of uniqueItemsMap) {
         doc.addPage();
         const anyItem = item as any;
-        //const itemData = anyItem.data || {}; 
 
         this.addHeader(doc, item.name || "Ficha Técnica", item.productId.toUpperCase());
         
@@ -360,20 +362,16 @@ export class PDFManager {
         const splitDesc = doc.splitTextToSize(finalDesc, w - (2*m));
         doc.text(splitDesc, m, yStart + 7);
         
-        // --- LOGICA DE LINKS DINAMICOS ---
+        // --- LINKS DINAMICOS ---
         let linkY = yStart + 20 + (splitDesc.length * 5);
         doc.setFont("helvetica", "bold");
         
-        // 1. FICHA TÉCNICA
         const urlTech = this.findValueInItem(anyItem, ['URL_TECH', 'url_tech', 'Url_Tech']);
-        // renderLinkLine ahora devuelve la altura que ha ocupado (0 si no existe, 8 si existe)
         linkY += this.renderLinkLine(doc, "Ficha Técnica (PDF)", urlTech, m, linkY);
 
-        // 2. CERTIFICADO
         const urlCert = this.findValueInItem(anyItem, ['URL_CERT', 'url_cert', 'Url_Cert']);
         linkY += this.renderLinkLine(doc, "Certificado de Conformidad", urlCert, m, linkY);
 
-        // 3. MONTAJE
         const urlInst = this.findValueInItem(anyItem, ['URL_INST', 'url_inst', 'Url_Inst']);
         linkY += this.renderLinkLine(doc, "Instrucciones de Montaje", urlInst, m, linkY);
         
@@ -382,18 +380,14 @@ export class PDFManager {
     doc.save(`${projectName}_Levipark.pdf`);
   }
 
-  // --- HELPER MEJORADO: Devuelve altura usada ---
   private renderLinkLine(doc: jsPDF, label: string, url: string | undefined, x: number, y: number): number {
-      // Si no hay URL, o es muy corta, o es 'undefined' en texto -> NO PINTAMOS NADA
       if (!url || url.length < 5 || url.toLowerCase() === 'undefined') {
-          return 0; // Altura ocupada = 0
+          return 0;
       }
-
-      doc.setTextColor(0, 102, 204); // Azul
+      doc.setTextColor(0, 102, 204);
       doc.text(`>> ${label}`, x, y);
       doc.link(x, y - 5, 100, 8, { url: url.trim() });
-      
-      return 8; // Altura ocupada = 8
+      return 8;
   }
 
   private findValueInItem(item: any, keys: string[]): string | undefined {
