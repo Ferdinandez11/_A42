@@ -20,6 +20,9 @@ export const QRModal: React.FC<QRModalProps> = ({ isOpen, onClose }) => {
     ? `${window.location.origin}/?project_id=${currentProjectId}` 
     : '';
 
+  // 💡 LÓGICA CLAVE: Verificamos si currentProjectId existe.
+  const isProjectSaved = !!currentProjectId;
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div className="bg-neutral-900 border border-neutral-700 rounded-2xl p-8 shadow-2xl max-w-sm w-full relative flex flex-col items-center gap-6 text-center">
@@ -28,48 +31,8 @@ export const QRModal: React.FC<QRModalProps> = ({ isOpen, onClose }) => {
           <X size={24} />
         </button>
 
-        {/* CASO 1: NO LOGUEADO */}
-        {!user ? (
-          <>
-            <div className="w-16 h-16 bg-neutral-800 rounded-full flex items-center justify-center text-neutral-400 mb-2">
-              <LogIn size={32} />
-            </div>
-            <div className="space-y-2">
-              <h2 className="text-xl font-bold text-white">Inicia Sesión</h2>
-              <p className="text-sm text-neutral-400">
-                Para generar un código QR y ver el proyecto en el móvil, necesitas estar registrado.
-              </p>
-            </div>
-            <button 
-              onClick={() => navigate('/login')}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition-colors"
-            >
-              Ir al Login
-            </button>
-          </>
-        ) 
-        /* CASO 2: LOGUEADO PERO SIN GUARDAR (Sin ID) */
-        : !currentProjectId ? (
-          <>
-            <div className="w-16 h-16 bg-yellow-500/10 rounded-full flex items-center justify-center text-yellow-500 mb-2">
-              <Save size={32} />
-            </div>
-            <div className="space-y-2">
-              <h2 className="text-xl font-bold text-white">Proyecto no Guardado</h2>
-              <p className="text-sm text-neutral-400">
-                Guarda el proyecto primero para generar un enlace único y poder verlo en el móvil.
-              </p>
-            </div>
-            <button 
-              onClick={onClose}
-              className="w-full py-3 bg-neutral-800 hover:bg-neutral-700 border border-neutral-600 text-white rounded-lg font-bold transition-colors"
-            >
-              Volver y Guardar
-            </button>
-          </>
-        ) 
-        /* CASO 3: TODO OK (Logueado y Guardado) */
-        : (
+        {/* CASO 1: PROYECTO GUARDADO (Generar QR) */}
+        {isProjectSaved ? (
           <>
             <div className="space-y-1">
               <div className="flex items-center justify-center gap-2 text-blue-400 mb-2">
@@ -92,6 +55,52 @@ export const QRModal: React.FC<QRModalProps> = ({ isOpen, onClose }) => {
             <div className="text-xs text-neutral-500 px-4 break-all">
                ID: <span className="font-mono text-neutral-400">{currentProjectId}</span>
             </div>
+            {/* Si NO hay user, mostramos una nota de modo visor */}
+            {!user && (
+                 <p className="text-xs text-yellow-500 bg-yellow-900/30 p-2 rounded">
+                    ⚠️ El enlace es de **solo lectura**. No es necesario iniciar sesión.
+                 </p>
+            )}
+          </>
+        ) 
+        /* CASO 2: NO GUARDADO PERO LOGUEADO */
+        : user ? (
+          <>
+            <div className="w-16 h-16 bg-yellow-500/10 rounded-full flex items-center justify-center text-yellow-500 mb-2">
+              <Save size={32} />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-xl font-bold text-white">Proyecto no Guardado</h2>
+              <p className="text-sm text-neutral-400">
+                Guarda el proyecto primero para generar un enlace único y poder verlo en el móvil.
+              </p>
+            </div>
+            <button 
+              onClick={onClose}
+              className="w-full py-3 bg-neutral-800 hover:bg-neutral-700 border border-neutral-600 text-white rounded-lg font-bold transition-colors"
+            >
+              Volver y Guardar
+            </button>
+          </>
+        ) 
+        /* CASO 3: NI GUARDADO NI LOGUEADO */
+        : (
+          <>
+            <div className="w-16 h-16 bg-neutral-800 rounded-full flex items-center justify-center text-neutral-400 mb-2">
+              <LogIn size={32} />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-xl font-bold text-white">Inicia Sesión</h2>
+              <p className="text-sm text-neutral-400">
+                Para guardar y compartir tu diseño, necesitas estar registrado.
+              </p>
+            </div>
+            <button 
+              onClick={() => navigate('/login')}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition-colors"
+            >
+              Ir al Login
+            </button>
           </>
         )}
       </div>

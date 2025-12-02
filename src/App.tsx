@@ -22,12 +22,12 @@ const navLinkStyle: React.CSSProperties = {
 // --- FUNCIÓN DE LOGOUT (EFECTO F5) ---
 const performLogout = async () => {
     await supabase.auth.signOut();
-    // Limpiamos el LocalStorage y recargamos la página para resetear Zustand y Three.js
     localStorage.clear();
     window.location.href = "/"; 
 };
 
-// --- LAYOUTS ---
+// --- LAYOUTS (Mantenidos Iguales) ---
+// ... EmployeeLayout y ClientPortalLayout sin cambios ...
 const EmployeeLayout = () => {
   return (
     <div style={{ display: 'flex', height: '100vh', fontFamily: 'sans-serif', background: '#121212', color: '#e0e0e0' }}>
@@ -72,7 +72,7 @@ const ClientPortalLayout = () => {
   );
 };
 
-// 3. PÁGINA DE LOGIN
+// 3. PÁGINA DE LOGIN (Mantenida Igual)
 const LoginPage = () => {
   const navigate = useNavigate();
   const [step, setStep] = React.useState<'selection' | 'form'>('selection');
@@ -140,20 +140,47 @@ const LoginPage = () => {
 
 // 4. VISOR (HOME)
 const ViewerPage = () => {
-  const { mode, user } = useAppStore(); // <--- IMPORTANTE: Leemos el user
+  // 💡 CAMBIO: Leemos 'isReadOnlyMode' y 'loadProjectFromURL'
+  const { mode, user, isReadOnlyMode, loadProjectFromURL } = useAppStore(); 
   
+  // --- LÓGICA DE CARGA PARA QR ---
+  React.useEffect(() => {
+    // Si ya estamos logueados, o el modo lectura ya está activo, no hacemos nada.
+    if (user || isReadOnlyMode) return; 
+
+    const params = new URLSearchParams(window.location.search);
+    const projectIdFromUrl = params.get('project_id');
+
+    if (projectIdFromUrl) {
+      // Llamamos a la acción del store para cargar el proyecto públicamente
+      loadProjectFromURL(projectIdFromUrl); 
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadProjectFromURL]); 
+
+  // --- FIN LÓGICA DE CARGA PARA QR ---
+
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden', margin: 0, background: '#000' }}>
       
-      {/* SOLUCIÓN: SOLO MOSTRAMOS EL BOTÓN SI NO HAY USUARIO */}
-      {!user && (
-        <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 1000 }}>
-          <Link to="/login" style={badgeStyle}>
-            <span style={{ fontSize: '18px' }}>👤</span>
-            <span>Acceso / Login</span>
-          </Link>
+      {/* 💡 CAMBIO: Mostrar mensaje si es Solo Lectura */}
+      {isReadOnlyMode ? (
+        <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 1000, color:'white', background:'rgba(0,0,0,0.7)', padding:'8px 16px', borderRadius:'10px', border:'1px solid #3b82f6', display:'flex', alignItems:'center', gap:'8px' }}>
+            <span style={{fontSize:'18px'}}>👁️</span>
+            <span style={{ fontSize: '14px', fontWeight: 'bold' }}>MODO VISOR (Solo Lectura)</span>
         </div>
+      ) : (
+        // Muestra el botón de Login SOLO si no hay usuario Y no estamos en modo lectura
+        !user && (
+            <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 1000 }}>
+                <Link to="/login" style={badgeStyle}>
+                    <span style={{ fontSize: '18px' }}>👤</span>
+                    <span>Acceso / Login</span>
+                </Link>
+            </div>
+        )
       )}
+
 
       <Editor3D />
       {mode === 'catalog' && <Catalog />}

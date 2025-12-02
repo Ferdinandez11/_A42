@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import * as THREE from 'three'; 
 import { FENCE_PRESETS } from '../features/editor/data/fence_presets';
+import { supabase } from '../lib/supabase'; // 💡 IMPORTAMOS SUPABASE PARA LA CARGA PÚBLICA
 
-// ... (MANTÉN TUS INTERFACES ANTERIORES: ProductDefinition, SceneItem, etc. IGUALES) ...
+// --- INTERFACES (Mantenidas Igual) ---
 export interface ProductDefinition { 
   id: string;
   name: string;
@@ -49,13 +50,18 @@ export interface SceneItem {
 export type CameraView = 'top' | 'front' | 'side' | 'iso';
 
 interface AppState {
-  // --- AUTH & PROJECT STATE (NUEVO) ---
+  // --- AUTH & PROJECT STATE ---
   user: any | null;
   currentProjectId: string | null;
   currentProjectName: string | null;
+  
+  // 💡 NUEVO ESTADO CLAVE: Bandera de Solo Lectura
+  isReadOnlyMode: boolean; 
 
   setUser: (user: any) => void;
   setProjectInfo: (id: string | null, name: string | null) => void;
+  // 💡 NUEVA ACCIÓN: Para cargar desde la URL sin login
+  loadProjectFromURL: (projectId: string) => Promise<void>; 
 
   // --- RESTO DE TU ESTADO EXISTENTE ---
   mode: 'idle' | 'drawing_floor' | 'drawing_fence' | 'placing_item' | 'editing' | 'catalog' | 'measuring';
@@ -85,7 +91,7 @@ interface AppState {
   };
   safetyZonesVisible: boolean;
 
-  // Acciones
+  // Acciones (el resto)
   setMode: (mode: AppState['mode']) => void;
   setSelectedProduct: (product: ProductDefinition | null) => void; 
   selectItem: (uuid: string | null) => void;
@@ -122,11 +128,47 @@ export const useAppStore = create<AppState>((set, get) => ({
   user: null,
   currentProjectId: null,
   currentProjectName: null,
-  
-  setUser: (user) => set({ user }),
-  setProjectInfo: (id, name) => set({ currentProjectId: id, currentProjectName: name }),
+  isReadOnlyMode: false, // 💡 VALOR INICIAL
 
-  // ... (RESTO DE TU ESTADO INICIAL IGUAL QUE ANTES) ...
+  // --- ACTIONS: AUTH & PROJECT ---
+  setUser: (user) => set({ user, isReadOnlyMode: false }), // Asegura que el modo lectura se desactiva al loguear
+  setProjectInfo: (id, name) => set({ currentProjectId: id, currentProjectName: name, isReadOnlyMode: false }),
+  
+  // 💡 IMPLEMENTACIÓN DE CARGA PÚBLICA CON SUPABASE
+  loadProjectFromURL: async (projectId: string) => {
+    // 1. Consulta pública a Supabase
+    // Usa la consulta select que necesites
+    const { data, error } = await supabase
+      .from('projects')
+      .select(`items, currentProjectName, sunPosition, backgroundColor`) 
+      .eq('id', projectId)
+      .single();
+
+    if (error || !data) {
+        console.error("Error al cargar proyecto:", error?.message || "Proyecto no encontrado.");
+        get().resetScene(); // Limpiar la escena si la carga falla
+        set({ isReadOnlyMode: false }); 
+        return;
+    }
+
+    // 2. Carga exitosa: calcular precio y establecer modo lectura
+    // Asegurarse de que el campo 'items' existe y es un array antes de usar reduce
+    const calculatedPrice = Array.isArray(data.items) ? data.items.reduce((sum: number, item: SceneItem) => sum + item.price, 0) : 0;
+
+    set({
+      currentProjectId: projectId,
+      currentProjectName: data.currentProjectName,
+      items: Array.isArray(data.items) ? data.items : [], 
+      sunPosition: data.sunPosition || { azimuth: 180, elevation: 45 }, // Fallback por si no existe
+      backgroundColor: data.backgroundColor || '#111111', // Fallback
+      isReadOnlyMode: true, // ¡CLAVE! Se activa el modo solo lectura
+      totalPrice: calculatedPrice,
+      past: [], // Limpiar historial
+      future: [],
+    });
+  },
+
+  // --- RESTO DEL ESTADO INICIAL (Copiado de tu archivo) ---
   mode: 'idle',
   selectedProduct: null,
   selectedItemId: null,
@@ -157,7 +199,181 @@ export const useAppStore = create<AppState>((set, get) => ({
     resolve: null,
   },
 
-  // ... (ACTIONS - COPIA TUS ACCIONES EXISTENTES AQUÍ, requestInput, etc.) ...
+  // --- ACTIONS: BLOQUEO DE ESCRITURA ---
+  
+  // Bloquea la creación de instantáneas
+  saveSnapshot: () => {
+    if (get().isReadOnlyMode) return; 
+    const { items, past } = get();
+    const newPast = [...past, JSON.parse(JSON.stringify(items))].slice(-20);
+    set({ past: newPast, future: [] }); 
+  },
+
+  // Bloquea la adición
+  addItem: (item) => {
+    if (get().isReadOnlyMode) {
+        console.warn('Bloqueado: No se puede añadir items en modo solo lectura.');
+        return;
+    }
+    get().saveSnapshot(); 
+    set((state) => ({ 
+      items: [...state.items, item],
+      totalPrice: state.totalPrice + item.price 
+    }));
+  },
+
+  // Bloquea la eliminación
+  removeItem: (uuid) => {
+    if (get().isReadOnlyMode) {
+        console.warn('Bloqueado: No se puede eliminar items en modo solo lectura.');
+        return;
+    }
+    get().saveSnapshot(); 
+    set((state) => {
+      const itemToRemove = state.items.find(i => i.uuid === uuid);
+      const priceToSubtract = itemToRemove ? itemToRemove.price : 0;
+      return { 
+        items: state.items.filter(i => i.uuid !== uuid),
+        selectedItemId: null,
+        mode: 'idle',
+        totalPrice: Math.max(0, state.totalPrice - priceToSubtract)
+      };
+    });
+  },
+
+  // Bloquea la duplicación
+  duplicateItem: (uuid) => {
+    if (get().isReadOnlyMode) {
+        console.warn('Bloqueado: No se puede duplicar items en modo solo lectura.');
+        return;
+    }
+    const state = get();
+    const originalItem = state.items.find(i => i.uuid === uuid);
+    if (!originalItem) return;
+    state.saveSnapshot();
+    const newItem: SceneItem = JSON.parse(JSON.stringify(originalItem));
+    newItem.uuid = THREE.MathUtils.generateUUID(); 
+    newItem.position = [originalItem.position[0] + 1, originalItem.position[1], originalItem.position[2] + 1];
+    set({
+      items: [...state.items, newItem],
+      totalPrice: state.totalPrice + newItem.price,
+      selectedItemId: newItem.uuid, 
+      mode: 'editing'
+    });
+  },
+
+  // Bloquea transformaciones
+  updateItemTransform: (uuid, pos, rot, scale) => {
+      if (get().isReadOnlyMode) return;
+      set((state) => ({
+        items: state.items.map(i => i.uuid === uuid 
+          ? { ...i, position: pos as any, rotation: rot as any, scale: scale as any } 
+          : i
+        )
+      }))
+  },
+  
+  updateFloorMaterial: (uuid, material) => {
+      if (get().isReadOnlyMode) return;
+      set((state) => ({
+        items: state.items.map(i => i.uuid === uuid ? { ...i, floorMaterial: material, textureUrl: undefined } : i)
+      }))
+  },
+
+  updateFloorTexture: (uuid, url, scale, rotation) => {
+    if (get().isReadOnlyMode) return;
+    set((state) => ({
+      items: state.items.map(i => i.uuid === uuid ? { 
+        ...i, 
+        textureUrl: url, 
+        textureScale: scale, 
+        textureRotation: rotation,
+        floorMaterial: undefined 
+      } : i)
+    }))
+  },
+
+  updateFloorPoints: (uuid, points) => {
+    if (get().isReadOnlyMode) return;
+    get().saveSnapshot(); 
+    set((state) => ({
+      items: state.items.map(i => i.uuid === uuid ? { ...i, points: points } : i)
+    }));
+  },
+
+  setFenceConfig: (config) => {
+    if (get().isReadOnlyMode) return;
+    set((state) => ({
+        fenceConfig: { ...state.fenceConfig, ...config }
+    }))
+  },
+
+  updateItemFenceConfig: (uuid, config) => {
+    if (get().isReadOnlyMode) return;
+    get().saveSnapshot();
+    set((state) => ({
+      items: state.items.map(i => {
+         if (i.uuid === uuid && i.fenceConfig) {
+             return { ...i, fenceConfig: { ...i.fenceConfig, ...config } };
+         }
+         return i;
+      })
+    }));
+  },
+
+  // Bloquea Undo/Redo
+  undo: () => set((state) => {
+    if (state.past.length === 0 || get().isReadOnlyMode) return {}; 
+    const previous = state.past[state.past.length - 1];
+    const newPast = state.past.slice(0, state.past.length - 1);
+    const prevTotal = previous.reduce((sum, item) => sum + item.price, 0);
+    return {
+      items: previous,
+      past: newPast,
+      future: [state.items, ...state.future],
+      selectedItemId: null,
+      mode: 'idle',
+      totalPrice: prevTotal
+    };
+  }),
+
+  redo: () => set((state) => {
+    if (state.future.length === 0 || get().isReadOnlyMode) return {}; 
+    const next = state.future[0];
+    const newFuture = state.future.slice(1);
+    const nextTotal = next.reduce((sum, item) => sum + item.price, 0);
+    return {
+      items: next,
+      past: [...state.past, state.items],
+      future: newFuture,
+      selectedItemId: null,
+      mode: 'idle',
+      totalPrice: nextTotal
+    };
+  }),
+
+  // Bloquea reset
+  resetScene: () => {
+    if (get().isReadOnlyMode) return;
+    set({ 
+      items: [], 
+      totalPrice: 0, 
+      selectedProduct: null, 
+      mode: 'idle', 
+      selectedItemId: null, 
+      past: [], 
+      future: [], 
+      pendingView: null 
+    });
+  },
+
+  // El resto de acciones se mantienen (no modifican la escena directamente):
+  setSelectedVertices: (indices, distance, angle) => set({ 
+    selectedVertexIndices: indices, 
+    measuredDistance: distance,
+    measuredAngle: angle
+  }),
+
   requestInput: (title: string, defaultValue = '') => {
     return new Promise((resolve) => {
       set({
@@ -180,7 +396,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   toggleSafetyZones: () => set((state) => ({ safetyZonesVisible: !state.safetyZonesVisible })),
-
   setMode: (mode) => {
     if (mode !== 'editing') set({ selectedItemId: null });
     if (mode !== 'measuring') set({ measurementResult: null });
@@ -188,13 +403,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (window.editorEngine) window.editorEngine.clearTools();
     set({ mode, selectedVertexIndices: [], measuredDistance: null, measuredAngle: null });
   },
-
   setSelectedProduct: (product) => set({ 
     selectedProduct: product, 
     mode: product ? 'placing_item' : 'idle',
     selectedItemId: null 
   }),
-
   selectItem: (uuid) => {
     set({ 
       selectedItemId: uuid, 
@@ -205,7 +418,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       measuredAngle: null
     });
   },
-
   toggleGrid: () => set((state) => ({ gridVisible: !state.gridVisible })),
   toggleBudget: () => set((state) => ({ budgetVisible: !state.budgetVisible })),
   toggleEnvPanel: () => set((state) => ({ envPanelVisible: !state.envPanelVisible })),
@@ -215,139 +427,4 @@ export const useAppStore = create<AppState>((set, get) => ({
   setCameraType: (type) => set({ cameraType: type }),
   triggerView: (view) => set({ pendingView: view }),
   clearPendingView: () => set({ pendingView: null }),
-
-  saveSnapshot: () => {
-    const { items, past } = get();
-    const newPast = [...past, JSON.parse(JSON.stringify(items))].slice(-20);
-    set({ past: newPast, future: [] }); 
-  },
-
-  addItem: (item) => {
-    get().saveSnapshot(); 
-    set((state) => ({ 
-      items: [...state.items, item],
-      totalPrice: state.totalPrice + item.price 
-    }));
-  },
-
-  removeItem: (uuid) => {
-    get().saveSnapshot(); 
-    set((state) => {
-      const itemToRemove = state.items.find(i => i.uuid === uuid);
-      const priceToSubtract = itemToRemove ? itemToRemove.price : 0;
-      return { 
-        items: state.items.filter(i => i.uuid !== uuid),
-        selectedItemId: null,
-        mode: 'idle',
-        totalPrice: Math.max(0, state.totalPrice - priceToSubtract)
-      };
-    });
-  },
-
-  duplicateItem: (uuid) => {
-    const state = get();
-    const originalItem = state.items.find(i => i.uuid === uuid);
-    if (!originalItem) return;
-    state.saveSnapshot();
-    const newItem: SceneItem = JSON.parse(JSON.stringify(originalItem));
-    newItem.uuid = THREE.MathUtils.generateUUID(); 
-    newItem.position = [originalItem.position[0] + 1, originalItem.position[1], originalItem.position[2] + 1];
-    set({
-      items: [...state.items, newItem],
-      totalPrice: state.totalPrice + newItem.price,
-      selectedItemId: newItem.uuid, 
-      mode: 'editing'
-    });
-  },
-
-  updateItemTransform: (uuid, pos, rot, scale) => set((state) => ({
-    items: state.items.map(i => i.uuid === uuid 
-      ? { ...i, position: pos as any, rotation: rot as any, scale: scale as any } 
-      : i
-    )
-  })),
-
-  updateFloorMaterial: (uuid, material) => set((state) => ({
-    items: state.items.map(i => i.uuid === uuid ? { ...i, floorMaterial: material, textureUrl: undefined } : i)
-  })),
-
-  updateFloorTexture: (uuid, url, scale, rotation) => set((state) => ({
-    items: state.items.map(i => i.uuid === uuid ? { 
-      ...i, 
-      textureUrl: url, 
-      textureScale: scale, 
-      textureRotation: rotation,
-      floorMaterial: undefined 
-    } : i)
-  })),
-
-  updateFloorPoints: (uuid, points) => {
-    get().saveSnapshot(); 
-    set((state) => ({
-      items: state.items.map(i => i.uuid === uuid ? { ...i, points: points } : i)
-    }));
-  },
-
-  setFenceConfig: (config) => set((state) => ({
-      fenceConfig: { ...state.fenceConfig, ...config }
-  })),
-
-  updateItemFenceConfig: (uuid, config) => {
-    get().saveSnapshot();
-    set((state) => ({
-      items: state.items.map(i => {
-         if (i.uuid === uuid && i.fenceConfig) {
-             return { ...i, fenceConfig: { ...i.fenceConfig, ...config } };
-         }
-         return i;
-      })
-    }));
-  },
-
-  undo: () => set((state) => {
-    if (state.past.length === 0) return {};
-    const previous = state.past[state.past.length - 1];
-    const newPast = state.past.slice(0, state.past.length - 1);
-    const prevTotal = previous.reduce((sum, item) => sum + item.price, 0);
-    return {
-      items: previous,
-      past: newPast,
-      future: [state.items, ...state.future],
-      selectedItemId: null,
-      mode: 'idle',
-      totalPrice: prevTotal
-    };
-  }),
-
-  redo: () => set((state) => {
-    if (state.future.length === 0) return {};
-    const next = state.future[0];
-    const newFuture = state.future.slice(1);
-    const nextTotal = next.reduce((sum, item) => sum + item.price, 0);
-    return {
-      items: next,
-      past: [...state.past, state.items],
-      future: newFuture,
-      selectedItemId: null,
-      mode: 'idle',
-      totalPrice: nextTotal
-    };
-  }),
-
-  resetScene: () => set({ 
-    items: [], 
-    totalPrice: 0, 
-    selectedProduct: null, 
-    mode: 'idle', 
-    selectedItemId: null, 
-    past: [], 
-    future: [], 
-    pendingView: null 
-  }),
-
-  setSelectedVertices: (indices, distance, angle) => set({ 
-    selectedVertexIndices: indices, 
-    measuredDistance: distance,
-    measuredAngle: angle
-  }),
 }));
