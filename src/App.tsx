@@ -11,7 +11,7 @@ import { ClientDashboard } from './features/crm/pages/ClientDashboard';
 import { ProfilePage } from './features/crm/pages/ProfilePage';
 import { BudgetDetailPage } from './features/crm/pages/BudgetDetailPage';
 import { AdminOrderDetailPage } from './features/crm/pages/AdminOrderDetailPage'; 
-import { AdminClientDetailPage } from './features/crm/pages/AdminClientDetailPage'; // 💡 IMPORT NUEVO
+import { AdminClientDetailPage } from './features/crm/pages/AdminClientDetailPage'; 
 
 // --- ESTILOS ---
 const badgeStyle: React.CSSProperties = {
@@ -94,21 +94,57 @@ const LoginPage = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true); setErrorMsg('');
+
+    // Función auxiliar para verificar estado de aprobación
+    const checkUserStatus = async (userId: string) => {
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role, is_approved')
+            .eq('id', userId)
+            .single();
+
+        if (profile) {
+            // 1. Si es Admin/Empleado entra siempre
+            if (profile.role === 'admin' || profile.role === 'employee') {
+                navigate('/admin/crm');
+                return;
+            }
+
+            // 2. Si es Cliente, verificamos si está aprobado
+            if (profile.is_approved) {
+                navigate('/portal');
+            } else {
+                // ⛔ BLOQUEADO
+                await supabase.auth.signOut();
+                throw new Error("🔒 Tu cuenta está pendiente de validación por un administrador.");
+            }
+        }
+    };
+
     try {
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
       if (authError) throw authError;
       if (!authData.user) throw new Error("No se pudo obtener el usuario.");
 
+      // Verificar rol en Supabase (seguridad extra)
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', authData.user.id).single();
       const userRole = profile?.role || 'client';
 
-      if (targetRole === 'employee') {
-        if (userRole === 'admin' || userRole === 'employee') navigate('/admin/crm');
-        else { await supabase.auth.signOut(); throw new Error("⛔ Acceso Denegado: Cuenta sin permisos."); }
-      } else {
-        navigate('/portal');
+      if (targetRole === 'employee' && (userRole !== 'admin' && userRole !== 'employee')) {
+         await supabase.auth.signOut(); 
+         throw new Error("⛔ Acceso Denegado: Cuenta sin permisos de empleado.");
       }
-    } catch (error: any) { setErrorMsg(error.message); } finally { setLoading(false); }
+
+      // ✅ LLAMADA A LA NUEVA FUNCIÓN DE VERIFICACIÓN
+      await checkUserStatus(authData.user.id);
+
+    } catch (error: any) { 
+        setErrorMsg(error.message); 
+        // Si hubo error de aprobación, aseguramos logout
+        if (error.message.includes('validación')) await supabase.auth.signOut();
+    } finally { 
+        setLoading(false); 
+    }
   };
 
   if (step === 'selection') {
@@ -124,7 +160,7 @@ const LoginPage = () => {
                 <span style={{fontSize:'30px'}}>🏢</span><span>Soy Empleado</span>
             </button>
           </div>
-          <button onClick={() => navigate('/')} style={{ background: 'transparent', border: 'none', color: '#666', cursor: 'pointer', textDecoration: 'underline' }}>Volver al Visor</button>
+          <button onClick={() => navigate('/')} style={{ background: 'transparent', border: 'none', color: '#666', cursor: 'pointer', textDecoration: 'underline' }}>Volver al Visor 3D</button>
         </div>
       </div>
     );
@@ -210,9 +246,7 @@ function App() {
           <Route index element={<h2 style={{color:'white', padding:'20px'}}>Bienvenido al Panel</h2>} />
           <Route path="crm" element={<CrmDashboard />} />
           <Route path="order/:id" element={<AdminOrderDetailPage />} />
-          {/* NUEVA RUTA PARA FICHA CLIENTE */}
           <Route path="client/:id" element={<AdminClientDetailPage />} />
-          
           <Route path="erp" element={<h2 style={{color:'white', padding:'20px'}}>ERP en construcción</h2>} />
           <Route path="purchases" element={<h2 style={{color:'white', padding:'20px'}}>Compras en construcción</h2>} />
         </Route>

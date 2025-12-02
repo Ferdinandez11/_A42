@@ -55,6 +55,18 @@ export const CrmDashboard = () => {
     } catch (err: any) { console.error(err); } finally { setLoading(false); }
   };
 
+  const handleApproveClient = async (clientId: string) => {
+    const { error } = await supabase
+        .from('profiles')
+        .update({ is_approved: true })
+        .eq('id', clientId);
+    
+    if (!error) {
+        alert("Usuario aprobado. Ahora ya puede entrar.");
+        loadData(); // Recargar la tabla
+    }
+  };
+
   const handleStatusUpdate = async (id: string, newStatus: string) => {
     const confirmMsg = `¿Cambiar estado a "${newStatus.toUpperCase()}"? \n(Si cambias de fase, la tarjeta se moverá de pestaña)`;
     if(!confirm(confirmMsg)) { loadData(); return; } 
@@ -199,15 +211,31 @@ export const CrmDashboard = () => {
             <table style={tableStyle}>
               <thead>
                 <tr>
+                    <th style={thStyle}>Estado</th>
                     <th style={thStyle}>Empresa</th>
                     <th style={thStyle}>Email</th>
-                    <th style={thStyle}>Dto. Fijo</th> {/* Nueva Columna */}
+                    <th style={thStyle}>Dto. Fijo</th>
                     <th style={thStyle}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {clients.map(c => (
                   <tr key={c.id}>
+                    <td style={tdStyle}>
+                        {c.is_approved ? (
+                            <span style={{color:'#2ecc71', fontSize:'20px'}} title="Aprobado">✅</span>
+                        ) : (
+                            <button 
+                                onClick={() => handleApproveClient(c.id)} 
+                                style={{
+                                    background:'#e67e22', color:'white', border:'none', 
+                                    padding:'5px 10px', borderRadius:'4px', cursor:'pointer', fontWeight:'bold'
+                                }}
+                            >
+                                🔔 Aprobar
+                            </button>
+                        )}
+                    </td>
                     <td style={{...tdStyle, fontWeight:'bold'}}>{c.company_name || '---'}</td>
                     <td style={tdStyle}>{c.email}</td>
                     <td style={{...tdStyle, color: c.discount_rate > 0 ? '#2ecc71' : '#666', fontWeight:'bold'}}>
