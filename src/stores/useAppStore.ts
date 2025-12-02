@@ -132,34 +132,45 @@ export const useAppStore = create<AppState>((set, get) => ({
   isReadOnlyMode: false, 
 
   // --- ACTIONS: AUTH & PROJECT ---
-  setUser: (user) => set({ user, isReadOnlyMode: false }),
+  setUser: (user) => set({ user }),
   setProjectInfo: (id, name) => set({ currentProjectId: id, currentProjectName: name, isReadOnlyMode: false }),
   
   // 💡 IMPLEMENTACIÓN DE NUEVA ACCIÓN
   resetProjectId: () => set({ currentProjectId: null, isReadOnlyMode: false }),
 
   loadProjectFromURL: async (projectId: string) => {
-    const { data, error } = await supabase
+     // 1. CORRECCIÓN: Pedimos 'data' (el JSON) y 'name', no 'items' suelto.
+    const { data: projectRecord, error } = await supabase
       .from('projects')
-      .select(`items, currentProjectName, sunPosition, backgroundColor`) 
+      .select('data, name, id') // <--- CAMBIO AQUÍ
       .eq('id', projectId)
       .single();
 
-    if (error || !data) {
-        console.error("Error al cargar proyecto:", error?.message || "Proyecto no encontrado.");
+    if (error || !projectRecord) {
+        console.error("Error al cargar proyecto:", error?.message || "No encontrado");
         get().resetScene(); 
         set({ isReadOnlyMode: false }); 
         return;
     }
 
-    const calculatedPrice = Array.isArray(data.items) ? data.items.reduce((sum: number, item: SceneItem) => sum + item.price, 0) : 0;
+    // 2. Extraer los datos del JSON
+    // Si 'data' es el campo JSON, los items están dentro de projectRecord.data.items
+    const sceneData = projectRecord.data || {};
+    const loadedItems = Array.isArray(sceneData.items) ? sceneData.items : [];
+    const loadedFence = sceneData.fenceConfig || { presetId: 'wood', colors: { post:0, slatA:0 }};
+    const loadedCamera = sceneData.camera || 'perspective';
 
+    // Calcular precio
+    const calculatedPrice = loadedItems.reduce((sum: number, item: SceneItem) => sum + (item.price || 0), 0);
+
+    // 3. Actualizar estado
     set({
-      currentProjectId: projectId,
-      currentProjectName: data.currentProjectName,
-      items: Array.isArray(data.items) ? data.items : [], 
-      sunPosition: data.sunPosition || { azimuth: 180, elevation: 45 }, 
-      backgroundColor: data.backgroundColor || '#111111', 
+      currentProjectId: projectRecord.id,
+      currentProjectName: projectRecord.name,
+      items: loadedItems,
+      fenceConfig: loadedFence,
+      cameraType: loadedCamera,
+      // Si quieres guardar la posición del sol o color de fondo en el JSON también, extráelos aquí
       isReadOnlyMode: true, 
       totalPrice: calculatedPrice,
       past: [], 

@@ -76,7 +76,7 @@ export const AdminOrderDetailPage = () => {
   const handleOpenViewer = () => {
       if (order.project_id) {
           // Añadimos &mode=readonly para que App.tsx sepa que es solo ver
-          window.open(`/?project_id=${order.project_id}&mode=readonly`, '_blank');
+          window.location.href = `/?project_id=${order.project_id}&mode=readonly`;
       }
   };
 

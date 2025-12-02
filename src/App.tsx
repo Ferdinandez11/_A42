@@ -168,37 +168,58 @@ const LoginPage = () => {
 
 // 4. VISOR (HOME) - LÓGICA MODIFICADA
 const ViewerPage = () => {
-  const { mode, user, isReadOnlyMode, loadProjectFromURL, resetProjectId } = useAppStore();
-  const navigate = useNavigate(); // Necesario para el botón de volver
+   // Asegúrate de sacar 'setUser' del store
+  const { mode, user, setUser, isReadOnlyMode, loadProjectFromURL, resetProjectId } = useAppStore();
+  const navigate = useNavigate();
   
+  // 1. EFECTO PARA RECUPERAR EL ROL REAL
+  React.useEffect(() => {
+    const checkUserRole = async () => {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser) {
+            // Buscamos el rol en la tabla profiles
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', authUser.id)
+                .single();
+            
+            // Actualizamos el usuario en el store con el rol correcto
+            // (Fusionamos los datos de auth con el rol de la tabla profile)
+            if (profile) {
+                setUser({ ...authUser, role: profile.role });
+            }
+        }
+    };
+    checkUserRole();
+  }, [setUser]); // Se ejecuta al montar
+
+  // 2. EFECTO DE CARGA DE URL (EL TUYO, SIN CAMBIOS)
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const projectIdFromUrl = params.get('project_id');
     const isCloneMode = params.get('mode') === 'clone';
 
-    // Si ya estamos en modo lectura y NO estamos intentando cargar uno nuevo, paramos.
     if (isReadOnlyMode && !projectIdFromUrl) return;
 
     if (projectIdFromUrl) {
       loadProjectFromURL(projectIdFromUrl).then(() => {
          if (isCloneMode && resetProjectId) {
-             console.log("Modo CLON activado.");
              resetProjectId(); 
          }
       });
     }
-  }, [loadProjectFromURL, resetProjectId]); 
+  }, [loadProjectFromURL, resetProjectId]);
 
-  // Detectar si soy Admin/Empleado
+  // Validamos rol
   const isAdminOrEmployee = user?.role === 'admin' || user?.role === 'employee';
 
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden', margin: 0, background: '#000' }}>
       
-      {/* --- ZONA SUPERIOR IZQUIERDA (NAVEGACIÓN Y AVISOS) --- */}
       <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 2000, display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-start' }}>
         
-        {/* 1. BOTÓN VOLVER AL PANEL (Solo para Admins) */}
+        {/* BOTÓN VOLVER (Ahora debería salir porque actualizamos el rol) */}
         {isAdminOrEmployee && (
             <button 
                 onClick={() => navigate('/admin/crm')}
@@ -213,23 +234,14 @@ const ViewerPage = () => {
             </button>
         )}
 
-        {/* 2. AVISO MODO LECTURA */}
         {isReadOnlyMode && (
-            <div style={{ 
-                color:'white', background:'rgba(0,0,0,0.8)', padding:'8px 16px', 
-                borderRadius:'8px', border:'1px solid #3b82f6', 
-                display:'flex', alignItems:'center', gap:'8px', fontSize:'13px' 
-            }}>
+            <div style={{ color:'white', background:'rgba(0,0,0,0.8)', padding:'8px 16px', borderRadius:'8px', border:'1px solid #3b82f6', fontSize:'13px' }}>
                 <span>👁️</span> Solo Lectura
             </div>
         )}
 
-        {/* 3. BOTÓN LOGIN (Solo si nadie está logueado y no es modo lectura forzado) */}
         {!user && !isReadOnlyMode && (
-            <Link to="/login" style={badgeStyle}>
-                <span style={{ fontSize: '18px' }}>👤</span>
-                <span>Acceso / Login</span>
-            </Link>
+            <Link to="/login" style={badgeStyle}>👤 Acceso / Login</Link>
         )}
       </div>
 
