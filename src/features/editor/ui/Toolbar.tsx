@@ -13,7 +13,8 @@ export const Toolbar = () => {
     mode, setMode, gridVisible, toggleGrid, undo, redo, past, future, 
     cameraType, setCameraType, triggerView, toggleEnvPanel, envPanelVisible, 
     setMeasurementResult, addItem, safetyZonesVisible, toggleSafetyZones,
-    user, requestInput, items, fenceConfig, totalPrice, currentProjectId, currentProjectName, setProjectInfo 
+    user, requestInput, items, fenceConfig, totalPrice, currentProjectId, currentProjectName, setProjectInfo,
+    isReadOnlyMode // 💡 IMPORTANTE: Leemos el estado de solo lectura
   } = useAppStore();
 
   const [showViews, setShowViews] = useState(false);
@@ -30,6 +31,8 @@ export const Toolbar = () => {
 
   // --- LÓGICA DE GUARDADO ---
   const handleSaveProject = async () => {
+    // Doble seguridad: Si es solo lectura, no hacemos nada
+    if (isReadOnlyMode) return alert("Modo de Solo Lectura. No puedes sobrescribir este proyecto.");
     if (!user) return alert("Debes iniciar sesión para guardar.");
 
     // 1. Captura de pantalla (Miniatura)
@@ -156,7 +159,7 @@ export const Toolbar = () => {
 
       <div className="glass-panel">
         
-        {/* NUEVO: Botón DASHBOARD (Solo si logueado) */}
+        {/* Botón DASHBOARD */}
         {user && (
            <button className="tool-btn text-blue-400 hover:text-blue-300" onClick={() => navigate(user.email?.includes('admin') || user.email?.includes('levipark') ? '/admin/crm' : '/portal?tab=projects')} title="Ir a Mis Proyectos">
              <LayoutDashboard size={20} /> <span className="tool-label">Portal</span>
@@ -174,9 +177,18 @@ export const Toolbar = () => {
 
         <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
 
-        {/* NUEVO: Botón GUARDAR (Solo si logueado) */}
+        {/* 💡 BOTÓN GUARDAR (BLOQUEADO EN MODO LECTURA) */}
         {user ? (
-            <button className={`tool-btn ${isSaving ? 'text-yellow-400' : ''}`} onClick={handleSaveProject} title="Guardar Proyecto en Nube">
+            <button 
+                className={`tool-btn ${isSaving ? 'text-yellow-400' : ''}`} 
+                onClick={handleSaveProject} 
+                disabled={isSaving || isReadOnlyMode} // <--- BLOQUEO
+                title={isReadOnlyMode ? "Modo Lectura (No se puede guardar)" : "Guardar Proyecto en Nube"}
+                style={{
+                    opacity: isReadOnlyMode ? 0.5 : 1, // <--- OPACIDAD VISUAL
+                    cursor: isReadOnlyMode ? 'not-allowed' : 'pointer' // <--- CURSOR PROHIBIDO
+                }}
+            >
                 <Save size={20} className={isSaving ? 'animate-pulse' : ''} /> 
                 <span className="tool-label">{isSaving ? '...' : 'Guardar'}</span>
             </button>

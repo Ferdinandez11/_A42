@@ -169,9 +169,9 @@ const LoginPage = () => {
 // 4. VISOR (HOME) - LÓGICA MODIFICADA
 const ViewerPage = () => {
   const { mode, user, isReadOnlyMode, loadProjectFromURL, resetProjectId } = useAppStore();
+  const navigate = useNavigate(); // Necesario para el botón de volver
   
   React.useEffect(() => {
-    // 💡 LÓGICA CORREGIDA: Leemos los parámetros ANTES de decidir si bloqueamos
     const params = new URLSearchParams(window.location.search);
     const projectIdFromUrl = params.get('project_id');
     const isCloneMode = params.get('mode') === 'clone';
@@ -180,36 +180,58 @@ const ViewerPage = () => {
     if (isReadOnlyMode && !projectIdFromUrl) return;
 
     if (projectIdFromUrl) {
-      // 💡 Cargamos SIEMPRE si hay ID en la URL (Aunque seas Admin)
       loadProjectFromURL(projectIdFromUrl).then(() => {
          if (isCloneMode && resetProjectId) {
-             console.log("Modo CLON activado: Reseteando ID para crear copia.");
+             console.log("Modo CLON activado.");
              resetProjectId(); 
          }
       });
     }
-  }, [loadProjectFromURL, resetProjectId]); // Quitamos dependencias de 'user' para evitar bloqueos
+  }, [loadProjectFromURL, resetProjectId]); 
+
+  // Detectar si soy Admin/Empleado
+  const isAdminOrEmployee = user?.role === 'admin' || user?.role === 'employee';
 
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden', margin: 0, background: '#000' }}>
       
-      {/* 💡 AVISO VISUAL: Si es modo lectura o admin */}
-      {(isReadOnlyMode || (user?.role === 'admin' && window.location.search.includes('project_id'))) && (
-        <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 1000, color:'white', background:'rgba(0,0,0,0.8)', padding:'8px 16px', borderRadius:'10px', border:'1px solid #e67e22', display:'flex', alignItems:'center', gap:'8px' }}>
-            <span style={{fontSize:'18px'}}>👁️</span>
-            <span style={{ fontSize: '14px', fontWeight: 'bold' }}>MODO LECTURA / ADMIN</span>
-        </div>
-      )}
+      {/* --- ZONA SUPERIOR IZQUIERDA (NAVEGACIÓN Y AVISOS) --- */}
+      <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 2000, display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-start' }}>
+        
+        {/* 1. BOTÓN VOLVER AL PANEL (Solo para Admins) */}
+        {isAdminOrEmployee && (
+            <button 
+                onClick={() => navigate('/admin/crm')}
+                style={{
+                    background: '#e67e22', color: 'white', border: 'none', 
+                    padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', 
+                    fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+                    display: 'flex', alignItems: 'center', gap: '8px'
+                }}
+            >
+                <span>⬅️</span> Volver al Panel
+            </button>
+        )}
 
-      {/* Botón Login solo si no hay usuario Y no estamos en modo lectura */}
-      {!user && !isReadOnlyMode && (
-            <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 1000 }}>
-                <Link to="/login" style={badgeStyle}>
-                    <span style={{ fontSize: '18px' }}>👤</span>
-                    <span>Acceso / Login</span>
-                </Link>
+        {/* 2. AVISO MODO LECTURA */}
+        {isReadOnlyMode && (
+            <div style={{ 
+                color:'white', background:'rgba(0,0,0,0.8)', padding:'8px 16px', 
+                borderRadius:'8px', border:'1px solid #3b82f6', 
+                display:'flex', alignItems:'center', gap:'8px', fontSize:'13px' 
+            }}>
+                <span>👁️</span> Solo Lectura
             </div>
-      )}
+        )}
+
+        {/* 3. BOTÓN LOGIN (Solo si nadie está logueado y no es modo lectura forzado) */}
+        {!user && !isReadOnlyMode && (
+            <Link to="/login" style={badgeStyle}>
+                <span style={{ fontSize: '18px' }}>👤</span>
+                <span>Acceso / Login</span>
+            </Link>
+        )}
+      </div>
 
       <Editor3D />
       {mode === 'catalog' && <Catalog />}
