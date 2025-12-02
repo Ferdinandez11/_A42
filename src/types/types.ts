@@ -1,3 +1,5 @@
+// --- src/types.ts ---
+
 export interface Profile {
   id: string;
   email: string;
@@ -20,12 +22,18 @@ export interface Order {
   created_at: string;
   order_ref: string;
   user_id: string;
-  project_id?: string; // Puede ser null si es desde catálogo
+  project_id?: string;
   status: OrderStatus;
   total_price: number;
   estimated_delivery_date?: string;
+  is_archived?: boolean; 
   
   // Relaciones (Supabase join)
   profiles?: Profile;
-  projects?: { name: string; thumbnail_url?: string };
+  // 👇 AQUÍ ESTABA EL ERROR: Faltaba añadir 'id: string'
+  projects?: { 
+    id: string; 
+    name: string; 
+    thumbnail_url?: string 
+  };
 }

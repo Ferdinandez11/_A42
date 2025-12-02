@@ -79,7 +79,7 @@ const ClientPortalLayout = () => {
         <h3 style={{ margin: 0, color: '#fff' }}>Portal del Cliente 👋</h3>
         <nav style={{ display: 'flex', gap: '20px', alignItems:'center' }}>
           <Link to="/portal?tab=projects" style={{ color: '#fff', textDecoration: 'none' }}>Mis Proyectos</Link>
-          <Link to="/portal?tab=orders" style={{ color: '#bbb', textDecoration: 'none' }}>Mis Pedidos</Link>
+          <Link to="/portal?tab=orders" style={{ color: '#bbb', textDecoration: 'none' }}>Mis Presupuestos</Link>
           <Link to="/portal/profile" style={{ color: '#bbb', textDecoration: 'none' }}>Mi Perfil 👤</Link>
           <Link to="/" style={{ ...badgeStyle, fontSize: '12px', padding: '6px 12px' }}>+ Nuevo Proyecto 3D</Link>
           <button onClick={performLogout} style={{background:'none', border:'none', color:'#666', cursor:'pointer'}}>Salir</button>
@@ -172,7 +172,7 @@ const LoginPage = () => {
 // 4. VISOR (HOME)
 const ViewerPage = () => {
   // 💡 CAMBIO: Leemos 'isReadOnlyMode' y 'loadProjectFromURL'
-  const { mode, user, isReadOnlyMode, loadProjectFromURL } = useAppStore(); 
+  const { mode, user, isReadOnlyMode, loadProjectFromURL, resetProjectId } = useAppStore();
   
   // --- LÓGICA DE CARGA PARA QR ---
   React.useEffect(() => {
@@ -181,13 +181,19 @@ const ViewerPage = () => {
 
     const params = new URLSearchParams(window.location.search);
     const projectIdFromUrl = params.get('project_id');
+    const isCloneMode = params.get('mode') === 'clone';
 
     if (projectIdFromUrl) {
       // Llamamos a la acción del store para cargar el proyecto públicamente
-      loadProjectFromURL(projectIdFromUrl); 
+      loadProjectFromURL(projectIdFromUrl).then(() => {
+         // Y si es modo clon, borramos el ID inmediatamente después de cargar
+         if (isCloneMode && resetProjectId) {
+             console.log("Modo CLON activado: Reseteando ID para crear copia.");
+             resetProjectId(); 
+         }
+      });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadProjectFromURL]); 
+  }, [loadProjectFromURL, resetProjectId]); // Añade dependencias
 
   // --- FIN LÓGICA DE CARGA PARA QR ---
 
