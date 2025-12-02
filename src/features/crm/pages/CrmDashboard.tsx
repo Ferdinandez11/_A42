@@ -37,7 +37,6 @@ export const CrmDashboard = () => {
         const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
         setClients(data || []);
       } else {
-        // Carga de Pedidos/Presupuestos INCLUYENDO mensajes para los avisos
         let query = supabase.from('orders')
             .select(`
                 *, 
@@ -60,7 +59,6 @@ export const CrmDashboard = () => {
     const confirmMsg = `¿Cambiar estado a "${newStatus.toUpperCase()}"? \n(Si cambias de fase, la tarjeta se moverá de pestaña)`;
     if(!confirm(confirmMsg)) { loadData(); return; } 
 
-    // Si pasamos a pedido, calculamos fecha +6 semanas (42 días)
     const updateData: any = { status: newStatus };
     if (newStatus === 'pedido') {
         const deliveryDate = new Date();
@@ -74,7 +72,7 @@ export const CrmDashboard = () => {
   };
 
   const handleDeleteClient = async (id: string) => {
-    if(!confirm("⚠️ ¿Borrar cliente y datos?")) return;
+    if(!confirm("⚠️ ¿Borrar cliente y todos sus datos?")) return;
     await supabase.from('profiles').delete().eq('id', id);
     loadData();
   };
@@ -85,24 +83,12 @@ export const CrmDashboard = () => {
     loadData();
   };
 
-  // --- LÓGICA DE AVISOS ---
   const getAlertStatus = (order: any) => {
-    // Ordenamos mensajes por fecha (el más nuevo primero)
-    // Nota: Supabase a veces devuelve en orden de inserción, aseguramos sort por fecha
     const messages = order.order_messages || [];
     messages.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    
     const lastMsg = messages[0];
-
-    // Si no hay mensajes
     if (!lastMsg) return null;
-
-    // Si el último mensaje es de un CLIENTE, es una alerta ROJA (esperando respuesta)
-    if (lastMsg.profiles?.role === 'client') {
-        return { icon: '🔴', text: 'Cliente escribió', color: '#e74c3c' };
-    }
-
-    // Si el último mensaje es ADMIN/EMPLOYEE, todo en orden
+    if (lastMsg.profiles?.role === 'client') return { icon: '🔴', text: 'Cliente escribió', color: '#e74c3c' };
     return { icon: '🟢', text: 'Respondido', color: '#27ae60' };
   };
 
@@ -125,11 +111,10 @@ export const CrmDashboard = () => {
             <table style={tableStyle}>
               <thead>
                 <tr>
-                  <th style={thStyle}>Avisos</th> {/* Nueva Columna */}
+                  <th style={thStyle}>Avisos</th>
                   <th style={thStyle}>REF</th>
                   <th style={thStyle}>Cliente</th>
                   
-                  {/* COLUMNAS EXCLUSIVAS PRESUPUESTOS */}
                   {activeTab === 'budgets' && (
                     <>
                         <th style={{...thStyle, color:'#e67e22'}}>Estado Presup.</th>
@@ -138,7 +123,6 @@ export const CrmDashboard = () => {
                     </>
                   )}
 
-                  {/* COLUMNAS EXCLUSIVAS PEDIDOS */}
                   {activeTab === 'orders' && (
                     <>
                         <th style={{...thStyle, color:'#3498db'}}>Estado Pedido</th>
@@ -156,26 +140,18 @@ export const CrmDashboard = () => {
                     const alert = getAlertStatus(o);
                     return (
                     <tr key={o.id}>
-                        {/* 0. AVISOS */}
                         <td style={{...tdStyle, textAlign:'center', cursor:'default'}} title={alert?.text || 'Sin novedad'}>
                             {alert ? alert.icon : <span style={{opacity:0.3}}>⚪</span>}
                         </td>
-
-                        {/* 1. REF & CLIENTE */}
                         <td style={tdStyle}><strong>{o.order_ref}</strong></td>
                         <td style={{...tdStyle, color: o.profiles ? '#4a90e2' : '#999'}}>
                              {o.profiles ? (o.profiles.company_name || o.profiles.email) : 'Usuario Eliminado'}
                         </td>
 
-                        {/* 2. ZONA PRESUPUESTO */}
                         {activeTab === 'budgets' && (
                             <>
                                 <td style={tdStyle}>
-                                    <select 
-                                        value={o.status} 
-                                        onChange={(e) => handleStatusUpdate(o.id, e.target.value)}
-                                        style={selectStyle}
-                                    >
+                                    <select value={o.status} onChange={(e) => handleStatusUpdate(o.id, e.target.value)} style={selectStyle}>
                                         <option value="pendiente">🟠 Pendiente</option>
                                         <option value="presupuestado">🟣 Presupuestado</option>
                                         <option value="entregado">🟣 Entregado</option>
@@ -184,21 +160,14 @@ export const CrmDashboard = () => {
                                     </select>
                                 </td>
                                 <td style={tdStyle}>{new Date(o.created_at).toLocaleDateString()}</td>
-                                <td style={tdStyle}>
-                                    {o.estimated_delivery_date ? new Date(o.estimated_delivery_date).toLocaleDateString() : '--'}
-                                </td>
+                                <td style={tdStyle}>{o.estimated_delivery_date ? new Date(o.estimated_delivery_date).toLocaleDateString() : '--'}</td>
                             </>
                         )}
 
-                        {/* 3. ZONA PEDIDO */}
                         {activeTab === 'orders' && (
                             <>
                                 <td style={tdStyle}>
-                                    <select 
-                                        value={o.status} 
-                                        onChange={(e) => handleStatusUpdate(o.id, e.target.value)}
-                                        style={{...selectStyle, borderColor: '#3498db'}}
-                                    >
+                                    <select value={o.status} onChange={(e) => handleStatusUpdate(o.id, e.target.value)} style={{...selectStyle, borderColor: '#3498db'}}>
                                         <option value="pedido">🔵 Pedido</option>
                                         <option value="fabricacion">🟠 Fabricación</option>
                                         <option value="entregado_parcial">🟡 Entr. Parcial</option>
@@ -208,22 +177,14 @@ export const CrmDashboard = () => {
                                         <option value="pendiente">⬅️ DEVOLVER A PPTO</option>
                                     </select>
                                 </td>
-                                <td style={tdStyle}>
-                                     {/* Usamos created_at como proxy de aceptación si no tenemos campo específico */}
-                                     {new Date(o.created_at).toLocaleDateString()}
-                                </td>
-                                <td style={tdStyle}>
-                                    {o.estimated_delivery_date ? new Date(o.estimated_delivery_date).toLocaleDateString() : '--'}
-                                </td>
+                                <td style={tdStyle}>{new Date(o.created_at).toLocaleDateString()}</td>
+                                <td style={tdStyle}>{o.estimated_delivery_date ? new Date(o.estimated_delivery_date).toLocaleDateString() : '--'}</td>
                             </>
                         )}
 
-                        {/* 4. TOTAL Y ACCIONES */}
                         <td style={{...tdStyle, borderLeft:'1px solid #444', fontWeight:'bold'}}>{o.total_price} €</td>
                         <td style={tdStyle}>
-                            <button onClick={() => navigate(`/admin/order/${o.id}`)} style={{marginRight:'10px', cursor:'pointer', background:'#333', color:'white', border:'1px solid #555', padding:'5px 10px', borderRadius:'4px'}}>
-                                👁️ Ficha
-                            </button>
+                            <button onClick={() => navigate(`/admin/order/${o.id}`)} style={{marginRight:'10px', cursor:'pointer', background:'#333', color:'white', border:'1px solid #555', padding:'5px 10px', borderRadius:'4px'}}>👁️ Ficha</button>
                             <button onClick={() => handleDeleteOrder(o.id)} style={{cursor:'pointer', background:'transparent', border:'none', color:'#666'}}>🗑️</button>
                         </td>
                     </tr>
@@ -236,15 +197,25 @@ export const CrmDashboard = () => {
 
           {activeTab === 'clients' && (
             <table style={tableStyle}>
-              <thead><tr><th style={thStyle}>Empresa</th><th style={thStyle}>Email</th><th style={thStyle}>Rol</th><th style={thStyle}>Acciones</th></tr></thead>
+              <thead>
+                <tr>
+                    <th style={thStyle}>Empresa</th>
+                    <th style={thStyle}>Email</th>
+                    <th style={thStyle}>Dto. Fijo</th> {/* Nueva Columna */}
+                    <th style={thStyle}>Acciones</th>
+                </tr>
+              </thead>
               <tbody>
                 {clients.map(c => (
                   <tr key={c.id}>
                     <td style={{...tdStyle, fontWeight:'bold'}}>{c.company_name || '---'}</td>
                     <td style={tdStyle}>{c.email}</td>
-                    <td style={tdStyle}>{c.role}</td>
+                    <td style={{...tdStyle, color: c.discount_rate > 0 ? '#2ecc71' : '#666', fontWeight:'bold'}}>
+                        {c.discount_rate ? `${c.discount_rate}%` : '0%'}
+                    </td>
                     <td style={tdStyle}>
-                        <button onClick={() => handleDeleteClient(c.id)} style={{color:'#e74c3c', background:'transparent', border:'none', cursor:'pointer'}}>Borrar 🗑️</button>
+                        <button onClick={() => navigate(`/admin/client/${c.id}`)} style={{marginRight:'10px', background:'#333', color:'white', border:'1px solid #555', padding:'5px 10px', borderRadius:'4px', cursor:'pointer'}}>Ficha 👤</button>
+                        <button onClick={() => handleDeleteClient(c.id)} style={{color:'#e74c3c', background:'transparent', border:'none', cursor:'pointer'}}>🗑️</button>
                     </td>
                   </tr>
                 ))}

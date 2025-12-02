@@ -60,7 +60,7 @@ export const ClientDashboard = () => {
 
       try {
         if (activeTab === 'projects') {
-          const { data } = await supabase.from('projects').select('*, orders(id)').order('updated_at', { ascending: false });
+          const { data } = await supabase.from('projects').select('*, orders(id)').eq('user_id', userId).order('updated_at', { ascending: false });
           const cleanProjects = (data || []).filter((p: any) => !p.orders || p.orders.length === 0);
           setProjects(cleanProjects);
         }

@@ -10,8 +10,8 @@ import { CrmDashboard } from './features/crm/pages/CrmDashboard';
 import { ClientDashboard } from './features/crm/pages/ClientDashboard';
 import { ProfilePage } from './features/crm/pages/ProfilePage';
 import { BudgetDetailPage } from './features/crm/pages/BudgetDetailPage';
-// 💡 IMPORTACIÓN AÑADIDA PARA QUE FUNCIONE LA RUTA ADMIN
 import { AdminOrderDetailPage } from './features/crm/pages/AdminOrderDetailPage'; 
+import { AdminClientDetailPage } from './features/crm/pages/AdminClientDetailPage'; // 💡 IMPORT NUEVO
 
 // --- ESTILOS ---
 const badgeStyle: React.CSSProperties = {
@@ -23,7 +23,7 @@ const navLinkStyle: React.CSSProperties = {
   color: '#aaa', textDecoration: 'none', padding: '8px 12px', borderRadius: '6px', transition: 'color 0.2s', fontSize: '14px', display: 'block'
 };
 
-// --- FUNCIÓN DE LOGOUT (EFECTO F5) ---
+// --- FUNCIÓN DE LOGOUT ---
 const performLogout = async () => {
     await supabase.auth.signOut();
     localStorage.clear();
@@ -56,24 +56,8 @@ const EmployeeLayout = () => {
 
 const ClientPortalLayout = () => {
   return (
-    <div style={{ 
-      height: '100vh', 
-      display: 'flex', 
-      flexDirection: 'column', 
-      background: '#121212', 
-      color: '#e0e0e0', 
-      fontFamily: 'sans-serif',
-      overflow: 'hidden' 
-    }}>
-      <header style={{ 
-        background: '#1e1e1e', 
-        borderBottom: '1px solid #333', 
-        padding: '15px 40px', 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        flexShrink: 0
-      }}>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#121212', color: '#e0e0e0', fontFamily: 'sans-serif', overflow: 'hidden' }}>
+      <header style={{ background: '#1e1e1e', borderBottom: '1px solid #333', padding: '15px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
         <h3 style={{ margin: 0, color: '#fff' }}>Portal del Cliente 👋</h3>
         <nav style={{ display: 'flex', gap: '20px', alignItems:'center' }}>
            <Link to="/portal?tab=projects" style={{ color: '#fff', textDecoration: 'none' }}>Mis Proyectos</Link>
@@ -84,12 +68,7 @@ const ClientPortalLayout = () => {
            <button onClick={performLogout} style={{background:'none', border:'none', color:'#666', cursor:'pointer'}}>Salir</button>
         </nav>
       </header>
-
-      <main style={{ 
-        flex: 1,            
-        overflowY: 'auto',  
-        padding: '40px' 
-      }}>
+      <main style={{ flex: 1, overflowY: 'auto', padding: '40px' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
           <div style={{ background: '#1e1e1e', padding: '30px', borderRadius: '12px', border: '1px solid #333' }}>
             <Outlet />
@@ -166,35 +145,22 @@ const LoginPage = () => {
   );
 };
 
-// 4. VISOR (HOME) - LÓGICA MODIFICADA
+// 4. VISOR (HOME)
 const ViewerPage = () => {
-   // Asegúrate de sacar 'setUser' del store
   const { mode, user, setUser, isReadOnlyMode, loadProjectFromURL, resetProjectId } = useAppStore();
   const navigate = useNavigate();
   
-  // 1. EFECTO PARA RECUPERAR EL ROL REAL
   React.useEffect(() => {
     const checkUserRole = async () => {
         const { data: { user: authUser } } = await supabase.auth.getUser();
         if (authUser) {
-            // Buscamos el rol en la tabla profiles
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('role')
-                .eq('id', authUser.id)
-                .single();
-            
-            // Actualizamos el usuario en el store con el rol correcto
-            // (Fusionamos los datos de auth con el rol de la tabla profile)
-            if (profile) {
-                setUser({ ...authUser, role: profile.role });
-            }
+            const { data: profile } = await supabase.from('profiles').select('role').eq('id', authUser.id).single();
+            if (profile) setUser({ ...authUser, role: profile.role });
         }
     };
     checkUserRole();
-  }, [setUser]); // Se ejecuta al montar
+  }, [setUser]);
 
-  // 2. EFECTO DE CARGA DE URL (EL TUYO, SIN CAMBIOS)
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const projectIdFromUrl = params.get('project_id');
@@ -211,40 +177,21 @@ const ViewerPage = () => {
     }
   }, [loadProjectFromURL, resetProjectId]);
 
-  // Validamos rol
   const isAdminOrEmployee = user?.role === 'admin' || user?.role === 'employee';
 
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden', margin: 0, background: '#000' }}>
-      
       <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 2000, display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-start' }}>
-        
-        {/* BOTÓN VOLVER (Ahora debería salir porque actualizamos el rol) */}
         {isAdminOrEmployee && (
-            <button 
-                onClick={() => navigate('/admin/crm')}
-                style={{
-                    background: '#e67e22', color: 'white', border: 'none', 
-                    padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', 
-                    fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
-                    display: 'flex', alignItems: 'center', gap: '8px'
-                }}
-            >
-                <span>⬅️</span> Volver al Panel
-            </button>
+            <button onClick={() => navigate('/admin/crm')} style={{background: '#e67e22', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px'}}><span>⬅️</span> Volver al Panel</button>
         )}
-
         {isReadOnlyMode && (
-            <div style={{ color:'white', background:'rgba(0,0,0,0.8)', padding:'8px 16px', borderRadius:'8px', border:'1px solid #3b82f6', fontSize:'13px' }}>
-                <span>👁️</span> Solo Lectura
-            </div>
+            <div style={{ color:'white', background:'rgba(0,0,0,0.8)', padding:'8px 16px', borderRadius:'8px', border:'1px solid #3b82f6', fontSize:'13px' }}><span>👁️</span> Solo Lectura</div>
         )}
-
         {!user && !isReadOnlyMode && (
             <Link to="/login" style={badgeStyle}>👤 Acceso / Login</Link>
         )}
       </div>
-
       <Editor3D />
       {mode === 'catalog' && <Catalog />}
     </div>
@@ -262,8 +209,9 @@ function App() {
         <Route path="/admin" element={<EmployeeLayout />}>
           <Route index element={<h2 style={{color:'white', padding:'20px'}}>Bienvenido al Panel</h2>} />
           <Route path="crm" element={<CrmDashboard />} />
-          {/* Ruta para el detalle del pedido (Admin) */}
           <Route path="order/:id" element={<AdminOrderDetailPage />} />
+          {/* NUEVA RUTA PARA FICHA CLIENTE */}
+          <Route path="client/:id" element={<AdminClientDetailPage />} />
           
           <Route path="erp" element={<h2 style={{color:'white', padding:'20px'}}>ERP en construcción</h2>} />
           <Route path="purchases" element={<h2 style={{color:'white', padding:'20px'}}>Compras en construcción</h2>} />
