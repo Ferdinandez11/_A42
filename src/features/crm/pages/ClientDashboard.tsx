@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
+import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 
 // --- ESTILOS ---
 const containerStyle = { color: '#e0e0e0', padding: '20px', fontFamily: 'sans-serif', minHeight: '100vh', display:'flex', flexDirection:'column' as const };
@@ -22,15 +23,17 @@ const tdStyle = { padding: '15px', borderBottom: '1px solid #333' };
 export const ClientDashboard = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  
-  // Añadimos 'archived' a los tabs
-  const initialTab = searchParams.get('tab') as 'projects' | 'orders' | 'tickets' | 'archived' || 'projects';
-  const [activeTab, setActiveTab] = useState<'projects' | 'orders' | 'tickets' | 'archived'>(initialTab);
+  const initialTab = searchParams.get('tab') as any || 'projects';
+  const [activeTab, setActiveTab] = useState<'projects' | 'orders' | 'archived'>(initialTab);
   
   const [projects, setProjects] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+
+  // --- ESTADO DEL MODAL ---
+  const [modal, setModal] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {}, isDestructive: false });
+  const closeModal = () => setModal({ ...modal, isOpen: false });
 
   useEffect(() => { setSearchParams({ tab: activeTab }); }, [activeTab, setSearchParams]);
 
@@ -43,80 +46,78 @@ export const ClientDashboard = () => {
 
       try {
         if (activeTab === 'projects') {
-          // Traemos proyectos y filtramos los que ya tienen pedido (para que no salgan aquí)
           const { data } = await supabase.from('projects').select('*, orders(id)').order('updated_at', { ascending: false });
           const cleanProjects = (data || []).filter((p: any) => !p.orders || p.orders.length === 0);
           setProjects(cleanProjects);
         }
         else if (activeTab === 'orders') {
-          // Solo pedidos NO archivados
-          const { data } = await supabase.from('orders')
-            .select('*, projects(name)')
-            .eq('is_archived', false) // FILTRO IMPORTANTE
-            .order('created_at', { ascending: false });
+          const { data } = await supabase.from('orders').select('*, projects(name)').eq('is_archived', false).order('created_at', { ascending: false });
           setOrders(data || []);
         }
         else if (activeTab === 'archived') {
-          // Solo pedidos ARCHIVADOS
-          const { data } = await supabase.from('orders')
-            .select('*, projects(name)')
-            .eq('is_archived', true) // FILTRO IMPORTANTE
-            .order('created_at', { ascending: false });
-          setOrders(data || []); // Reutilizamos el estado orders
+          const { data } = await supabase.from('orders').select('*, projects(name)').eq('is_archived', true).order('created_at', { ascending: false });
+          setOrders(data || []);
         }
-        // ... tickets logic if needed
       } catch (error) { console.error(error); } finally { setLoading(false); }
     };
     fetchData();
   }, [activeTab, navigate]);
 
-  const handleRequestQuote = async (project: any) => {
-    if(!confirm(`¿Solicitar presupuesto formal para "${project.name}"?`)) return;
-    const estimatedDate = new Date(); estimatedDate.setHours(estimatedDate.getHours() + 48);
-    const ref = 'SOL-' + Math.floor(10000 + Math.random() * 90000);
-    
-    const { data, error } = await supabase.from('orders').insert([{ 
-        user_id: userId, project_id: project.id, order_ref: ref, total_price: 0, 
-        status: 'pendiente', estimated_delivery_date: estimatedDate.toISOString() 
-    }]).select();
-
-    if(!error && data) {
-        alert("¡Solicitud enviada!");
-        navigate(`/portal/order/${data[0].id}`);
-    }
+  const handleRequestQuote = (project: any) => {
+    setModal({
+      isOpen: true,
+      title: 'Solicitar Presupuesto',
+      message: `¿Quieres enviar "${project.name}" a revisión? Se moverá a la pestaña de Presupuestos.`,
+      isDestructive: false,
+      onConfirm: async () => {
+        const estimatedDate = new Date(); estimatedDate.setHours(estimatedDate.getHours() + 48);
+        const ref = 'SOL-' + Math.floor(10000 + Math.random() * 90000);
+        const { data } = await supabase.from('orders').insert([{ 
+            user_id: userId, project_id: project.id, order_ref: ref, total_price: 0, 
+            status: 'pendiente', estimated_delivery_date: estimatedDate.toISOString() 
+        }]).select();
+        
+        if(data) { navigate(`/portal/order/${data[0].id}`); }
+        closeModal();
+      }
+    });
   };
 
-  const handleEditProject = (projectId: string) => navigate(`/?project_id=${projectId}`);
-  const handleDeleteProject = async (id: string) => { if(confirm('¿Borrar proyecto?')) { await supabase.from('projects').delete().eq('id', id); setProjects(p => p.filter(x => x.id !== id)); }};
+  const handleDeleteProject = (id: string) => {
+    setModal({
+      isOpen: true, title: 'Borrar Proyecto', message: '¿Estás seguro? Esta acción no se puede deshacer.', isDestructive: true,
+      onConfirm: async () => {
+        await supabase.from('projects').delete().eq('id', id);
+        setProjects(p => p.filter(x => x.id !== id));
+        closeModal();
+      }
+    });
+  };
 
-  // --- LÓGICA DE REACTIVACIÓN ---
-  const handleReactivate = async (order: any) => {
-    if (!confirm("¿Deseas reactivar este presupuesto?")) return;
-
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    const isOld = new Date(order.created_at) < oneWeekAgo;
-    
-    // Si tiene más de una semana, vuelve a pendiente (precios pueden haber cambiado)
-    // Si es reciente, mantiene su estado (ej: rechazado o completado)
-    const newStatus = isOld ? 'pendiente' : order.status; 
-    const alertMsg = isOld 
-        ? "El presupuesto es antiguo (>1 semana). Se ha reactivado como 'Pendiente' para revisión de precios." 
-        : "Presupuesto reactivado con su estado original.";
-
-    const { error } = await supabase.from('orders').update({ is_archived: false, status: newStatus }).eq('id', order.id);
-
-    if (!error) {
-        alert(alertMsg);
-        setActiveTab('orders'); // Volver a la lista activa
-    }
+  const handleReactivate = (order: any) => {
+    setModal({
+      isOpen: true, 
+      title: 'Reactivar Presupuesto', 
+      message: 'El presupuesto volverá a la lista principal en estado PENDIENTE para ser revisado de nuevo.', 
+      isDestructive: false,
+      onConfirm: async () => {
+        // Lógica forzada: Siempre vuelve a Pendiente y se desarchiva
+        await supabase.from('orders').update({ is_archived: false, status: 'pendiente' }).eq('id', order.id);
+        setActiveTab('orders');
+        closeModal();
+      }
+    });
   };
 
   return (
     <div style={containerStyle}>
+      <ConfirmModal {...modal} onCancel={closeModal} />
+
       <div style={headerStyle}>
         <h2 style={{ margin: 0, color: '#fff' }}>Mi Espacio Personal</h2>
-        <Link to="/" style={{ background: '#27ae60', color: 'white', textDecoration: 'none', padding: '10px 20px', borderRadius: '6px', fontWeight: 'bold' }}>+ Nuevo Proyecto 3D</Link>
+        <a href="/" style={{ background: '#27ae60', color: 'white', textDecoration: 'none', padding: '10px 20px', borderRadius: '6px', fontWeight: 'bold' }}>
+          + Nuevo Proyecto 3D
+        </a>
       </div>
 
       <div style={tabContainerStyle}>
@@ -135,7 +136,7 @@ export const ClientDashboard = () => {
                             <div style={cardBodyStyle}>
                                 <h4 style={{margin:'0 0 5px 0', color:'white'}}>{p.name || 'Sin Nombre'}</h4>
                                 <div style={{display:'flex', gap:'8px', marginTop:'10px'}}>
-                                    <button onClick={() => handleEditProject(p.id)} style={{...btnActionStyle, background:'#3b82f6', color:'white'}}>✏️ Editar</button>
+                                    <button onClick={() => navigate(`/?project_id=${p.id}`)} style={{...btnActionStyle, background:'#3b82f6', color:'white'}}>✏️ Editar</button>
                                     <button onClick={() => handleRequestQuote(p)} style={{...btnActionStyle, background:'#e67e22', color:'white'}}>🛒 Pedir</button>
                                     <button onClick={() => handleDeleteProject(p.id)} style={{...btnActionStyle, background:'#e74c3c', color:'white', flex:0}}>🗑️</button>
                                 </div>
@@ -169,7 +170,6 @@ export const ClientDashboard = () => {
                                 </td>
                             </tr>
                         ))}
-                        {orders.length === 0 && <tr><td colSpan={5} style={{padding:'20px', textAlign:'center', color:'#666'}}>{activeTab === 'archived' ? 'No hay presupuestos archivados.' : 'No hay presupuestos activos.'}</td></tr>}
                     </tbody>
                 </table>
             )}
