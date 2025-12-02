@@ -23,7 +23,6 @@ const navLinkStyle: React.CSSProperties = {
   color: '#aaa', textDecoration: 'none', padding: '8px 12px', borderRadius: '6px', transition: 'color 0.2s', fontSize: '14px', display: 'block'
 };
 
-// --- FUNCIÓN DE LOGOUT ---
 const performLogout = async () => {
     await supabase.auth.signOut();
     localStorage.clear();
@@ -31,8 +30,7 @@ const performLogout = async () => {
 };
 
 // --- LAYOUTS ---
-const EmployeeLayout = () => {
-  return (
+const EmployeeLayout = () => (
     <div style={{ display: 'flex', height: '100vh', fontFamily: 'sans-serif', background: '#121212', color: '#e0e0e0' }}>
       <aside style={{ width: '240px', background: '#1e1e1e', borderRight: '1px solid #333', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '20px', borderBottom: '1px solid #333' }}>
@@ -51,11 +49,9 @@ const EmployeeLayout = () => {
       </aside>
       <main style={{ flex: 1, overflow: 'auto' }}><Outlet /></main>
     </div>
-  );
-};
+);
 
-const ClientPortalLayout = () => {
-  return (
+const ClientPortalLayout = () => (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#121212', color: '#e0e0e0', fontFamily: 'sans-serif', overflow: 'hidden' }}>
       <header style={{ background: '#1e1e1e', borderBottom: '1px solid #333', padding: '15px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
         <h3 style={{ margin: 0, color: '#fff' }}>Portal del Cliente 👋</h3>
@@ -76,14 +72,15 @@ const ClientPortalLayout = () => {
         </div>
       </main>
     </div>
-  );
-};
+);
 
 // 3. PÁGINA DE LOGIN
 const LoginPage = () => {
   const navigate = useNavigate();
   const [step, setStep] = React.useState<'selection' | 'form'>('selection');
   const [targetRole, setTargetRole] = React.useState<'client' | 'employee'>('client');
+  const [isRegistering, setIsRegistering] = React.useState(false); 
+  
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [loading, setLoading] = React.useState(false);
@@ -91,57 +88,59 @@ const LoginPage = () => {
 
   const selectRole = (role: 'client' | 'employee') => { setTargetRole(role); setStep('form'); setErrorMsg(''); };
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const checkUserStatus = async (userId: string) => {
+    const { data: profile } = await supabase.from('profiles').select('role, is_approved').eq('id', userId).single();
+    if (profile) {
+        if (profile.role === 'admin' || profile.role === 'employee') {
+            navigate('/admin/crm');
+            return;
+        }
+        if (profile.is_approved) {
+            navigate('/portal');
+        } else {
+            await supabase.auth.signOut();
+            throw new Error("🔒 Cuenta creada correctamente. Pendiente de validación por un administrador.");
+        }
+    }
+  };
+
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true); setErrorMsg('');
 
-    // Función auxiliar para verificar estado de aprobación
-    const checkUserStatus = async (userId: string) => {
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('role, is_approved')
-            .eq('id', userId)
-            .single();
-
-        if (profile) {
-            // 1. Si es Admin/Empleado entra siempre
-            if (profile.role === 'admin' || profile.role === 'employee') {
-                navigate('/admin/crm');
-                return;
-            }
-
-            // 2. Si es Cliente, verificamos si está aprobado
-            if (profile.is_approved) {
-                navigate('/portal');
-            } else {
-                // ⛔ BLOQUEADO
-                await supabase.auth.signOut();
-                throw new Error("🔒 Tu cuenta está pendiente de validación por un administrador.");
-            }
-        }
-    };
-
     try {
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
-      if (authError) throw authError;
-      if (!authData.user) throw new Error("No se pudo obtener el usuario.");
+      if (isRegistering) {
+        // --- REGISTRO ---
+        const { data, error } = await supabase.auth.signUp({ 
+            email, 
+            password,
+            options: { data: { role: 'client' } } 
+        });
+        if (error) throw error;
+        if (data.user) {
+             await checkUserStatus(data.user.id);
+        }
+      } else {
+        // --- LOGIN ---
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        if (!data.user) throw new Error("No usuario.");
 
-      // Verificar rol en Supabase (seguridad extra)
-      const { data: profile } = await supabase.from('profiles').select('role').eq('id', authData.user.id).single();
-      const userRole = profile?.role || 'client';
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single();
+        const userRole = profile?.role || 'client';
 
-      if (targetRole === 'employee' && (userRole !== 'admin' && userRole !== 'employee')) {
-         await supabase.auth.signOut(); 
-         throw new Error("⛔ Acceso Denegado: Cuenta sin permisos de empleado.");
+        if (targetRole === 'employee' && (userRole !== 'admin' && userRole !== 'employee')) {
+            await supabase.auth.signOut(); 
+            throw new Error("⛔ Acceso Denegado: No eres empleado.");
+        }
+        await checkUserStatus(data.user.id);
       }
-
-      // ✅ LLAMADA A LA NUEVA FUNCIÓN DE VERIFICACIÓN
-      await checkUserStatus(authData.user.id);
 
     } catch (error: any) { 
         setErrorMsg(error.message); 
-        // Si hubo error de aprobación, aseguramos logout
-        if (error.message.includes('validación')) await supabase.auth.signOut();
+        if (error.message.includes('validación')) {
+            setEmail(''); setPassword('');
+        }
     } finally { 
         setLoading(false); 
     }
@@ -168,14 +167,34 @@ const LoginPage = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#000', color: '#fff', fontFamily: 'sans-serif' }}>
       <div style={{ padding: '3rem', background: '#1e1e1e', borderRadius: '16px', border: '1px solid #333', textAlign: 'center', minWidth: '350px' }}>
-        <h2 style={{ marginBottom: '5px' }}>{targetRole === 'employee' ? 'Acceso Empleados' : 'Acceso Clientes'}</h2>
-        {errorMsg && <div style={{ background: 'rgba(231, 76, 60, 0.2)', color: '#e74c3c', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize:'13px' }}>{errorMsg}</div>}
-        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+        <h2 style={{ marginBottom: '5px' }}>
+            {targetRole === 'employee' ? 'Acceso Empleados' : (isRegistering ? 'Nuevo Registro' : 'Acceso Clientes')}
+        </h2>
+        
+        {errorMsg && <div style={{ background: errorMsg.includes('validación') ? 'rgba(39, 174, 96, 0.2)' : 'rgba(231, 76, 60, 0.2)', color: errorMsg.includes('validación') ? '#2ecc71' : '#e74c3c', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize:'13px' }}>{errorMsg}</div>}
+        
+        <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
           <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ padding: '12px', borderRadius: '6px', border: '1px solid #444', background: '#2a2a2a', color: 'white', outline:'none' }} required />
           <input type="password" placeholder="Contraseña" value={password} onChange={(e) => setPassword(e.target.value)} style={{ padding: '12px', borderRadius: '6px', border: '1px solid #444', background: '#2a2a2a', color: 'white', outline:'none' }} required />
-          <button type="submit" disabled={loading} style={{ ...badgeStyle, justifyContent: 'center', backgroundColor: targetRole==='employee'?'#e67e22':'#3b82f6', border: 'none', padding: '12px', marginTop: '10px' }}>{loading ? 'Verificando...' : 'Entrar'}</button>
+          
+          <button type="submit" disabled={loading} style={{ ...badgeStyle, justifyContent: 'center', backgroundColor: targetRole==='employee'?'#e67e22':'#3b82f6', border: 'none', padding: '12px', marginTop: '10px' }}>
+              {loading ? 'Procesando...' : (isRegistering ? 'Crear Cuenta' : 'Entrar')}
+          </button>
         </form>
-        <button onClick={() => setStep('selection')} style={{ marginTop: '20px', background: 'transparent', border: 'none', color: '#666', cursor: 'pointer', textDecoration: 'underline' }}>← Cambiar</button>
+
+        {targetRole === 'client' && (
+            <div style={{marginTop:'15px', fontSize:'13px', color:'#888'}}>
+                {isRegistering ? "¿Ya tienes cuenta? " : "¿No tienes cuenta? "}
+                <button 
+                    onClick={() => { setIsRegistering(!isRegistering); setErrorMsg(''); }} 
+                    style={{ background:'none', border:'none', color:'#3b82f6', cursor:'pointer', fontWeight:'bold', textDecoration:'underline' }}
+                >
+                    {isRegistering ? "Inicia Sesión" : "Regístrate aquí"}
+                </button>
+            </div>
+        )}
+
+        <button onClick={() => setStep('selection')} style={{ marginTop: '20px', background: 'transparent', border: 'none', color: '#666', cursor: 'pointer', textDecoration: 'underline' }}>← Volver</button>
       </div>
     </div>
   );
@@ -197,6 +216,7 @@ const ViewerPage = () => {
     checkUserRole();
   }, [setUser]);
 
+  // --- ESTE ES EL BLOQUE QUE FALTABA ---
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const projectIdFromUrl = params.get('project_id');
@@ -211,7 +231,8 @@ const ViewerPage = () => {
          }
       });
     }
-  }, [loadProjectFromURL, resetProjectId]);
+  }, [loadProjectFromURL, resetProjectId, isReadOnlyMode]);
+  // ------------------------------------
 
   const isAdminOrEmployee = user?.role === 'admin' || user?.role === 'employee';
 
