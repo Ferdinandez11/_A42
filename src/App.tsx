@@ -8,6 +8,7 @@ import { Catalog } from './features/editor/ui/Catalog';
 import { useAppStore } from './stores/useAppStore';
 import { CrmDashboard } from './features/crm/pages/CrmDashboard';
 import { ClientDashboard } from './features/crm/pages/ClientDashboard';
+import { ProfilePage } from './features/crm/pages/ProfilePage';
 
 // --- ESTILOS ---
 const badgeStyle: React.CSSProperties = {
@@ -53,19 +54,48 @@ const EmployeeLayout = () => {
 
 const ClientPortalLayout = () => {
   return (
-    <div style={{ minHeight: '100vh', background: '#121212', color: '#e0e0e0', fontFamily: 'sans-serif' }}>
-      <header style={{ background: '#1e1e1e', borderBottom: '1px solid #333', padding: '15px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    // 1. Contenedor principal fijo al 100% de la altura de la pantalla
+    <div style={{ 
+      height: '100vh', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      background: '#121212', 
+      color: '#e0e0e0', 
+      fontFamily: 'sans-serif',
+      overflow: 'hidden' // Evita doble scroll en algunos navegadores
+    }}>
+      
+      {/* HEADER (Se queda fijo arriba) */}
+      <header style={{ 
+        background: '#1e1e1e', 
+        borderBottom: '1px solid #333', 
+        padding: '15px 40px', 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        flexShrink: 0 // Evita que el header se aplaste
+      }}>
         <h3 style={{ margin: 0, color: '#fff' }}>Portal del Cliente 👋</h3>
         <nav style={{ display: 'flex', gap: '20px', alignItems:'center' }}>
           <Link to="/portal?tab=projects" style={{ color: '#fff', textDecoration: 'none' }}>Mis Proyectos</Link>
           <Link to="/portal?tab=orders" style={{ color: '#bbb', textDecoration: 'none' }}>Mis Pedidos</Link>
+          <Link to="/portal/profile" style={{ color: '#bbb', textDecoration: 'none' }}>Mi Perfil 👤</Link>
           <Link to="/" style={{ ...badgeStyle, fontSize: '12px', padding: '6px 12px' }}>+ Nuevo Proyecto 3D</Link>
           <button onClick={performLogout} style={{background:'none', border:'none', color:'#666', cursor:'pointer'}}>Salir</button>
         </nav>
       </header>
-      <main style={{ padding: '40px', maxWidth: '1200px', margin: '0 auto' }}>
-        <div style={{ background: '#1e1e1e', padding: '30px', borderRadius: '12px', border: '1px solid #333' }}>
-          <Outlet />
+
+      {/* MAIN (Esta es la parte que hará SCROLL) */}
+      <main style={{ 
+        flex: 1,            // Ocupa el resto del espacio
+        overflowY: 'auto',  // Activa el scroll vertical aquí
+        padding: '40px' 
+      }}>
+        {/* Contenedor para centrar y limitar ancho */}
+        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+          <div style={{ background: '#1e1e1e', padding: '30px', borderRadius: '12px', border: '1px solid #333' }}>
+            <Outlet />
+          </div>
         </div>
       </main>
     </div>
@@ -205,6 +235,7 @@ function App() {
 
         <Route path="/portal" element={<ClientPortalLayout />}>
            <Route index element={<ClientDashboard />} />
+           <Route path="profile" element={<ProfilePage />} /> {/* <--- NUEVA RUTA */}
         </Route>
       </Routes>
     </BrowserRouter>
