@@ -36,14 +36,18 @@ export const AdminClientDetailPage = () => {
   };
 
   const handleSave = async () => {
+    // IMPORTANTE: Convertimos descuento a número para evitar error al guardar
+    const discountValue = parseFloat(profile.discount_rate) || 0;
+
     const { error } = await supabase.from('profiles').update({
         company_name: profile.company_name,
         full_name: profile.full_name,
+        email: profile.email, // Añadido campo email al guardado
         phone: profile.phone,
         cif: profile.cif,
         shipping_address: profile.shipping_address,
         billing_address: profile.billing_address,
-        discount_rate: Number(profile.discount_rate) // Guardamos el descuento
+        discount_rate: discountValue
     }).eq('id', id);
 
     if (error) alert("Error al guardar: " + error.message);
@@ -100,6 +104,15 @@ export const AdminClientDetailPage = () => {
                         <input type="text" value={profile.phone || ''} onChange={e => setProfile({...profile, phone: e.target.value})} style={inputStyle} />
                     </div>
                 </div>
+
+                {/* NUEVO CAMPO EMAIL */}
+                <label style={labelStyle}>Email Principal (CRM)</label>
+                <input 
+                    type="email" 
+                    value={profile.email || ''} 
+                    onChange={e => setProfile({...profile, email: e.target.value})} 
+                    style={inputStyle} 
+                />
 
                 <label style={labelStyle}>Dirección de Facturación</label>
                 <textarea rows={3} value={profile.billing_address || ''} onChange={e => setProfile({...profile, billing_address: e.target.value})} style={{...inputStyle, resize:'none'}} />

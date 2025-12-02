@@ -3,7 +3,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { A42Engine } from '../A42Engine';
 import { useAppStore, type SceneItem } from '../../../../stores/useAppStore';
-import { PriceCalculator } from './PriceCalculator'; 
+import { PriceCalculator } from '../../../../utils/PriceCalculator'; 
 
 export class PDFManager {
   private engine: A42Engine;

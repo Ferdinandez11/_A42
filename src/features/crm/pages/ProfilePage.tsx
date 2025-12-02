@@ -22,6 +22,7 @@ export const ProfilePage = () => {
   const [formData, setFormData] = useState<Partial<Profile>>({
     company_name: '',
     full_name: '',
+    email: '', // Añadido campo email
     cif: '',
     phone: '',
     shipping_address: '',
@@ -130,17 +131,29 @@ export const ProfilePage = () => {
             />
           </label>
         </div>
+        
+        {/* NUEVO: EMAIL DE CONTACTO */}
+        <label style={labelStyle}>
+            Email de Contacto (CRM)
+            <input 
+              type="email" 
+              style={inputStyle} 
+              value={formData.email || ''} 
+              onChange={e => setFormData({...formData, email: e.target.value})} 
+              placeholder="ejemplo@empresa.com"
+            />
+        </label>
 
         <label style={labelStyle}>
-            Email para Facturación
+            Email para Facturación (si es distinto)
             <input 
               type="email" 
               style={inputStyle} 
               value={formData.billing_email || ''} 
               onChange={e => setFormData({...formData, billing_email: e.target.value})} 
-              placeholder="Si es diferente al de login..."
+              placeholder="contabilidad@empresa.com..."
             />
-          </label>
+        </label>
 
         {/* DIRECCIONES */}
         <h4 style={sectionTitleStyle}>📍 Direcciones</h4>
