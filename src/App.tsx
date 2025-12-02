@@ -9,6 +9,7 @@ import { useAppStore } from './stores/useAppStore';
 import { CrmDashboard } from './features/crm/pages/CrmDashboard';
 import { ClientDashboard } from './features/crm/pages/ClientDashboard';
 import { ProfilePage } from './features/crm/pages/ProfilePage';
+import { BudgetDetailPage } from './features/crm/pages/BudgetDetailPage';
 
 // --- ESTILOS ---
 const badgeStyle: React.CSSProperties = {
@@ -236,6 +237,7 @@ function App() {
         <Route path="/portal" element={<ClientPortalLayout />}>
            <Route index element={<ClientDashboard />} />
            <Route path="profile" element={<ProfilePage />} /> {/* <--- NUEVA RUTA */}
+           <Route path="order/:id" element={<BudgetDetailPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

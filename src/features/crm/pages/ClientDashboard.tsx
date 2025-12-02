@@ -94,14 +94,44 @@ export const ClientDashboard = () => {
     setProjects(prev => prev.filter(p => p.id !== id));
   };
 
-  const handleRequestQuote = async (project: any) => {
-    if(!confirm(`¿Solicitar presupuesto para "${project.name}"?`)) return;
-    const ref = 'PED-' + Math.floor(1000 + Math.random() * 9000);
-    const { error } = await supabase.from('orders').insert([{ 
-        user_id: userId, project_id: project.id, order_ref: ref, total_price: project.total_price || 0, status: 'pendiente' 
-    }]);
-    if(error) alert("Error: " + error.message);
-    else { alert("¡Solicitud enviada!"); setActiveTab('orders'); }
+const handleRequestQuote = async (project: any) => {
+    if(!confirm(`¿Solicitar presupuesto formal para "${project.name}"? Esto enviará el proyecto a revisión.`)) return;
+    
+    // 1. Calcular Fecha Estimada (+48 horas desde ahora)
+    const estimatedDate = new Date();
+    estimatedDate.setHours(estimatedDate.getHours() + 48);
+
+    // 2. Generar Referencia Única
+    const ref = 'SOL-' + Math.floor(10000 + Math.random() * 90000); // Ej: SOL-45892
+
+    // 3. Crear el registro en Supabase
+    const { data, error } = await supabase.from('orders').insert([{ 
+        user_id: userId, 
+        project_id: project.id, 
+        order_ref: ref, 
+        total_price: 0, // Aún no tiene precio, es solicitud
+        status: 'pendiente', // Estado inicial
+        estimated_delivery_date: estimatedDate.toISOString()
+    }]).select(); // .select() devuelve el objeto creado para coger su ID
+
+    if(error) {
+        alert("Error al crear solicitud: " + error.message);
+    } else { 
+        // 4. Mensaje inicial automático en el chat (Opcional, pero queda pro)
+        if(data && data[0]) {
+            const orderId = data[0].id;
+            await supabase.from('order_messages').insert([{
+                order_id: orderId,
+                user_id: userId,
+                content: 'Hola, acabo de solicitar presupuesto para este proyecto. Quedo a la espera.',
+                is_system_message: false
+            }]);
+            
+            // 5. Redirigir a la ficha del pedido
+            alert("¡Solicitud enviada correctamente!"); 
+            navigate(`/portal/order/${orderId}`);
+        }
+    }
   };
 
   const handleNewTicket = async () => {
@@ -170,12 +200,32 @@ export const ClientDashboard = () => {
                     <thead><tr><th style={thStyle}>Ref</th><th style={thStyle}>Proyecto</th><th style={thStyle}>Estado</th><th style={thStyle}>Total</th></tr></thead>
                     <tbody>
                         {orders.map(o => (
-                            <tr key={o.id}>
-                                <td style={tdStyle}><strong style={{color:'#fff'}}>{o.order_ref}</strong></td>
-                                <td style={tdStyle}>{o.projects?.name}</td>
-                                <td style={tdStyle}><span style={{color: o.status==='pendiente'?'orange':'#27ae60'}}>{o.status}</span></td>
-                                <td style={tdStyle}>{(o.total_price||0).toLocaleString()} €</td>
-                            </tr>
+                            <tr key={o.id} style={{borderBottom: '1px solid #333'}}>
+                            <td style={tdStyle}><strong style={{color:'#fff'}}>{o.order_ref}</strong></td>
+                            <td style={tdStyle}>{o.projects?.name || 'Varios'}</td>
+                            <td style={tdStyle}>
+                                <span style={{
+                                    color: o.status === 'pendiente' ? '#e67e22' : '#27ae60', 
+                                    fontWeight:'bold',
+                                    textTransform: 'uppercase',
+                                    fontSize: '12px'
+                                }}>
+                                    {o.status}
+                                </span>
+                            </td>
+                            <td style={tdStyle}>
+                                {/* Botón para ir al detalle */}
+                                <button 
+                                    onClick={() => navigate(`/portal/order/${o.id}`)}
+                                    style={{
+                                        background: '#333', color: 'white', border: '1px solid #555', 
+                                        padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontSize:'12px'
+                                    }}
+                                >
+                                    Ver Ficha 👁️
+                                </button>
+                            </td>
+                        </tr>
                         ))}
                         {orders.length === 0 && <tr><td colSpan={4} style={{padding:'20px', textAlign:'center', color:'#666'}}>No hay pedidos.</td></tr>}
                     </tbody>
