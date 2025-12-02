@@ -22,13 +22,12 @@ const tdStyle = { padding: '15px', borderBottom: '1px solid #333' };
 
 type TabType = 'projects' | 'budgets' | 'orders' | 'archived';
 
-// Función para colores de estados en la tabla
 const getStatusColor = (status: string) => {
     switch(status) {
-        case 'pedido': return '#3498db'; // Azul
-        case 'fabricacion': return '#e67e22'; // Naranja
-        case 'entregado_parcial': return '#f1c40f'; // Amarillo
-        case 'entregado': return '#27ae60'; // Verde
+        case 'pedido': return '#3498db'; 
+        case 'fabricacion': return '#e67e22'; 
+        case 'entregado_parcial': return '#f1c40f'; 
+        case 'entregado': return '#27ae60'; 
         case 'pendiente': return 'orange';
         case 'rechazado': return '#c0392b';
         case 'cancelado': return '#7f8c8d';
@@ -124,7 +123,6 @@ export const ClientDashboard = () => {
     });
   };
 
-  // --- LÓGICA CORREGIDA AQUÍ ---
   const handleReactivate = (order: any) => {
     setModal({
       isOpen: true, title: 'Reactivar Presupuesto', message: 'El presupuesto volverá a la lista de "Mis Presupuestos" en estado PENDIENTE con fecha de HOY.', isDestructive: false,
@@ -132,9 +130,8 @@ export const ClientDashboard = () => {
         await supabase.from('orders').update({ 
             is_archived: false, 
             status: 'pendiente',
-            created_at: new Date().toISOString() // 💡 ACTUALIZAMOS LA FECHA A "AHORA MISMO"
+            created_at: new Date().toISOString() 
         }).eq('id', order.id);
-        
         setActiveTab('budgets');
         closeModal();
       }
@@ -182,16 +179,37 @@ export const ClientDashboard = () => {
 
             {activeTab !== 'projects' && (
                 <table style={tableStyle}>
-                    <thead><tr><th style={thStyle}>Ref</th><th style={thStyle}>Proyecto</th><th style={thStyle}>Fecha</th><th style={thStyle}>Estado</th><th style={thStyle}>Acciones</th></tr></thead>
+                    {/* --- CABECERA DE TABLA ACTUALIZADA CON DOS FECHAS --- */}
+                    <thead>
+                        <tr>
+                            <th style={thStyle}>Ref</th>
+                            <th style={thStyle}>Proyecto</th>
+                            {/* Cambio de etiquetas según pestaña para mayor claridad */}
+                            <th style={thStyle}>{activeTab === 'orders' ? 'F. Inicio Pedido' : 'F. Solicitud'}</th>
+                            <th style={thStyle}>F. Entrega Est.</th>
+                            <th style={thStyle}>Estado</th>
+                            <th style={thStyle}>Acciones</th>
+                        </tr>
+                    </thead>
                     <tbody>
                         {dataList.map(o => (
                             <tr key={o.id} style={{borderBottom:'1px solid #333'}}>
                                 <td style={tdStyle}><strong style={{color:'#fff'}}>{o.order_ref}</strong></td>
                                 <td style={tdStyle}>{o.projects?.name || '---'}</td>
+                                
+                                {/* 1. FECHA SOLICITUD / INICIO */}
                                 <td style={tdStyle}>{new Date(o.created_at).toLocaleDateString()}</td>
+                                
+                                {/* 2. FECHA ENTREGA */}
+                                <td style={{...tdStyle, color: o.estimated_delivery_date ? '#ccc' : '#666'}}>
+                                    {o.estimated_delivery_date 
+                                        ? new Date(o.estimated_delivery_date).toLocaleDateString() 
+                                        : '--'}
+                                </td>
+
                                 <td style={tdStyle}>
                                     <span style={{
-                                        color: getStatusColor(o.status), // USAMOS LA FUNCIÓN DE COLOR
+                                        color: getStatusColor(o.status), 
                                         fontWeight:'bold', textTransform:'uppercase', fontSize:'12px'
                                     }}>
                                         {o.status.replace('_', ' ')}
@@ -207,7 +225,7 @@ export const ClientDashboard = () => {
                             </tr>
                         ))}
                         {dataList.length === 0 && (
-                            <tr><td colSpan={5} style={{padding:'20px', textAlign:'center', color:'#666'}}>
+                            <tr><td colSpan={6} style={{padding:'20px', textAlign:'center', color:'#666'}}>
                                 {activeTab === 'budgets' && 'No tienes presupuestos pendientes.'}
                                 {activeTab === 'orders' && 'No tienes pedidos confirmados aún.'}
                                 {activeTab === 'archived' && 'No hay archivados.'}

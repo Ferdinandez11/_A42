@@ -7,17 +7,6 @@ import type { Order } from '../../../types/types';
 // --- ESTILOS ---
 const containerStyle = { display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px', height: '100%' };
 const cardStyle = { background: '#1e1e1e', borderRadius: '12px', border: '1px solid #333', padding: '20px', display: 'flex', flexDirection: 'column' as const };
-const chatBubbleStyle = (isMe: boolean) => ({
-  alignSelf: isMe ? 'flex-end' : 'flex-start',
-  background: isMe ? '#3b82f6' : '#333',
-  color: 'white',
-  padding: '10px 15px',
-  borderRadius: '10px',
-  borderBottomRightRadius: isMe ? '0' : '10px',
-  borderBottomLeftRadius: isMe ? '10px' : '0',
-  marginBottom: '10px',
-  maxWidth: '80%'
-});
 const sectionHeaderStyle = { color: 'white', marginTop: 0, borderBottom: '1px solid #333', paddingBottom: '10px', display:'flex', justifyContent:'space-between', alignItems:'center' };
 
 // Función auxiliar para traducir estados
@@ -116,7 +105,7 @@ export const BudgetDetailPage = () => {
         const updateData: any = { status: status };
         if (isAccepting) {
             const deliveryDate = new Date();
-            deliveryDate.setDate(deliveryDate.getDate() + 42); // +6 semanas
+            deliveryDate.setDate(deliveryDate.getDate() + 42); 
             updateData.estimated_delivery_date = deliveryDate.toISOString();
         }
         if (isRejecting) {
@@ -124,7 +113,6 @@ export const BudgetDetailPage = () => {
         }
 
         await supabase.from('orders').update(updateData).eq('id', id);
-
         if (isAccepting) navigate('/portal?tab=orders'); 
         if (isRejecting) navigate('/portal?tab=archived');
         closeModal();
@@ -134,19 +122,12 @@ export const BudgetDetailPage = () => {
 
   const handleCancelOrder = () => {
     if (!order) return;
-
-    // Si NO es "pedido" (es decir, ya está en fabricación, enviado, etc.) mostramos la alerta que pediste
     if (order.status !== 'pedido') {
         alert("⚠️ El pedido ya está en proceso.\n\nPor favor, contacte directamente con la empresa para gestionar cualquier cambio o cancelación en esta etapa.");
         return;
     }
-
-    // Si es "pedido", dejamos cancelar normalmente
     setModal({
-        isOpen: true,
-        title: 'Cancelar Pedido',
-        message: '¿Estás seguro de cancelar este pedido solicitado? Pasará a archivados como cancelado.',
-        isDestructive: true,
+        isOpen: true, title: 'Cancelar Pedido', message: '¿Estás seguro de cancelar este pedido solicitado? Pasará a archivados como cancelado.', isDestructive: true,
         onConfirm: async () => {
             await supabase.from('orders').update({ status: 'cancelado', is_archived: true }).eq('id', id);
             navigate('/portal?tab=archived');
@@ -176,11 +157,7 @@ export const BudgetDetailPage = () => {
   if (!order) return <p>Error.</p>;
 
   const isDecisionTime = ['presupuestado', 'entregado'].includes(order.status);
-  
-  // SOLUCIÓN: Usamos isOrderPhase para MOSTRAR el botón siempre en estas fases,
-  // pero dentro de handleCancelOrder controlamos si muestra alerta o modal.
   const isOrderPhase = ['pedido', 'fabricacion', 'entregado_parcial', 'entregado'].includes(order.status);
-  
   const badge = getStatusBadge(order.status);
 
   return (
@@ -193,22 +170,13 @@ export const BudgetDetailPage = () => {
         <div style={{display:'flex', gap:'10px'}}>
              {isDecisionTime && (
                 <>
-                    <button onClick={() => handleStatusChange('pedido')} style={{background:'#27ae60', color:'white', border:'none', padding:'8px 15px', borderRadius:'6px', cursor:'pointer', fontWeight:'bold'}}>
-                        ✅ Aceptar Presupuesto
-                    </button>
-                    <button onClick={() => handleStatusChange('rechazado')} style={{background:'#c0392b', color:'white', border:'none', padding:'8px 15px', borderRadius:'6px', cursor:'pointer', fontWeight:'bold'}}>
-                        ❌ Rechazar
-                    </button>
+                    <button onClick={() => handleStatusChange('pedido')} style={{background:'#27ae60', color:'white', border:'none', padding:'8px 15px', borderRadius:'6px', cursor:'pointer', fontWeight:'bold'}}>✅ Aceptar Presupuesto</button>
+                    <button onClick={() => handleStatusChange('rechazado')} style={{background:'#c0392b', color:'white', border:'none', padding:'8px 15px', borderRadius:'6px', cursor:'pointer', fontWeight:'bold'}}>❌ Rechazar</button>
                 </>
              )}
-
-             {/* BOTÓN CANCELAR: Visible en todas las fases de pedido, pero con comportamiento distinto según estado */}
              {isOrderPhase && (
-                 <button onClick={handleCancelOrder} style={{background:'#c0392b', color:'white', border:'none', padding:'8px 15px', borderRadius:'6px', cursor:'pointer', fontWeight:'bold'}}>
-                     🚫 Cancelar Pedido
-                 </button>
+                 <button onClick={handleCancelOrder} style={{background:'#c0392b', color:'white', border:'none', padding:'8px 15px', borderRadius:'6px', cursor:'pointer', fontWeight:'bold'}}>🚫 Cancelar Pedido</button>
              )}
-
              {order.status === 'pendiente' && (
                 <button onClick={handleDelete} style={{background:'#c0392b', color:'white', border:'none', padding:'8px 15px', borderRadius:'6px', cursor:'pointer'}}>🗑️ Borrar Solicitud</button>
              )}
@@ -216,20 +184,14 @@ export const BudgetDetailPage = () => {
       </div>
       
       <div style={containerStyle}>
+        {/* COLUMNA IZQUIERDA */}
         <div style={{ display:'flex', flexDirection:'column', gap:'20px' }}>
             <div style={cardStyle}>
                 <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                     <h2 style={{margin:0, color:'white'}}>Ref: {order.order_ref}</h2>
                     <div style={{display:'flex', gap:'10px'}}>
                         <button onClick={handlePrintPDF} style={{background:'#222', color:'#888', border:'1px solid #444', padding:'5px 10px', borderRadius:'4px', cursor:'pointer'}}>🖨️ PDF Oficial</button>
-                        <span style={{
-                            padding:'5px 10px', borderRadius:'4px', 
-                            background: badge.color, 
-                            color: badge.textColor || 'white', 
-                            fontWeight:'bold'
-                        }}>
-                            {badge.label}
-                        </span>
+                        <span style={{padding:'5px 10px', borderRadius:'4px', background: badge.color, color: badge.textColor || 'white', fontWeight:'bold'}}>{badge.label}</span>
                     </div>
                 </div>
                 <p style={{color:'#888', marginTop:'5px'}}>Solicitado el: {new Date(order.created_at).toLocaleString()}</p>
@@ -246,9 +208,7 @@ export const BudgetDetailPage = () => {
                         <div style={{width:'100%', height:'250px', background: '#111', borderRadius:'8px', overflow: 'hidden', display:'flex', alignItems:'center', justifyContent:'center', border: '1px solid #333'}}>
                             {order.projects?.thumbnail_url ? <img src={order.projects.thumbnail_url} alt="Vista" style={{width:'100%', height:'100%', objectFit:'cover'}}/> : '🏞️'}
                         </div>
-                        <button onClick={() => order.projects?.id && (window.location.href = `/?project_id=${order.projects.id}&mode=clone`)} style={{marginTop: '15px', width: '100%', padding: '12px', background: '#333', color: 'white', border: '1px dashed #666', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'}}>
-                            <span>✏️</span> Editar Copia en 3D
-                        </button>
+                        <button onClick={() => order.projects?.id && (window.location.href = `/?project_id=${order.projects.id}&mode=clone`)} style={{marginTop: '15px', width: '100%', padding: '12px', background: '#333', color: 'white', border: '1px dashed #666', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'}}><span>✏️</span> Editar Copia en 3D</button>
                     </div>
                 ) : <p>Catálogo</p>}
                 
@@ -265,9 +225,7 @@ export const BudgetDetailPage = () => {
                 <div style={{display:'flex', flexDirection:'column', gap:'10px', marginBottom:'15px'}}>
                     {attachments.map(file => (
                         <div key={file.id} style={{display:'flex', justifyContent:'space-between', alignItems:'center', background:'#252525', padding:'8px', borderRadius:'6px'}}>
-                            <a href={file.file_url} target="_blank" rel="noreferrer" style={{color:'#3b82f6', textDecoration:'none', display:'flex', alignItems:'center', gap:'5px', flex:1, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis'}}>
-                                📄 {file.file_name}
-                            </a>
+                            <a href={file.file_url} target="_blank" rel="noreferrer" style={{color:'#3b82f6', textDecoration:'none', display:'flex', alignItems:'center', gap:'5px', flex:1, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis'}}>📄 {file.file_name}</a>
                             <button onClick={() => handleDeleteAttachment(file.id, file.file_url, file.file_name)} style={{background:'transparent', border:'none', color:'#e74c3c', cursor:'pointer', fontSize:'14px', padding:'0 5px'}}>🗑️</button>
                         </div>
                     ))}
@@ -282,20 +240,47 @@ export const BudgetDetailPage = () => {
             </div>
         </div>
 
+        {/* COLUMNA DERECHA: CHAT MEJORADO */}
         <div style={{...cardStyle, maxHeight:'80vh'}}>
             <h3 style={sectionHeaderStyle}>💬 Mensajes</h3>
-            <div style={{flex:1, overflowY:'auto', display:'flex', flexDirection:'column', paddingRight:'5px'}}>
-                {messages.map(msg => (
-                    <div key={msg.id} style={chatBubbleStyle(msg.profiles?.role !== 'employee')}>
-                        <small style={{display:'block', fontSize:'10px', opacity:0.7}}>{new Date(msg.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</small>
-                        {msg.content}
-                    </div>
-                ))}
+            <div style={{flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:'10px', paddingRight:'5px'}}>
+                {messages.length === 0 && <p style={{color:'#666', textAlign:'center', fontSize:'13px'}}>No hay mensajes.</p>}
+                
+                {messages.map(msg => {
+                    // LÓGICA CORREGIDA:
+                    // Si el rol es 'client', soy yo (Blue, Right).
+                    // Si el rol es 'admin' o 'employee', es Soporte (Dark/Gray, Left).
+                    const isMe = msg.profiles?.role === 'client';
+                    
+                    return (
+                        <div key={msg.id} style={{
+                            alignSelf: isMe ? 'flex-end' : 'flex-start',
+                            maxWidth: '85%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: isMe ? 'flex-end' : 'flex-start'
+                        }}>
+                            <div style={{
+                                background: isMe ? '#3b82f6' : '#444', 
+                                color: 'white',
+                                padding: '10px 15px',
+                                borderRadius: '12px',
+                                borderBottomRightRadius: isMe ? '0' : '12px',
+                                borderBottomLeftRadius: isMe ? '12px' : '0'
+                            }}>
+                                {msg.content}
+                            </div>
+                            <small style={{color:'#666', fontSize:'10px', marginTop:'4px'}}>
+                                {isMe ? 'Tú' : 'Soporte'} • {new Date(msg.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                            </small>
+                        </div>
+                    );
+                })}
                 <div ref={chatEndRef} />
             </div>
             <div style={{marginTop:'15px', display:'flex', gap:'10px'}}>
-                <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => e.key==='Enter' && handleSendMessage()} placeholder="Escribe..." style={{flex:1, padding:'10px', borderRadius:'6px', border:'1px solid #444', background:'#252525', color:'white'}}/>
-                <button onClick={handleSendMessage} style={{padding:'0 15px', background:'#3b82f6', border:'none', borderRadius:'6px', color:'white'}}>➤</button>
+                <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => e.key==='Enter' && handleSendMessage()} placeholder="Escribe..." style={{flex:1, padding:'10px', borderRadius:'6px', border:'1px solid #444', background:'#252525', color:'white', outline:'none'}}/>
+                <button onClick={handleSendMessage} style={{padding:'0 15px', background:'#3b82f6', border:'none', borderRadius:'6px', color:'white', cursor:'pointer'}}>➤</button>
             </div>
         </div>
       </div>

@@ -10,6 +10,7 @@ import { CrmDashboard } from './features/crm/pages/CrmDashboard';
 import { ClientDashboard } from './features/crm/pages/ClientDashboard';
 import { ProfilePage } from './features/crm/pages/ProfilePage';
 import { BudgetDetailPage } from './features/crm/pages/BudgetDetailPage';
+// 💡 IMPORTACIÓN AÑADIDA PARA QUE FUNCIONE LA RUTA ADMIN
 import { AdminOrderDetailPage } from './features/crm/pages/AdminOrderDetailPage'; 
 
 // --- ESTILOS ---
@@ -29,8 +30,7 @@ const performLogout = async () => {
     window.location.href = "/"; 
 };
 
-// --- LAYOUTS (Mantenidos Iguales) ---
-// ... EmployeeLayout y ClientPortalLayout sin cambios ...
+// --- LAYOUTS ---
 const EmployeeLayout = () => {
   return (
     <div style={{ display: 'flex', height: '100vh', fontFamily: 'sans-serif', background: '#121212', color: '#e0e0e0' }}>
@@ -56,7 +56,6 @@ const EmployeeLayout = () => {
 
 const ClientPortalLayout = () => {
   return (
-    // 1. Contenedor principal fijo al 100% de la altura de la pantalla
     <div style={{ 
       height: '100vh', 
       display: 'flex', 
@@ -64,10 +63,8 @@ const ClientPortalLayout = () => {
       background: '#121212', 
       color: '#e0e0e0', 
       fontFamily: 'sans-serif',
-      overflow: 'hidden' // Evita doble scroll en algunos navegadores
+      overflow: 'hidden' 
     }}>
-      
-      {/* HEADER (Se queda fijo arriba) */}
       <header style={{ 
         background: '#1e1e1e', 
         borderBottom: '1px solid #333', 
@@ -75,28 +72,24 @@ const ClientPortalLayout = () => {
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center',
-        flexShrink: 0 // Evita que el header se aplaste
+        flexShrink: 0
       }}>
         <h3 style={{ margin: 0, color: '#fff' }}>Portal del Cliente 👋</h3>
         <nav style={{ display: 'flex', gap: '20px', alignItems:'center' }}>
            <Link to="/portal?tab=projects" style={{ color: '#fff', textDecoration: 'none' }}>Mis Proyectos</Link>
-            {/* Cambio de ruta y nombre */}
-            <Link to="/portal?tab=budgets" style={{ color: '#bbb', textDecoration: 'none' }}>Mis Presupuestos</Link>
-            {/* Nuevo enlace */}
-            <Link to="/portal?tab=orders" style={{ color: '#bbb', textDecoration: 'none' }}>Mis Pedidos</Link>
-          <Link to="/portal/profile" style={{ color: '#bbb', textDecoration: 'none' }}>Mi Perfil 👤</Link>
-          <Link to="/" style={{ ...badgeStyle, fontSize: '12px', padding: '6px 12px' }}>+ Nuevo Proyecto 3D</Link>
-          <button onClick={performLogout} style={{background:'none', border:'none', color:'#666', cursor:'pointer'}}>Salir</button>
+           <Link to="/portal?tab=budgets" style={{ color: '#bbb', textDecoration: 'none' }}>Mis Presupuestos</Link>
+           <Link to="/portal?tab=orders" style={{ color: '#bbb', textDecoration: 'none' }}>Mis Pedidos</Link>
+           <Link to="/portal/profile" style={{ color: '#bbb', textDecoration: 'none' }}>Mi Perfil 👤</Link>
+           <Link to="/" style={{ ...badgeStyle, fontSize: '12px', padding: '6px 12px' }}>+ Nuevo Proyecto 3D</Link>
+           <button onClick={performLogout} style={{background:'none', border:'none', color:'#666', cursor:'pointer'}}>Salir</button>
         </nav>
       </header>
 
-      {/* MAIN (Esta es la parte que hará SCROLL) */}
       <main style={{ 
-        flex: 1,            // Ocupa el resto del espacio
-        overflowY: 'auto',  // Activa el scroll vertical aquí
+        flex: 1,            
+        overflowY: 'auto',  
         padding: '40px' 
       }}>
-        {/* Contenedor para centrar y limitar ancho */}
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
           <div style={{ background: '#1e1e1e', padding: '30px', borderRadius: '12px', border: '1px solid #333' }}>
             <Outlet />
@@ -107,7 +100,7 @@ const ClientPortalLayout = () => {
   );
 };
 
-// 3. PÁGINA DE LOGIN (Mantenida Igual)
+// 3. PÁGINA DE LOGIN
 const LoginPage = () => {
   const navigate = useNavigate();
   const [step, setStep] = React.useState<'selection' | 'form'>('selection');
@@ -173,55 +166,50 @@ const LoginPage = () => {
   );
 };
 
-// 4. VISOR (HOME)
+// 4. VISOR (HOME) - LÓGICA MODIFICADA
 const ViewerPage = () => {
-  // 💡 CAMBIO: Leemos 'isReadOnlyMode' y 'loadProjectFromURL'
   const { mode, user, isReadOnlyMode, loadProjectFromURL, resetProjectId } = useAppStore();
   
-  // --- LÓGICA DE CARGA PARA QR ---
   React.useEffect(() => {
-    // Si ya estamos logueados, o el modo lectura ya está activo, no hacemos nada.
-    if (user || isReadOnlyMode) return; 
-
+    // 💡 LÓGICA CORREGIDA: Leemos los parámetros ANTES de decidir si bloqueamos
     const params = new URLSearchParams(window.location.search);
     const projectIdFromUrl = params.get('project_id');
     const isCloneMode = params.get('mode') === 'clone';
 
+    // Si ya estamos en modo lectura y NO estamos intentando cargar uno nuevo, paramos.
+    if (isReadOnlyMode && !projectIdFromUrl) return;
+
     if (projectIdFromUrl) {
-      // Llamamos a la acción del store para cargar el proyecto públicamente
+      // 💡 Cargamos SIEMPRE si hay ID en la URL (Aunque seas Admin)
       loadProjectFromURL(projectIdFromUrl).then(() => {
-         // Y si es modo clon, borramos el ID inmediatamente después de cargar
          if (isCloneMode && resetProjectId) {
              console.log("Modo CLON activado: Reseteando ID para crear copia.");
              resetProjectId(); 
          }
       });
     }
-  }, [loadProjectFromURL, resetProjectId]); // Añade dependencias
-
-  // --- FIN LÓGICA DE CARGA PARA QR ---
+  }, [loadProjectFromURL, resetProjectId]); // Quitamos dependencias de 'user' para evitar bloqueos
 
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden', margin: 0, background: '#000' }}>
       
-      {/* 💡 CAMBIO: Mostrar mensaje si es Solo Lectura */}
-      {isReadOnlyMode ? (
-        <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 1000, color:'white', background:'rgba(0,0,0,0.7)', padding:'8px 16px', borderRadius:'10px', border:'1px solid #3b82f6', display:'flex', alignItems:'center', gap:'8px' }}>
+      {/* 💡 AVISO VISUAL: Si es modo lectura o admin */}
+      {(isReadOnlyMode || (user?.role === 'admin' && window.location.search.includes('project_id'))) && (
+        <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 1000, color:'white', background:'rgba(0,0,0,0.8)', padding:'8px 16px', borderRadius:'10px', border:'1px solid #e67e22', display:'flex', alignItems:'center', gap:'8px' }}>
             <span style={{fontSize:'18px'}}>👁️</span>
-            <span style={{ fontSize: '14px', fontWeight: 'bold' }}>MODO VISOR (Solo Lectura)</span>
+            <span style={{ fontSize: '14px', fontWeight: 'bold' }}>MODO LECTURA / ADMIN</span>
         </div>
-      ) : (
-        // Muestra el botón de Login SOLO si no hay usuario Y no estamos en modo lectura
-        !user && (
+      )}
+
+      {/* Botón Login solo si no hay usuario Y no estamos en modo lectura */}
+      {!user && !isReadOnlyMode && (
             <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 1000 }}>
                 <Link to="/login" style={badgeStyle}>
                     <span style={{ fontSize: '18px' }}>👤</span>
                     <span>Acceso / Login</span>
                 </Link>
             </div>
-        )
       )}
-
 
       <Editor3D />
       {mode === 'catalog' && <Catalog />}
@@ -240,14 +228,16 @@ function App() {
         <Route path="/admin" element={<EmployeeLayout />}>
           <Route index element={<h2 style={{color:'white', padding:'20px'}}>Bienvenido al Panel</h2>} />
           <Route path="crm" element={<CrmDashboard />} />
+          {/* Ruta para el detalle del pedido (Admin) */}
           <Route path="order/:id" element={<AdminOrderDetailPage />} />
+          
           <Route path="erp" element={<h2 style={{color:'white', padding:'20px'}}>ERP en construcción</h2>} />
           <Route path="purchases" element={<h2 style={{color:'white', padding:'20px'}}>Compras en construcción</h2>} />
         </Route>
 
         <Route path="/portal" element={<ClientPortalLayout />}>
            <Route index element={<ClientDashboard />} />
-           <Route path="profile" element={<ProfilePage />} /> {/* <--- NUEVA RUTA */}
+           <Route path="profile" element={<ProfilePage />} />
            <Route path="order/:id" element={<BudgetDetailPage />} />
         </Route>
       </Routes>

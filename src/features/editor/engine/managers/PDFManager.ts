@@ -311,7 +311,7 @@ export class PDFManager {
       // --- PRESUPUESTO (SOLO SI USER) ---
       if (user) {
         doc.addPage();
-        this.addHeader(doc, "Presupuesto", "");
+        this.addHeader(doc, "Estimación orientativa", "");
         let total = 0;
         const tableData = items.map(item => {
             const price = PriceCalculator.getItemPrice(item);
