@@ -10,6 +10,7 @@ import { CrmDashboard } from './features/crm/pages/CrmDashboard';
 import { ClientDashboard } from './features/crm/pages/ClientDashboard';
 import { ProfilePage } from './features/crm/pages/ProfilePage';
 import { BudgetDetailPage } from './features/crm/pages/BudgetDetailPage';
+import { AdminOrderDetailPage } from './features/crm/pages/AdminOrderDetailPage'; 
 
 // --- ESTILOS ---
 const badgeStyle: React.CSSProperties = {
@@ -78,8 +79,11 @@ const ClientPortalLayout = () => {
       }}>
         <h3 style={{ margin: 0, color: '#fff' }}>Portal del Cliente 👋</h3>
         <nav style={{ display: 'flex', gap: '20px', alignItems:'center' }}>
-          <Link to="/portal?tab=projects" style={{ color: '#fff', textDecoration: 'none' }}>Mis Proyectos</Link>
-          <Link to="/portal?tab=orders" style={{ color: '#bbb', textDecoration: 'none' }}>Mis Presupuestos</Link>
+           <Link to="/portal?tab=projects" style={{ color: '#fff', textDecoration: 'none' }}>Mis Proyectos</Link>
+            {/* Cambio de ruta y nombre */}
+            <Link to="/portal?tab=budgets" style={{ color: '#bbb', textDecoration: 'none' }}>Mis Presupuestos</Link>
+            {/* Nuevo enlace */}
+            <Link to="/portal?tab=orders" style={{ color: '#bbb', textDecoration: 'none' }}>Mis Pedidos</Link>
           <Link to="/portal/profile" style={{ color: '#bbb', textDecoration: 'none' }}>Mi Perfil 👤</Link>
           <Link to="/" style={{ ...badgeStyle, fontSize: '12px', padding: '6px 12px' }}>+ Nuevo Proyecto 3D</Link>
           <button onClick={performLogout} style={{background:'none', border:'none', color:'#666', cursor:'pointer'}}>Salir</button>
@@ -236,6 +240,7 @@ function App() {
         <Route path="/admin" element={<EmployeeLayout />}>
           <Route index element={<h2 style={{color:'white', padding:'20px'}}>Bienvenido al Panel</h2>} />
           <Route path="crm" element={<CrmDashboard />} />
+          <Route path="order/:id" element={<AdminOrderDetailPage />} />
           <Route path="erp" element={<h2 style={{color:'white', padding:'20px'}}>ERP en construcción</h2>} />
           <Route path="purchases" element={<h2 style={{color:'white', padding:'20px'}}>Compras en construcción</h2>} />
         </Route>

@@ -20,18 +20,33 @@ const tableStyle = { width: '100%', borderCollapse: 'collapse' as const, backgro
 const thStyle = { textAlign: 'left' as const, padding: '15px', background: '#252525', color: '#aaa', borderBottom: '1px solid #333' };
 const tdStyle = { padding: '15px', borderBottom: '1px solid #333' };
 
+type TabType = 'projects' | 'budgets' | 'orders' | 'archived';
+
+// Función para colores de estados en la tabla
+const getStatusColor = (status: string) => {
+    switch(status) {
+        case 'pedido': return '#3498db'; // Azul
+        case 'fabricacion': return '#e67e22'; // Naranja
+        case 'entregado_parcial': return '#f1c40f'; // Amarillo
+        case 'entregado': return '#27ae60'; // Verde
+        case 'pendiente': return 'orange';
+        case 'rechazado': return '#c0392b';
+        case 'cancelado': return '#7f8c8d';
+        default: return '#27ae60';
+    }
+};
+
 export const ClientDashboard = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = searchParams.get('tab') as any || 'projects';
-  const [activeTab, setActiveTab] = useState<'projects' | 'orders' | 'archived'>(initialTab);
+  const initialTab = (searchParams.get('tab') as TabType) || 'projects';
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   
   const [projects, setProjects] = useState<any[]>([]);
-  const [orders, setOrders] = useState<any[]>([]);
+  const [dataList, setDataList] = useState<any[]>([]); 
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
-  // --- ESTADO DEL MODAL ---
   const [modal, setModal] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {}, isDestructive: false });
   const closeModal = () => setModal({ ...modal, isOpen: false });
 
@@ -50,13 +65,28 @@ export const ClientDashboard = () => {
           const cleanProjects = (data || []).filter((p: any) => !p.orders || p.orders.length === 0);
           setProjects(cleanProjects);
         }
+        else if (activeTab === 'budgets') {
+          const { data } = await supabase.from('orders')
+            .select('*, projects(name)')
+            .eq('is_archived', false)
+            .in('status', ['pendiente', 'presupuestado', 'entregado']) 
+            .order('created_at', { ascending: false });
+          setDataList(data || []);
+        }
         else if (activeTab === 'orders') {
-          const { data } = await supabase.from('orders').select('*, projects(name)').eq('is_archived', false).order('created_at', { ascending: false });
-          setOrders(data || []);
+          const { data } = await supabase.from('orders')
+            .select('*, projects(name)')
+            .eq('is_archived', false)
+            .in('status', ['pedido', 'fabricacion', 'entregado_parcial', 'entregado', 'completado'])
+            .order('created_at', { ascending: false });
+          setDataList(data || []);
         }
         else if (activeTab === 'archived') {
-          const { data } = await supabase.from('orders').select('*, projects(name)').eq('is_archived', true).order('created_at', { ascending: false });
-          setOrders(data || []);
+          const { data } = await supabase.from('orders')
+            .select('*, projects(name)')
+            .eq('is_archived', true)
+            .order('created_at', { ascending: false });
+          setDataList(data || []);
         }
       } catch (error) { console.error(error); } finally { setLoading(false); }
     };
@@ -94,16 +124,18 @@ export const ClientDashboard = () => {
     });
   };
 
+  // --- LÓGICA CORREGIDA AQUÍ ---
   const handleReactivate = (order: any) => {
     setModal({
-      isOpen: true, 
-      title: 'Reactivar Presupuesto', 
-      message: 'El presupuesto volverá a la lista principal en estado PENDIENTE para ser revisado de nuevo.', 
-      isDestructive: false,
+      isOpen: true, title: 'Reactivar Presupuesto', message: 'El presupuesto volverá a la lista de "Mis Presupuestos" en estado PENDIENTE con fecha de HOY.', isDestructive: false,
       onConfirm: async () => {
-        // Lógica forzada: Siempre vuelve a Pendiente y se desarchiva
-        await supabase.from('orders').update({ is_archived: false, status: 'pendiente' }).eq('id', order.id);
-        setActiveTab('orders');
+        await supabase.from('orders').update({ 
+            is_archived: false, 
+            status: 'pendiente',
+            created_at: new Date().toISOString() // 💡 ACTUALIZAMOS LA FECHA A "AHORA MISMO"
+        }).eq('id', order.id);
+        
+        setActiveTab('budgets');
         closeModal();
       }
     });
@@ -122,7 +154,8 @@ export const ClientDashboard = () => {
 
       <div style={tabContainerStyle}>
         <div onClick={() => setActiveTab('projects')} style={tabStyle(activeTab === 'projects')}>📂 Mis Proyectos</div>
-        <div onClick={() => setActiveTab('orders')} style={tabStyle(activeTab === 'orders')}>📑 Mis Presupuestos</div>
+        <div onClick={() => setActiveTab('budgets')} style={tabStyle(activeTab === 'budgets')}>📑 Mis Presupuestos</div>
+        <div onClick={() => setActiveTab('orders')} style={tabStyle(activeTab === 'orders')}>📦 Mis Pedidos</div>
         <div onClick={() => setActiveTab('archived')} style={tabStyle(activeTab === 'archived')}>🗄️ Archivados</div>
       </div>
 
@@ -147,29 +180,39 @@ export const ClientDashboard = () => {
                 </div>
             )}
 
-            {(activeTab === 'orders' || activeTab === 'archived') && (
+            {activeTab !== 'projects' && (
                 <table style={tableStyle}>
                     <thead><tr><th style={thStyle}>Ref</th><th style={thStyle}>Proyecto</th><th style={thStyle}>Fecha</th><th style={thStyle}>Estado</th><th style={thStyle}>Acciones</th></tr></thead>
                     <tbody>
-                        {orders.map(o => (
+                        {dataList.map(o => (
                             <tr key={o.id} style={{borderBottom:'1px solid #333'}}>
                                 <td style={tdStyle}><strong style={{color:'#fff'}}>{o.order_ref}</strong></td>
                                 <td style={tdStyle}>{o.projects?.name || '---'}</td>
                                 <td style={tdStyle}>{new Date(o.created_at).toLocaleDateString()}</td>
                                 <td style={tdStyle}>
-                                    <span style={{color: o.status==='pendiente'?'orange':(o.status==='rechazado'?'#e74c3c':'#27ae60'), fontWeight:'bold', textTransform:'uppercase', fontSize:'12px'}}>
-                                        {o.status}
+                                    <span style={{
+                                        color: getStatusColor(o.status), // USAMOS LA FUNCIÓN DE COLOR
+                                        fontWeight:'bold', textTransform:'uppercase', fontSize:'12px'
+                                    }}>
+                                        {o.status.replace('_', ' ')}
                                     </span>
                                 </td>
                                 <td style={tdStyle}>
-                                    {activeTab === 'orders' ? (
-                                        <button onClick={() => navigate(`/portal/order/${o.id}`)} style={{background:'#333', color:'white', border:'1px solid #555', padding:'5px 10px', borderRadius:'4px', cursor:'pointer'}}>Ver Ficha 👁️</button>
-                                    ) : (
+                                    {activeTab === 'archived' ? (
                                         <button onClick={() => handleReactivate(o)} style={{background:'#3b82f6', color:'white', border:'none', padding:'5px 10px', borderRadius:'4px', cursor:'pointer'}}>Reactivar 🔄</button>
+                                    ) : (
+                                        <button onClick={() => navigate(`/portal/order/${o.id}`)} style={{background:'#333', color:'white', border:'1px solid #555', padding:'5px 10px', borderRadius:'4px', cursor:'pointer'}}>Ver Ficha 👁️</button>
                                     )}
                                 </td>
                             </tr>
                         ))}
+                        {dataList.length === 0 && (
+                            <tr><td colSpan={5} style={{padding:'20px', textAlign:'center', color:'#666'}}>
+                                {activeTab === 'budgets' && 'No tienes presupuestos pendientes.'}
+                                {activeTab === 'orders' && 'No tienes pedidos confirmados aún.'}
+                                {activeTab === 'archived' && 'No hay archivados.'}
+                            </td></tr>
+                        )}
                     </tbody>
                 </table>
             )}
