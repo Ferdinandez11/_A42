@@ -60,44 +60,45 @@ export const ClientDashboard = () => {
 
       try {
         if (activeTab === 'projects') {
-          const { data } = await supabase.from('projects').select('*, orders(id)').eq('user_id', userId).order('updated_at', { ascending: false });
+          const { data } = await supabase.from('projects').select('*, orders(id)').eq('user_id', user.id).order('updated_at', { ascending: false });
           const cleanProjects = (data || []).filter((p: any) => !p.orders || p.orders.length === 0);
           setProjects(cleanProjects);
         }
-        else if (activeTab === 'budgets') {
-          const { data } = await supabase.from('orders')
-            .select('*, projects(name)')
-            .eq('is_archived', false)
-            .in('status', ['pendiente', 'presupuestado', 'entregado']) 
-            .order('created_at', { ascending: false });
-          setDataList(data || []);
-        }
-        else if (activeTab === 'orders') {
-          const { data } = await supabase.from('orders')
-            .select('*, projects(name)')
-            .eq('is_archived', false)
-            .in('status', ['pedido', 'fabricacion', 'entregado_parcial', 'entregado', 'completado'])
-            .order('created_at', { ascending: false });
-          setDataList(data || []);
-        }
-        else if (activeTab === 'archived') {
-          const { data } = await supabase.from('orders')
-            .select('*, projects(name)')
-            .eq('is_archived', true)
-            .order('created_at', { ascending: false });
-          setDataList(data || []);
+        else {
+            let query = supabase.from('orders').select('*, projects(name)').order('created_at', { ascending: false });
+            
+            if (activeTab === 'budgets') query = query.eq('is_archived', false).in('status', ['pendiente', 'presupuestado', 'rechazado']);
+            else if (activeTab === 'orders') query = query.eq('is_archived', false).in('status', ['pedido', 'fabricacion', 'entregado_parcial', 'entregado', 'completado']);
+            else if (activeTab === 'archived') query = query.eq('is_archived', true);
+
+            const { data } = await query;
+            setDataList(data || []);
         }
       } catch (error) { console.error(error); } finally { setLoading(false); }
     };
     fetchData();
   }, [activeTab, navigate]);
 
+  const handleCreateManualBudget = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    const ref = 'MAN-' + Math.floor(10000 + Math.random() * 90000);
+    
+    const { data, error } = await supabase.from('orders').insert([{
+        user_id: user?.id,
+        order_ref: ref,
+        status: 'pendiente',
+        total_price: 0,
+        is_archived: false,
+        created_at: new Date().toISOString()
+    }]).select();
+
+    if (error) { alert("Error al crear: " + error.message); return; }
+    if (data) navigate(`/portal/order/${data[0].id}`);
+  };
+
   const handleRequestQuote = (project: any) => {
     setModal({
-      isOpen: true,
-      title: 'Solicitar Presupuesto',
-      message: `¿Quieres enviar "${project.name}" a revisión? Se moverá a la pestaña de Presupuestos.`,
-      isDestructive: false,
+      isOpen: true, title: 'Solicitar Presupuesto', message: `¿Quieres enviar "${project.name}" a revisión?`, isDestructive: false,
       onConfirm: async () => {
         const estimatedDate = new Date(); estimatedDate.setHours(estimatedDate.getHours() + 48);
         const ref = 'SOL-' + Math.floor(10000 + Math.random() * 90000);
@@ -125,13 +126,9 @@ export const ClientDashboard = () => {
 
   const handleReactivate = (order: any) => {
     setModal({
-      isOpen: true, title: 'Reactivar Presupuesto', message: 'El presupuesto volverá a la lista de "Mis Presupuestos" en estado PENDIENTE con fecha de HOY.', isDestructive: false,
+      isOpen: true, title: 'Reactivar Presupuesto', message: 'El presupuesto volverá a la lista de "Mis Presupuestos".', isDestructive: false,
       onConfirm: async () => {
-        await supabase.from('orders').update({ 
-            is_archived: false, 
-            status: 'pendiente',
-            created_at: new Date().toISOString() 
-        }).eq('id', order.id);
+        await supabase.from('orders').update({ is_archived: false, status: 'pendiente', created_at: new Date().toISOString() }).eq('id', order.id);
         setActiveTab('budgets');
         closeModal();
       }
@@ -144,9 +141,15 @@ export const ClientDashboard = () => {
 
       <div style={headerStyle}>
         <h2 style={{ margin: 0, color: '#fff' }}>Mi Espacio Personal</h2>
-        <a href="/" style={{ background: '#27ae60', color: 'white', textDecoration: 'none', padding: '10px 20px', borderRadius: '6px', fontWeight: 'bold' }}>
-          + Nuevo Proyecto 3D
-        </a>
+        <div style={{display:'flex', gap:'15px'}}>
+             {/* --- BOTONES DE ACCIÓN PRINCIPAL --- */}
+            <button onClick={handleCreateManualBudget} style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', display:'flex', alignItems:'center', gap:'8px' }}>
+                📝 Crear Presupuesto Manual
+            </button>
+            <a href="/" style={{ background: '#27ae60', color: 'white', textDecoration: 'none', padding: '10px 20px', borderRadius: '6px', fontWeight: 'bold', display:'flex', alignItems:'center', gap:'8px' }}>
+                + Nuevo Proyecto 3D
+            </a>
+        </div>
       </div>
 
       <div style={tabContainerStyle}>
@@ -179,12 +182,10 @@ export const ClientDashboard = () => {
 
             {activeTab !== 'projects' && (
                 <table style={tableStyle}>
-                    {/* --- CABECERA DE TABLA ACTUALIZADA CON DOS FECHAS --- */}
                     <thead>
                         <tr>
                             <th style={thStyle}>Ref</th>
                             <th style={thStyle}>Proyecto</th>
-                            {/* Cambio de etiquetas según pestaña para mayor claridad */}
                             <th style={thStyle}>{activeTab === 'orders' ? 'F. Inicio Pedido' : 'F. Solicitud'}</th>
                             <th style={thStyle}>F. Entrega Est.</th>
                             <th style={thStyle}>Estado</th>
@@ -196,22 +197,12 @@ export const ClientDashboard = () => {
                             <tr key={o.id} style={{borderBottom:'1px solid #333'}}>
                                 <td style={tdStyle}><strong style={{color:'#fff'}}>{o.order_ref}</strong></td>
                                 <td style={tdStyle}>{o.projects?.name || '---'}</td>
-                                
-                                {/* 1. FECHA SOLICITUD / INICIO */}
                                 <td style={tdStyle}>{new Date(o.created_at).toLocaleDateString()}</td>
-                                
-                                {/* 2. FECHA ENTREGA */}
                                 <td style={{...tdStyle, color: o.estimated_delivery_date ? '#ccc' : '#666'}}>
-                                    {o.estimated_delivery_date 
-                                        ? new Date(o.estimated_delivery_date).toLocaleDateString() 
-                                        : '--'}
+                                    {o.estimated_delivery_date ? new Date(o.estimated_delivery_date).toLocaleDateString() : '--'}
                                 </td>
-
                                 <td style={tdStyle}>
-                                    <span style={{
-                                        color: getStatusColor(o.status), 
-                                        fontWeight:'bold', textTransform:'uppercase', fontSize:'12px'
-                                    }}>
+                                    <span style={{ color: getStatusColor(o.status), fontWeight:'bold', textTransform:'uppercase', fontSize:'12px'}}>
                                         {o.status.replace('_', ' ')}
                                     </span>
                                 </td>
@@ -225,11 +216,7 @@ export const ClientDashboard = () => {
                             </tr>
                         ))}
                         {dataList.length === 0 && (
-                            <tr><td colSpan={6} style={{padding:'20px', textAlign:'center', color:'#666'}}>
-                                {activeTab === 'budgets' && 'No tienes presupuestos pendientes.'}
-                                {activeTab === 'orders' && 'No tienes pedidos confirmados aún.'}
-                                {activeTab === 'archived' && 'No hay archivados.'}
-                            </td></tr>
+                            <tr><td colSpan={6} style={{padding:'20px', textAlign:'center', color:'#666'}}>No hay datos en esta sección.</td></tr>
                         )}
                     </tbody>
                 </table>
