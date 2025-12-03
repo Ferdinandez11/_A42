@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
 import { PriceCalculator, PRICES } from '../../../utils/PriceCalculator';
 import { generateBillOfMaterials } from '../../../utils/budgetUtils';
+import { generateBudgetPDF } from '../../../utils/pdfGenerator'; // <--- IMPORTANTE
 
 const CATALOG_ITEMS = [
     { id: 'bench_01', name: 'Banco Clásico', type: 'model', price: 150 },
@@ -43,6 +44,7 @@ export const AdminOrderDetailPage = () => {
   // Archivos
   const [attachments, setAttachments] = useState<any[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false); // Estado visual para el PDF
 
   // UI
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
@@ -71,10 +73,9 @@ export const AdminOrderDetailPage = () => {
             setNewDate('');
         }
         
-        // 1.1 Procesar Items 3D (Cálculo corregido: Sumar el BOM visual)
+        // 1.1 Procesar Items 3D
         let total3D = 0;
         let processed3DItems: any[] = [];
-        
         const raw3DItems = o.projects?.data?.items || o.projects?.items || [];
 
         if (raw3DItems.length > 0) {
@@ -82,10 +83,7 @@ export const AdminOrderDetailPage = () => {
                 ...item,
                 price: PriceCalculator.getItemPrice(item) 
             }));
-            // Agrupamos para visualización limpia (BOM)
             processed3DItems = generateBillOfMaterials(itemsWithRealPrices);
-            
-            // CORRECCIÓN CLAVE: Sumamos sobre las líneas procesadas para que coincida con la tabla visual
             total3D = processed3DItems.reduce((acc, line) => acc + line.totalPrice, 0);
         }
         setItems3D(processed3DItems);
@@ -95,7 +93,7 @@ export const AdminOrderDetailPage = () => {
         const manual = mItems || [];
         setManualItems(manual);
 
-        // 1.3 Calcular Total Base Real (3D + Manuales)
+        // 1.3 Calcular Total Base Real
         const totalManual = manual.reduce((acc: number, item: any) => acc + item.total_price, 0);
         setCalculatedBasePrice(total3D + totalManual);
     }
@@ -117,20 +115,62 @@ export const AdminOrderDetailPage = () => {
     setObservations(obs || []);
   };
 
-  // --- ACTUALIZAR PEDIDO ---
+  // --- ACTUALIZAR PEDIDO Y GENERAR PDF ---
   const handleUpdateOrder = async () => {
     if (!order) return;
-    const dateToSave = newDate ? new Date(newDate).toISOString() : null;
+    setIsGeneratingPDF(true); // Bloquear botón visualmente
 
-    const { error } = await supabase.from('orders').update({
-        status: order.status,
-        custom_name: order.custom_name, 
-        estimated_delivery_date: dateToSave,
-        total_price: order.total_price 
-    }).eq('id', id);
+    try {
+        const dateToSave = newDate ? new Date(newDate).toISOString() : null;
 
-    if (error) alert("Error actualizando: " + error.message);
-    else alert("✅ Pedido actualizado correctamente");
+        // 1. Guardar cambios en la Base de Datos
+        const { error } = await supabase.from('orders').update({
+            status: order.status,
+            custom_name: order.custom_name, 
+            estimated_delivery_date: dateToSave,
+            total_price: order.total_price 
+        }).eq('id', id);
+
+        if (error) throw error;
+
+        // 2. Si el estado es "presupuestado", generar PDF automático
+        if (order.status === 'presupuestado') {
+            // Generar Blob del PDF
+            const pdfBlob = await generateBudgetPDF(order, items3D, manualItems);
+            
+            // Nombre del archivo: Presupuesto_REF_FECHA.pdf
+            const fileName = `Presupuesto_${order.order_ref}_${Date.now()}.pdf`;
+            const filePath = `${id}/${fileName}`;
+
+            // Subir a Supabase Storage
+            const { error: uploadError } = await supabase.storage.from('attachments').upload(filePath, pdfBlob);
+            if (uploadError) throw uploadError;
+
+            // Obtener URL Pública
+            const { data: { publicUrl } } = supabase.storage.from('attachments').getPublicUrl(filePath);
+
+            // Guardar registro en la tabla de adjuntos
+            const { data: { user } } = await supabase.auth.getUser();
+            const { error: dbError } = await supabase.from('order_attachments').insert([{
+                order_id: id,
+                file_name: `📄 ${fileName}`, // Icono para distinguir
+                file_url: publicUrl,
+                uploader_id: user?.id
+            }]);
+
+            if (dbError) throw dbError;
+            
+            alert("✅ Cambios guardados y PDF de Presupuesto generado y enviado al cliente.");
+        } else {
+            alert("✅ Pedido actualizado correctamente.");
+        }
+
+        loadData(); // Recargar para ver el PDF en la lista
+    } catch (error: any) {
+        alert("Error: " + error.message);
+    } finally {
+        setIsGeneratingPDF(false);
+    }
   };
 
   const handleStatusChangeRaw = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -162,7 +202,6 @@ export const AdminOrderDetailPage = () => {
       }
   };
 
-  // Función rápida para copiar el precio base al precio final si es 0
   const copyBasePrice = () => {
       setOrder({ ...order, total_price: calculatedBasePrice });
   };
@@ -291,16 +330,14 @@ export const AdminOrderDetailPage = () => {
                     </div>
                 </div>
 
-                {/* --- SECCIÓN PRECIOS CORREGIDA --- */}
+                {/* --- SECCIÓN PRECIOS --- */}
                 <div style={{background:'rgba(59, 130, 246, 0.1)', padding:'15px', borderRadius:'8px', border:'1px solid rgba(59, 130, 246, 0.3)'}}>
                     
-                    {/* Fila 1: Precio Tarifa (Sumatorio real) */}
                     <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px', borderBottom:'1px solid rgba(255,255,255,0.1)', paddingBottom:'10px'}}>
                         <span style={{color:'#aaa', fontSize:'13px'}}>Total Tarifa (Suma Items):</span>
                         <span style={{fontSize:'16px', fontWeight:'bold', color:'white'}}>{formatMoney(calculatedBasePrice)}</span>
                     </div>
 
-                    {/* Fila 2: Configuración Precio Oferta */}
                     <div style={{display:'grid', gridTemplateColumns:'1fr auto auto', gap:'10px', alignItems:'end'}}>
                         <div>
                             <label style={{...labelStyle, color:'#3b82f6', fontWeight:'bold'}}>Precio Final Oferta (€)</label>
@@ -330,8 +367,12 @@ export const AdminOrderDetailPage = () => {
                 </div>
                 
                 <div style={{marginTop:'20px', display:'flex', justifyContent:'flex-end'}}>
-                     <button onClick={handleUpdateOrder} style={{background:'#27ae60', color:'white', padding:'12px 30px', border:'none', borderRadius:'6px', cursor:'pointer', fontWeight:'bold', fontSize:'14px'}}>
-                        💾 Guardar Cambios
+                     <button 
+                        onClick={handleUpdateOrder} 
+                        disabled={isGeneratingPDF}
+                        style={{background:'#27ae60', color:'white', padding:'12px 30px', border:'none', borderRadius:'6px', cursor: isGeneratingPDF ? 'wait' : 'pointer', fontWeight:'bold', fontSize:'14px', opacity: isGeneratingPDF ? 0.7 : 1}}
+                    >
+                        {isGeneratingPDF ? 'Guardando y Generando PDF...' : '💾 Guardar Cambios'}
                     </button>
                 </div>
             </div>
@@ -457,8 +498,8 @@ export const AdminOrderDetailPage = () => {
         </div>
 
       </div>
-
-      {isCatalogOpen && (
+      {/* ... MODALES ... */}
+       {isCatalogOpen && (
           <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.8)', display:'flex', justifyContent:'center', alignItems:'center', zIndex:999}}>
               <div style={{background:'#1e1e1e', width:'600px', maxHeight:'80vh', borderRadius:'12px', border:'1px solid #444', display:'flex', flexDirection:'column'}}>
                   <div style={{padding:'20px', borderBottom:'1px solid #333', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
@@ -488,7 +529,6 @@ export const AdminOrderDetailPage = () => {
               </div>
           </div>
       )}
-
     </div>
   );
 };
