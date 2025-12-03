@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
 
-// --- ESTILOS ---
+// ESTILOS
 const containerStyle = { color: '#e0e0e0', padding: '20px', fontFamily: 'sans-serif' };
 const headerStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', borderBottom: '1px solid #333', paddingBottom: '15px' };
 const tabBtnStyle = (active: boolean) => ({
@@ -15,12 +15,9 @@ const tdStyle = { padding: '12px', borderBottom: '1px solid #333', verticalAlign
 const selectStyle = {
     background: '#252525', color: 'white', border: '1px solid #444', padding: '4px', borderRadius: '4px', cursor: 'pointer', maxWidth: '130px'
 };
-// Estilos Modal
-const modalOverlayStyle = { position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 };
-const modalContentStyle = { background: '#1e1e1e', padding: '30px', borderRadius: '12px', width: '400px', border: '1px solid #444' };
-const modalInputStyle = { width: '100%', padding: '10px', marginBottom: '15px', background: '#252525', border: '1px solid #444', color: 'white', borderRadius: '6px' };
 
-// Listas de estados
+const formatMoney = (amount: number) => amount.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+
 const BUDGET_STATUSES = ['pendiente', 'presupuestado', 'rechazado'];
 const ORDER_STATUSES = ['pedido', 'fabricacion', 'entregado_parcial', 'entregado', 'completado', 'cancelado'];
 
@@ -31,7 +28,7 @@ export const CrmDashboard = () => {
   const [dataList, setDataList] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   
-  // Estado Modal Alta Cliente
+  // Modal Cliente
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newClientData, setNewClientData] = useState({ email: '', company_name: '', full_name: '', phone: '', discount_rate: 0 });
 
@@ -44,8 +41,9 @@ export const CrmDashboard = () => {
         const { data } = await supabase.from('profiles').select('*, is_approved').order('created_at', { ascending: false });
         setClients(data || []);
       } else {
+        // CORRECCIÓN: Añadido 'discount_rate' en el select de profiles
         let query = supabase.from('orders')
-            .select(`*, profiles(company_name, email), projects(name), order_messages(created_at, profiles(role))`)
+            .select(`*, profiles(company_name, email, discount_rate), projects(name), order_messages(created_at, profiles(role))`)
             .order('created_at', { ascending: false });
         
         if (activeTab === 'budgets') query = query.in('status', BUDGET_STATUSES);
@@ -62,50 +60,48 @@ export const CrmDashboard = () => {
     if (!error) { alert("Usuario aprobado."); loadData(); }
   };
 
-  // --- ALTA MANUAL DE CLIENTE ---
   const handleCreateClient = async () => {
-    if (!newClientData.email) return alert("El email es obligatorio");
-
-    // 1. Guardar en pre_clients (para que el trigger copie datos al registrarse)
+    if (!newClientData.email) return alert("Email obligatorio");
     const { error } = await supabase.from('pre_clients').insert([newClientData]);
-    
-    if (error) {
-        alert("Error al crear pre-ficha: " + error.message);
-    } else {
-        alert(`✅ Ficha creada para ${newClientData.email}.\n\nCuando el cliente se registre en la web con este email, sus datos se rellenarán automáticamente y tendrá acceso inmediato.`);
+    if (error) alert("Error: " + error.message);
+    else {
+        alert(`✅ Ficha creada para ${newClientData.email}.`);
         setShowCreateModal(false);
         setNewClientData({ email: '', company_name: '', full_name: '', phone: '', discount_rate: 0 });
     }
   };
 
   const handleDeleteClient = async (id: string) => {
-    if(!confirm("⚠️ ¿Borrar cliente y todos sus datos?")) return;
+    if(!confirm("¿Borrar cliente?")) return;
     await supabase.from('profiles').delete().eq('id', id);
     loadData();
   };
   const handleDeleteOrder = async (id: string) => {
-    if(!confirm("¿Borrar registro permanentemente?")) return;
+    if(!confirm("¿Borrar registro?")) return;
     await supabase.from('orders').delete().eq('id', id);
     loadData();
   };
+  
   const handleStatusUpdate = async (id: string, newStatus: string) => {
-      // (Mismo código de antes)
       const confirmMsg = `¿Cambiar estado a "${newStatus.toUpperCase()}"?`;
       if(!confirm(confirmMsg)) return; 
+      
       const updateData: any = { status: newStatus };
-      if (newStatus === 'pedido') {
-          const d = new Date(); d.setDate(d.getDate() + 42);
-          updateData.estimated_delivery_date = d.toISOString();
-      }
+      const now = new Date();
+      
+      if (newStatus === 'pedido') updateData.estimated_delivery_date = new Date(now.getTime() + (6 * 7 * 24 * 60 * 60 * 1000)).toISOString();
+      else if (newStatus === 'presupuestado') updateData.estimated_delivery_date = new Date(now.getTime() + (48 * 60 * 60 * 1000)).toISOString();
+
       await supabase.from('orders').update(updateData).eq('id', id);
       loadData();
   };
+
   const getAlertStatus = (order: any) => {
     const messages = order.order_messages || [];
     messages.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     if (!messages[0]) return null;
-    if (messages[0].profiles?.role === 'client') return { icon: '🔴', text: 'Cliente escribió', color: '#e74c3c' };
-    return { icon: '🟢', text: 'Respondido', color: '#27ae60' };
+    if (messages[0].profiles?.role === 'client') return { icon: '🔴', text: 'Cliente escribió' };
+    return { icon: '🟢', text: 'Respondido' };
   };
 
   return (
@@ -122,37 +118,42 @@ export const CrmDashboard = () => {
 
       {loading ? <p>Cargando...</p> : (
         <>
-            {/* TABLA PRESUPUESTOS Y PEDIDOS (Igual que antes) */}
           {(activeTab === 'budgets' || activeTab === 'orders') && (
              <div style={{overflowX: 'auto'}}>
                 <table style={tableStyle}>
                   <thead>
                     <tr>
-                      <th style={thStyle}>Avisos</th>
+                      <th style={thStyle}>Aviso</th>
                       <th style={thStyle}>REF</th>
                       <th style={thStyle}>Cliente</th>
-                      {activeTab === 'budgets' ? (
-                        <>
-                            <th style={{...thStyle, color:'#e67e22'}}>Estado</th>
-                            <th style={{...thStyle, color:'#e67e22'}}>F. Solicitud</th>
-                        </>
-                      ) : (
-                        <>
-                            <th style={{...thStyle, color:'#3498db'}}>Estado</th>
-                            <th style={{...thStyle, color:'#3498db'}}>F. Aceptación</th>
-                        </>
-                      )}
-                      <th style={{...thStyle, borderLeft:'1px solid #444'}}>Total</th>
+                      <th style={thStyle}>Estado</th>
+                      <th style={thStyle}>F. Solicitud</th>
+                      <th style={thStyle}>F. Entrega Est.</th>
+                      <th style={{...thStyle, borderLeft:'1px solid #444'}}>Total / Oferta</th>
                       <th style={thStyle}>Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
                     {dataList.map(o => {
                         const alert = getAlertStatus(o);
+                        // --- CÁLCULO VISUAL DE DESCUENTOS ---
+                        const finalPrice = o.total_price || 0;
+                        const discount = o.profiles?.discount_rate || 0;
+                        let basePrice = finalPrice;
+                        
+                        // Si hay descuento, calculamos el precio base original inverso
+                        // Precio Final = Base * (1 - Dto/100)  =>  Base = Precio Final / (1 - Dto/100)
+                        if (discount > 0 && finalPrice > 0) {
+                            basePrice = finalPrice / (1 - (discount / 100));
+                        }
+
                         return (
                         <tr key={o.id}>
                             <td style={{...tdStyle, textAlign:'center'}} title={alert?.text}>{alert ? alert.icon : '⚪'}</td>
-                            <td style={tdStyle}><strong>{o.order_ref}</strong></td>
+                            <td style={tdStyle}>
+                                <strong>{o.order_ref}</strong>
+                                {o.custom_name && <div style={{fontSize:'11px', color:'#aaa'}}>{o.custom_name}</div>}
+                            </td>
                             <td style={{...tdStyle, color: o.profiles ? '#4a90e2' : '#999'}}>{o.profiles ? (o.profiles.company_name || o.profiles.email) : 'Eliminado'}</td>
                             <td style={tdStyle}>
                                 <select value={o.status} onChange={(e) => handleStatusUpdate(o.id, e.target.value)} style={selectStyle}>
@@ -160,22 +161,45 @@ export const CrmDashboard = () => {
                                         <>
                                             <option value="pendiente">🟠 Pendiente</option>
                                             <option value="presupuestado">🟣 Presupuestado</option>
-                                            <option value="entregado">🟣 Entregado</option>
                                             <option value="rechazado">🔴 Rechazado</option>
-                                            <option value="pedido">➡️ PASAR A PEDIDO</option>
+                                            <option value="pedido">➡️ A PEDIDO</option>
                                         </>
                                     ) : (
                                         <>
                                             <option value="pedido">🔵 Pedido</option>
                                             <option value="fabricacion">🟠 Fabricación</option>
-                                            <option value="entregado">🟣 Entregado</option>
-                                            <option value="completado">🟢 Completado</option>
+                                            <option value="entregado">🟢 Entregado</option>
+                                            <option value="completado">🏁 Completado</option>
                                         </>
                                     )}
                                 </select>
                             </td>
                             <td style={tdStyle}>{new Date(o.created_at).toLocaleDateString()}</td>
-                            <td style={{...tdStyle, fontWeight:'bold'}}>{o.total_price} €</td>
+                            <td style={tdStyle}>
+                                {o.estimated_delivery_date ? (
+                                    <span style={{color: activeTab === 'orders' ? '#e67e22' : '#ccc'}}>
+                                        {new Date(o.estimated_delivery_date).toLocaleDateString()}
+                                    </span>
+                                ) : '--'}
+                            </td>
+                            
+                            {/* COLUMNA TOTAL MODIFICADA */}
+                            <td style={tdStyle}>
+                                {discount > 0 ? (
+                                    <div style={{display:'flex', flexDirection:'column', alignItems:'flex-start'}}>
+                                        <span style={{textDecoration:'line-through', color:'#666', fontSize:'11px'}}>
+                                            Base: {formatMoney(basePrice)}
+                                        </span>
+                                        <span style={{color:'white', fontWeight:'bold'}}>
+                                            {formatMoney(finalPrice)} 
+                                            <span style={{color:'#e67e22', fontSize:'11px', marginLeft:'5px'}}>({discount}%)</span>
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <span style={{fontWeight:'bold'}}>{formatMoney(finalPrice)}</span>
+                                )}
+                            </td>
+
                             <td style={tdStyle}>
                                 <button onClick={() => navigate(`/admin/order/${o.id}`)} style={{background:'#333', color:'white', border:'1px solid #555', padding:'5px 10px', borderRadius:'4px', marginRight:'5px'}}>👁️</button>
                                 <button onClick={() => handleDeleteOrder(o.id)} style={{background:'none', border:'none', color:'#666'}}>🗑️</button>
@@ -188,13 +212,10 @@ export const CrmDashboard = () => {
              </div>
           )}
 
-          {/* TABLA CLIENTES */}
           {activeTab === 'clients' && (
             <div>
                 <div style={{marginBottom:'15px', textAlign:'right'}}>
-                    <button onClick={() => setShowCreateModal(true)} style={{background:'#3b82f6', color:'white', border:'none', padding:'10px 20px', borderRadius:'6px', fontWeight:'bold', cursor:'pointer'}}>
-                        + Nuevo Cliente (Manual)
-                    </button>
+                    <button onClick={() => setShowCreateModal(true)} style={{background:'#3b82f6', color:'white', border:'none', padding:'10px 20px', borderRadius:'6px', fontWeight:'bold', cursor:'pointer'}}>+ Nuevo Cliente</button>
                 </div>
                 <table style={tableStyle}>
                 <thead>
@@ -209,9 +230,7 @@ export const CrmDashboard = () => {
                 <tbody>
                     {clients.map(c => (
                     <tr key={c.id}>
-                        <td style={tdStyle}>
-                            {c.is_approved ? <span title="Activo">✅</span> : <button onClick={() => handleApproveClient(c.id)} style={{background:'#e67e22', color:'white', border:'none', padding:'4px 8px', borderRadius:'4px', cursor:'pointer'}}>Aprobar</button>}
-                        </td>
+                        <td style={tdStyle}>{c.is_approved ? <span title="Activo">✅</span> : <button onClick={() => handleApproveClient(c.id)} style={{background:'#e67e22', color:'white', border:'none', padding:'4px 8px', borderRadius:'4px', cursor:'pointer'}}>Aprobar</button>}</td>
                         <td style={{...tdStyle, fontWeight:'bold'}}>{c.company_name || '---'}</td>
                         <td style={tdStyle}>{c.email}</td>
                         <td style={{...tdStyle, color:'#2ecc71', fontWeight:'bold'}}>{c.discount_rate}%</td>
@@ -228,24 +247,19 @@ export const CrmDashboard = () => {
         </>
       )}
 
-      {/* MODAL ALTA MANUAL */}
       {showCreateModal && (
-        <div style={modalOverlayStyle}>
-            <div style={modalContentStyle}>
+        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.7)', display:'flex', justifyContent:'center', alignItems:'center', zIndex:9999}}>
+            <div style={{background:'#1e1e1e', padding:'30px', borderRadius:'12px', width:'400px', border:'1px solid #444'}}>
                 <h3 style={{marginTop:0, color:'white'}}>Dar de Alta Cliente</h3>
-                <p style={{color:'#888', fontSize:'13px', marginBottom:'20px'}}>
-                    Introduce los datos para pre-aprobar al cliente. Cuando se registre con este email, tendrá acceso inmediato y estos datos cargados.
-                </p>
-                <input type="email" placeholder="Email (Obligatorio)" style={modalInputStyle} value={newClientData.email} onChange={e => setNewClientData({...newClientData, email: e.target.value})} />
-                <input type="text" placeholder="Nombre Empresa" style={modalInputStyle} value={newClientData.company_name} onChange={e => setNewClientData({...newClientData, company_name: e.target.value})} />
-                <input type="text" placeholder="Persona de Contacto" style={modalInputStyle} value={newClientData.full_name} onChange={e => setNewClientData({...newClientData, full_name: e.target.value})} />
-                <input type="text" placeholder="Teléfono" style={modalInputStyle} value={newClientData.phone} onChange={e => setNewClientData({...newClientData, phone: e.target.value})} />
-                <label style={{display:'block', color:'#aaa', marginBottom:'5px', fontSize:'12px'}}>Descuento Comercial (%)</label>
-                <input type="number" placeholder="0" style={modalInputStyle} value={newClientData.discount_rate} onChange={e => setNewClientData({...newClientData, discount_rate: parseFloat(e.target.value)})} />
+                <input type="email" placeholder="Email (Obligatorio)" style={{width:'100%', padding:'10px', marginBottom:'15px', background:'#252525', border:'1px solid #444', color:'white', borderRadius:'6px'}} value={newClientData.email} onChange={e => setNewClientData({...newClientData, email: e.target.value})} />
+                <input type="text" placeholder="Nombre Empresa" style={{width:'100%', padding:'10px', marginBottom:'15px', background:'#252525', border:'1px solid #444', color:'white', borderRadius:'6px'}} value={newClientData.company_name} onChange={e => setNewClientData({...newClientData, company_name: e.target.value})} />
+                <input type="text" placeholder="Contacto" style={{width:'100%', padding:'10px', marginBottom:'15px', background:'#252525', border:'1px solid #444', color:'white', borderRadius:'6px'}} value={newClientData.full_name} onChange={e => setNewClientData({...newClientData, full_name: e.target.value})} />
+                <input type="text" placeholder="Teléfono" style={{width:'100%', padding:'10px', marginBottom:'15px', background:'#252525', border:'1px solid #444', color:'white', borderRadius:'6px'}} value={newClientData.phone} onChange={e => setNewClientData({...newClientData, phone: e.target.value})} />
+                <input type="number" placeholder="Descuento %" style={{width:'100%', padding:'10px', marginBottom:'15px', background:'#252525', border:'1px solid #444', color:'white', borderRadius:'6px'}} value={newClientData.discount_rate} onChange={e => setNewClientData({...newClientData, discount_rate: parseFloat(e.target.value)})} />
                 
-                <div style={{display:'flex', justifyContent:'flex-end', gap:'10px', marginTop:'10px'}}>
+                <div style={{display:'flex', justifyContent:'flex-end', gap:'10px'}}>
                     <button onClick={() => setShowCreateModal(false)} style={{background:'transparent', color:'#888', border:'none', cursor:'pointer'}}>Cancelar</button>
-                    <button onClick={handleCreateClient} style={{background:'#3b82f6', color:'white', border:'none', padding:'10px 20px', borderRadius:'6px', fontWeight:'bold', cursor:'pointer'}}>Crear Pre-Ficha</button>
+                    <button onClick={handleCreateClient} style={{background:'#3b82f6', color:'white', border:'none', padding:'10px 20px', borderRadius:'6px', fontWeight:'bold', cursor:'pointer'}}>Crear</button>
                 </div>
             </div>
         </div>
