@@ -41,8 +41,9 @@ export const CrmDashboard = () => {
         const { data } = await supabase.from('profiles').select('*, is_approved').order('created_at', { ascending: false });
         setClients(data || []);
       } else {
+        // CORRECCIÓN: Añadido 'discount_rate' en el select de profiles
         let query = supabase.from('orders')
-            .select(`*, profiles(company_name, email), projects(name), order_messages(created_at, profiles(role))`)
+            .select(`*, profiles(company_name, email, discount_rate), projects(name), order_messages(created_at, profiles(role))`)
             .order('created_at', { ascending: false });
         
         if (activeTab === 'budgets') query = query.in('status', BUDGET_STATUSES);
@@ -128,13 +129,24 @@ export const CrmDashboard = () => {
                       <th style={thStyle}>Estado</th>
                       <th style={thStyle}>F. Solicitud</th>
                       <th style={thStyle}>F. Entrega Est.</th>
-                      <th style={{...thStyle, borderLeft:'1px solid #444'}}>Total</th>
+                      <th style={{...thStyle, borderLeft:'1px solid #444'}}>Total / Oferta</th>
                       <th style={thStyle}>Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
                     {dataList.map(o => {
                         const alert = getAlertStatus(o);
+                        // --- CÁLCULO VISUAL DE DESCUENTOS ---
+                        const finalPrice = o.total_price || 0;
+                        const discount = o.profiles?.discount_rate || 0;
+                        let basePrice = finalPrice;
+                        
+                        // Si hay descuento, calculamos el precio base original inverso
+                        // Precio Final = Base * (1 - Dto/100)  =>  Base = Precio Final / (1 - Dto/100)
+                        if (discount > 0 && finalPrice > 0) {
+                            basePrice = finalPrice / (1 - (discount / 100));
+                        }
+
                         return (
                         <tr key={o.id}>
                             <td style={{...tdStyle, textAlign:'center'}} title={alert?.text}>{alert ? alert.icon : '⚪'}</td>
@@ -170,7 +182,24 @@ export const CrmDashboard = () => {
                                     </span>
                                 ) : '--'}
                             </td>
-                            <td style={{...tdStyle, fontWeight:'bold'}}>{formatMoney(o.total_price)}</td>
+                            
+                            {/* COLUMNA TOTAL MODIFICADA */}
+                            <td style={tdStyle}>
+                                {discount > 0 ? (
+                                    <div style={{display:'flex', flexDirection:'column', alignItems:'flex-start'}}>
+                                        <span style={{textDecoration:'line-through', color:'#666', fontSize:'11px'}}>
+                                            Base: {formatMoney(basePrice)}
+                                        </span>
+                                        <span style={{color:'white', fontWeight:'bold'}}>
+                                            {formatMoney(finalPrice)} 
+                                            <span style={{color:'#e67e22', fontSize:'11px', marginLeft:'5px'}}>({discount}%)</span>
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <span style={{fontWeight:'bold'}}>{formatMoney(finalPrice)}</span>
+                                )}
+                            </td>
+
                             <td style={tdStyle}>
                                 <button onClick={() => navigate(`/admin/order/${o.id}`)} style={{background:'#333', color:'white', border:'1px solid #555', padding:'5px 10px', borderRadius:'4px', marginRight:'5px'}}>👁️</button>
                                 <button onClick={() => handleDeleteOrder(o.id)} style={{background:'none', border:'none', color:'#666'}}>🗑️</button>

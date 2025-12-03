@@ -27,16 +27,16 @@ export const AdminOrderDetailPage = () => {
   const [order, setOrder] = useState<any>(null);
   
   // Items
-  const [items3D, setItems3D] = useState<any[]>([]); // Items del diseño 3D
-  const [manualItems, setManualItems] = useState<any[]>([]); // Extras añadidos
-  const [calculatedBasePrice, setCalculatedBasePrice] = useState(0); // Suma total real
+  const [items3D, setItems3D] = useState<any[]>([]); 
+  const [manualItems, setManualItems] = useState<any[]>([]); 
+  const [calculatedBasePrice, setCalculatedBasePrice] = useState(0); 
 
   // Chat y Datos
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [newDate, setNewDate] = useState('');
+  const [newDate, setNewDate] = useState(''); 
   
-  // OBSERVACIONES (Historial)
+  // OBSERVACIONES
   const [observations, setObservations] = useState<any[]>([]);
   const [newObservation, setNewObservation] = useState('');
 
@@ -44,7 +44,7 @@ export const AdminOrderDetailPage = () => {
   const [attachments, setAttachments] = useState<any[]>([]);
   const [uploading, setUploading] = useState(false);
 
-  // UI Admin Extras
+  // UI
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [parametricModal, setParametricModal] = useState<{isOpen: boolean, item: any | null, value: string}>({ isOpen: false, item: null, value: '' });
 
@@ -67,29 +67,35 @@ export const AdminOrderDetailPage = () => {
         setOrder(o);
         if (o.estimated_delivery_date) {
             setNewDate(new Date(o.estimated_delivery_date).toISOString().slice(0, 16));
+        } else {
+            setNewDate('');
         }
         
-        // 1.1 Procesar Items 3D (Solo lectura, vienen del proyecto)
+        // 1.1 Procesar Items 3D (Cálculo corregido: Sumar el BOM visual)
         let total3D = 0;
         let processed3DItems: any[] = [];
+        
+        const raw3DItems = o.projects?.data?.items || o.projects?.items || [];
 
-        if (o.projects && o.projects.items) {
-            const itemsWithRealPrices = o.projects.items.map((item: any) => ({
+        if (raw3DItems.length > 0) {
+            const itemsWithRealPrices = raw3DItems.map((item: any) => ({
                 ...item,
                 price: PriceCalculator.getItemPrice(item) 
             }));
             // Agrupamos para visualización limpia (BOM)
             processed3DItems = generateBillOfMaterials(itemsWithRealPrices);
-            total3D = PriceCalculator.calculateProjectTotal(itemsWithRealPrices);
+            
+            // CORRECCIÓN CLAVE: Sumamos sobre las líneas procesadas para que coincida con la tabla visual
+            total3D = processed3DItems.reduce((acc, line) => acc + line.totalPrice, 0);
         }
         setItems3D(processed3DItems);
 
-        // 1.2 Cargar Items Manuales (Extras añadidos por cliente o admin)
+        // 1.2 Cargar Items Manuales
         const { data: mItems } = await supabase.from('order_items').select('*').eq('order_id', id);
         const manual = mItems || [];
         setManualItems(manual);
 
-        // 1.3 Calcular Total Base Real (Suma de todo sin descuentos)
+        // 1.3 Calcular Total Base Real (3D + Manuales)
         const totalManual = manual.reduce((acc: number, item: any) => acc + item.total_price, 0);
         setCalculatedBasePrice(total3D + totalManual);
     }
@@ -111,13 +117,15 @@ export const AdminOrderDetailPage = () => {
     setObservations(obs || []);
   };
 
-  // --- LÓGICA DE ACTUALIZACIÓN PEDIDO ---
+  // --- ACTUALIZAR PEDIDO ---
   const handleUpdateOrder = async () => {
     if (!order) return;
+    const dateToSave = newDate ? new Date(newDate).toISOString() : null;
+
     const { error } = await supabase.from('orders').update({
         status: order.status,
         custom_name: order.custom_name, 
-        estimated_delivery_date: new Date(newDate).toISOString(),
+        estimated_delivery_date: dateToSave,
         total_price: order.total_price 
     }).eq('id', id);
 
@@ -128,12 +136,20 @@ export const AdminOrderDetailPage = () => {
   const handleStatusChangeRaw = (e: React.ChangeEvent<HTMLSelectElement>) => {
       const status = e.target.value;
       const now = new Date();
-      let calculatedDate = new Date(newDate || now);
+      let calculatedDateStr = newDate;
 
-      if (status === 'presupuestado') calculatedDate = new Date(now.getTime() + (48 * 60 * 60 * 1000));
-      else if (status === 'pedido') calculatedDate = new Date(now.getTime() + (6 * 7 * 24 * 60 * 60 * 1000));
+      if (status === 'presupuestado') {
+          const d = new Date(now.getTime() + (48 * 60 * 60 * 1000));
+          d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+          calculatedDateStr = d.toISOString().slice(0, 16);
+      } 
+      else if (status === 'pedido') {
+          const d = new Date(now.getTime() + (42 * 24 * 60 * 60 * 1000));
+          d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+          calculatedDateStr = d.toISOString().slice(0, 16);
+      }
 
-      setNewDate(calculatedDate.toISOString().slice(0, 16));
+      setNewDate(calculatedDateStr);
       setOrder({...order, status: status});
   };
 
@@ -146,31 +162,26 @@ export const AdminOrderDetailPage = () => {
       }
   };
 
-  // --- OBSERVACIONES (ADMIN) ---
+  // Función rápida para copiar el precio base al precio final si es 0
+  const copyBasePrice = () => {
+      setOrder({ ...order, total_price: calculatedBasePrice });
+  };
+
+  // --- OBSERVACIONES ---
   const handleAddObservation = async () => {
     if(!newObservation.trim()) return;
     const { data: { user } } = await supabase.auth.getUser();
-    
     const { error } = await supabase.from('order_observations').insert([{
-        order_id: id,
-        user_id: user?.id,
-        content: newObservation
+        order_id: id, user_id: user?.id, content: newObservation
     }]);
-    
     if(error) alert("Error: " + error.message);
-    else {
-        setNewObservation('');
-        loadData();
-    }
+    else { setNewObservation(''); loadData(); }
   };
 
-  // --- LÓGICA DE ITEMS MANUALES (ADMIN) ---
+  // --- ITEMS MANUALES ---
   const handleAddItem = (item: any) => {
-      if (item.type === 'fence' || item.type === 'floor') {
-          setParametricModal({ isOpen: true, item: item, value: '' });
-      } else {
-          saveManualItem(item.id, item.name, 1, item.price, '1 ud');
-      }
+      if (item.type === 'fence' || item.type === 'floor') setParametricModal({ isOpen: true, item: item, value: '' });
+      else saveManualItem(item.id, item.name, 1, item.price, '1 ud');
   };
 
   const confirmParametricItem = () => {
@@ -215,19 +226,14 @@ export const AdminOrderDetailPage = () => {
           const fileExt = file.name.split('.').pop();
           const fileName = `${Math.random()}.${fileExt}`;
           const filePath = `${id}/${fileName}`;
-          
           await supabase.storage.from('attachments').upload(filePath, file);
           const { data: { publicUrl } } = supabase.storage.from('attachments').getPublicUrl(filePath);
-          
           await supabase.from('order_attachments').insert([{
               order_id: id, file_name: file.name, file_url: publicUrl, uploader_id: (await supabase.auth.getUser()).data.user?.id
           }]);
           loadData();
-      } catch (error: any) { 
-          alert('Error al subir: ' + error.message); 
-      } finally { 
-          setUploading(false); 
-      }
+      } catch (error: any) { alert('Error: ' + error.message); } 
+      finally { setUploading(false); }
   };
 
   const handleDeleteAttachment = async (attId: string) => {
@@ -271,8 +277,8 @@ export const AdminOrderDetailPage = () => {
                         <label style={labelStyle}>Estado</label>
                         <select value={order.status} onChange={handleStatusChangeRaw} style={inputStyle}>
                             <option value="pendiente">🟠 Pendiente</option>
-                            <option value="presupuestado">🟣 Presupuestado</option>
-                            <option value="pedido">🔵 Pedido Aceptado</option>
+                            <option value="presupuestado">🟣 Presupuestado (Auto: +48h)</option>
+                            <option value="pedido">🔵 Pedido Aceptado (Auto: +6sem)</option>
                             <option value="fabricacion">🟠 En Fabricación</option>
                             <option value="entregado">🟢 Entregado</option>
                             <option value="rechazado">🔴 Rechazado</option>
@@ -285,26 +291,54 @@ export const AdminOrderDetailPage = () => {
                     </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                    <div>
-                        <label style={labelStyle}>Precio Final Oferta (€)</label>
-                        <div style={{display:'flex', gap:'10px'}}>
-                            <input type="number" step="0.01" value={order.total_price} onChange={(e) => setOrder({...order, total_price: parseFloat(e.target.value)})} style={inputStyle} />
-                            <button onClick={applyClientDiscount} style={{background:'#e67e22', color:'white', border:'none', borderRadius:'6px', padding:'0 15px', height:'38px', cursor:'pointer'}}>%</button>
+                {/* --- SECCIÓN PRECIOS CORREGIDA --- */}
+                <div style={{background:'rgba(59, 130, 246, 0.1)', padding:'15px', borderRadius:'8px', border:'1px solid rgba(59, 130, 246, 0.3)'}}>
+                    
+                    {/* Fila 1: Precio Tarifa (Sumatorio real) */}
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px', borderBottom:'1px solid rgba(255,255,255,0.1)', paddingBottom:'10px'}}>
+                        <span style={{color:'#aaa', fontSize:'13px'}}>Total Tarifa (Suma Items):</span>
+                        <span style={{fontSize:'16px', fontWeight:'bold', color:'white'}}>{formatMoney(calculatedBasePrice)}</span>
+                    </div>
+
+                    {/* Fila 2: Configuración Precio Oferta */}
+                    <div style={{display:'grid', gridTemplateColumns:'1fr auto auto', gap:'10px', alignItems:'end'}}>
+                        <div>
+                            <label style={{...labelStyle, color:'#3b82f6', fontWeight:'bold'}}>Precio Final Oferta (€)</label>
+                            <input 
+                                type="number" 
+                                step="0.01" 
+                                value={order.total_price} 
+                                onChange={(e) => setOrder({...order, total_price: parseFloat(e.target.value)})} 
+                                style={{...inputStyle, marginBottom:0, fontSize:'16px', fontWeight:'bold'}} 
+                            />
                         </div>
-                        <small style={{color:'#666'}}>Base Calculada (Tarifa): {formatMoney(calculatedBasePrice)}</small>
+                        <button 
+                            onClick={applyClientDiscount} 
+                            title={`Aplicar Descuento Cliente (${order.profiles?.discount_rate || 0}%)`}
+                            style={{background:'#e67e22', color:'white', border:'none', borderRadius:'6px', padding:'0 15px', height:'42px', cursor:'pointer', fontWeight:'bold'}}
+                        >
+                            % Dto
+                        </button>
+                        <button 
+                            onClick={copyBasePrice} 
+                            title="Copiar precio base a precio oferta"
+                            style={{background:'#333', color:'white', border:'1px solid #555', borderRadius:'6px', padding:'0 15px', height:'42px', cursor:'pointer'}}
+                        >
+                            Igualar ⬇
+                        </button>
                     </div>
-                    <div style={{display:'flex', alignItems:'center'}}>
-                         <button onClick={handleUpdateOrder} style={{width:'100%', background:'#27ae60', color:'white', padding:'12px', border:'none', borderRadius:'6px', cursor:'pointer', fontWeight:'bold'}}>💾 Guardar Cambios</button>
-                    </div>
+                </div>
+                
+                <div style={{marginTop:'20px', display:'flex', justifyContent:'flex-end'}}>
+                     <button onClick={handleUpdateOrder} style={{background:'#27ae60', color:'white', padding:'12px 30px', border:'none', borderRadius:'6px', cursor:'pointer', fontWeight:'bold', fontSize:'14px'}}>
+                        💾 Guardar Cambios
+                    </button>
                 </div>
             </div>
 
-            {/* OBSERVACIONES CRONOLÓGICAS */}
+            {/* OBSERVACIONES */}
             <div style={{...cardStyle, borderLeft:'4px solid #e67e22'}}>
                 <h4 style={{margin:'0 0 15px 0', color:'#e67e22'}}>📝 Historial de Observaciones</h4>
-                
-                {/* Lista */}
                 <div style={{maxHeight:'200px', overflowY:'auto', marginBottom:'15px', display:'flex', flexDirection:'column', gap:'10px'}}>
                     {observations.length === 0 && <p style={{color:'#666', fontStyle:'italic', fontSize:'13px'}}>No hay observaciones registradas.</p>}
                     {observations.map(obs => (
@@ -319,16 +353,8 @@ export const AdminOrderDetailPage = () => {
                         </div>
                     ))}
                 </div>
-
-                {/* Input */}
                 <div style={{display:'flex', gap:'10px'}}>
-                    <input 
-                        type="text" 
-                        value={newObservation}
-                        onChange={e => setNewObservation(e.target.value)}
-                        placeholder="Añadir nota interna o mensaje..."
-                        style={{flex:1, padding:'8px', background:'#252525', border:'1px solid #444', color:'white', borderRadius:'6px'}}
-                    />
+                    <input type="text" value={newObservation} onChange={e => setNewObservation(e.target.value)} placeholder="Añadir nota interna o mensaje..." style={{flex:1, padding:'8px', background:'#252525', border:'1px solid #444', color:'white', borderRadius:'6px'}} />
                     <button onClick={handleAddObservation} style={{background:'#e67e22', color:'white', border:'none', padding:'0 15px', borderRadius:'6px', cursor:'pointer'}}>Añadir</button>
                 </div>
             </div>
@@ -354,7 +380,6 @@ export const AdminOrderDetailPage = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {/* Items 3D */}
                             {items3D.map((line, idx) => (
                                 <tr key={`3d-${idx}`} style={{borderBottom:'1px solid #333'}}>
                                     <td style={{padding:'8px', color:'white'}}>
@@ -365,7 +390,6 @@ export const AdminOrderDetailPage = () => {
                                     <td style={{textAlign:'right', padding:'8px'}}><small style={{color:'#666'}}>Auto</small></td>
                                 </tr>
                             ))}
-                            {/* Items Manuales */}
                             {manualItems.map((item) => (
                                 <tr key={item.id} style={{borderBottom:'1px solid #333', background:'rgba(59, 130, 246, 0.1)'}}>
                                     <td style={{padding:'8px', color:'white'}}>
@@ -379,6 +403,13 @@ export const AdminOrderDetailPage = () => {
                                 </tr>
                             ))}
                         </tbody>
+                        <tfoot style={{background:'#2a2a2a', fontWeight:'bold'}}>
+                             <tr>
+                                <td colSpan={2} style={{padding:'10px', textAlign:'right', color:'#aaa'}}>SUMA TOTAL</td>
+                                <td style={{padding:'10px', textAlign:'right', color:'white'}}>{formatMoney(calculatedBasePrice)}</td>
+                                <td></td>
+                             </tr>
+                        </tfoot>
                     </table>
                 </div>
             </div>
@@ -427,12 +458,11 @@ export const AdminOrderDetailPage = () => {
 
       </div>
 
-      {/* MODALES DE CATALOGO (Mismo que en cliente) */}
       {isCatalogOpen && (
           <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.8)', display:'flex', justifyContent:'center', alignItems:'center', zIndex:999}}>
               <div style={{background:'#1e1e1e', width:'600px', maxHeight:'80vh', borderRadius:'12px', border:'1px solid #444', display:'flex', flexDirection:'column'}}>
                   <div style={{padding:'20px', borderBottom:'1px solid #333', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                      <h3 style={{margin:0, color:'white'}}>Añadir Extra (Admin)</h3>
+                      <h3 style={{margin:0, color:'white'}}>Añadir Extra</h3>
                       <button onClick={() => setIsCatalogOpen(false)} style={{background:'none', border:'none', color:'#888', fontSize:'20px'}}>✕</button>
                   </div>
                   <div style={{padding:'20px', overflowY:'auto', display:'grid', gridTemplateColumns:'1fr 1fr', gap:'15px'}}>
@@ -450,7 +480,7 @@ export const AdminOrderDetailPage = () => {
           <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.8)', display:'flex', justifyContent:'center', alignItems:'center', zIndex:1000}}>
               <div style={{background:'#1e1e1e', padding:'30px', borderRadius:'12px', width:'350px', border:'1px solid #444'}}>
                   <h3 style={{margin:'0 0 15px 0', color:'white'}}>{parametricModal.item?.name}</h3>
-                  <input type="number" autoFocus value={parametricModal.value} onChange={e => setParametricModal({...parametricModal, value: e.target.value})} placeholder="Cantidad (m o m2)" style={{width:'100%', padding:'10px', marginBottom:'20px'}}/>
+                  <input type="number" autoFocus value={parametricModal.value} onChange={e => setParametricModal({...parametricModal, value: e.target.value})} placeholder="Cantidad" style={{width:'100%', padding:'10px', marginBottom:'20px'}}/>
                   <div style={{display:'flex', gap:'10px', justifyContent:'flex-end'}}>
                       <button onClick={() => setParametricModal({isOpen:false, item:null, value:''})}>Cancelar</button>
                       <button onClick={confirmParametricItem}>Añadir</button>

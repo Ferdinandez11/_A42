@@ -5,7 +5,6 @@ import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 import { PriceCalculator, PRICES } from '../../../utils/PriceCalculator';
 import type { Order } from '../../../types/types';
 
-// DATA CATALOGO
 const CATALOG_ITEMS = [
     { id: 'bench_01', name: 'Banco Clásico', type: 'model', price: 150 },
     { id: 'swing_01', name: 'Columpio Doble', type: 'model', price: 1200 },
@@ -43,6 +42,7 @@ export const BudgetDetailPage = () => {
   
   // Nombres y Notas
   const [customName, setCustomName] = useState('');
+  
   // OBSERVACIONES (Historial)
   const [observations, setObservations] = useState<any[]>([]);
   const [newObservation, setNewObservation] = useState('');
@@ -72,10 +72,12 @@ export const BudgetDetailPage = () => {
     const { data: orderData } = await supabase.from('orders').select('*, projects(*), profiles(discount_rate)').eq('id', id).single();
     if (!orderData) { navigate('/portal'); return; }
     
-    // Items 3D
+    // Items 3D (Carga segura)
     let calculated3DItems: any[] = [];
-    if (orderData.projects && orderData.projects.data && orderData.projects.data.items) {
-        calculated3DItems = orderData.projects.data.items.map((item: any) => ({
+    const raw3DItems = orderData.projects?.data?.items || orderData.projects?.items || [];
+    
+    if (raw3DItems.length > 0) {
+        calculated3DItems = raw3DItems.map((item: any) => ({
             uuid: item.uuid,
             name: item.name || 'Elemento 3D',
             quantity: 1,
@@ -87,6 +89,7 @@ export const BudgetDetailPage = () => {
     setItems3D(calculated3DItems);
     setOrder(orderData as any);
     
+    // Cargar Nombre si existe
     if(orderData.custom_name) setCustomName(orderData.custom_name);
 
     // Items Manuales
@@ -106,7 +109,7 @@ export const BudgetDetailPage = () => {
         .from('order_observations')
         .select('*, profiles(full_name, role)')
         .eq('order_id', id)
-        .order('created_at', { ascending: false }); // Las más nuevas arriba
+        .order('created_at', { ascending: false }); 
     setObservations(obs || []);
 
     setLoading(false);
@@ -124,6 +127,7 @@ export const BudgetDetailPage = () => {
 
   // --- ACCIONES DATOS ---
   const handleSaveName = async () => {
+      // Guardado directo del nombre
       const { error } = await supabase.from('orders').update({ custom_name: customName }).eq('id', id);
       if(error) alert("Error: " + error.message);
       else alert("✅ Nombre guardado");
@@ -312,7 +316,7 @@ export const BudgetDetailPage = () => {
                             style={{flex:1, padding:'10px', background:'#252525', border:'1px solid #444', borderRadius:'6px', color:'white'}}
                         />
                         {(isPending || isDecisionTime) && (
-                            <button onClick={handleSaveName} style={{background:'#333', border:'1px solid #555', color:'white', borderRadius:'6px', padding:'0 15px', cursor:'pointer'}}>💾</button>
+                            <button onClick={handleSaveName} style={{background:'#333', border:'1px solid #555', color:'white', borderRadius:'6px', padding:'0 15px', cursor:'pointer'}} title="Guardar Nombre">💾</button>
                         )}
                     </div>
                 </div>

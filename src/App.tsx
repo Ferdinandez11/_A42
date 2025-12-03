@@ -12,6 +12,7 @@ import { ProfilePage } from './features/crm/pages/ProfilePage';
 import { BudgetDetailPage } from './features/crm/pages/BudgetDetailPage';
 import { AdminOrderDetailPage } from './features/crm/pages/AdminOrderDetailPage'; 
 import { AdminClientDetailPage } from './features/crm/pages/AdminClientDetailPage'; 
+import { AdminCalendarPage } from './features/crm/pages/AdminCalendarPage'; // <--- NUEVO IMPORT
 
 // --- ESTILOS ---
 const badgeStyle: React.CSSProperties = {
@@ -38,7 +39,8 @@ const EmployeeLayout = () => (
           <small style={{ color: '#666' }}>Modo Empleado</small>
         </div>
         <nav style={{ display: 'flex', flexDirection: 'column', padding: '15px', gap: '5px' }}>
-          <Link to="/admin/crm" style={{ ...navLinkStyle, color: '#fff', background: '#2a2a2a' }}>👥 CRM (Clientes)</Link>
+          <Link to="/admin/crm" style={{ ...navLinkStyle, color: '#fff', background: '#2a2a2a' }}>👥 CRM (Listado)</Link>
+          <Link to="/admin/calendar" style={navLinkStyle}>📅 Calendario Entregas</Link> {/* <--- NUEVO ENLACE */}
           <Link to="/admin/erp" style={navLinkStyle}>🏭 ERP (Fábrica)</Link>
           <Link to="/admin/purchases" style={navLinkStyle}>🛒 Compras</Link>
         </nav>
@@ -216,7 +218,7 @@ const ViewerPage = () => {
     checkUserRole();
   }, [setUser]);
 
-  // --- ESTE ES EL BLOQUE QUE FALTABA ---
+  // --- LOGICA DE CARGA URL ---
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const projectIdFromUrl = params.get('project_id');
@@ -268,6 +270,7 @@ function App() {
           <Route path="crm" element={<CrmDashboard />} />
           <Route path="order/:id" element={<AdminOrderDetailPage />} />
           <Route path="client/:id" element={<AdminClientDetailPage />} />
+          <Route path="calendar" element={<AdminCalendarPage />} /> {/* <--- NUEVA RUTA */}
           <Route path="erp" element={<h2 style={{color:'white', padding:'20px'}}>ERP en construcción</h2>} />
           <Route path="purchases" element={<h2 style={{color:'white', padding:'20px'}}>Compras en construcción</h2>} />
         </Route>
