@@ -1,6 +1,10 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { PriceCalculator } from './PriceCalculator';
+
+// Función auxiliar local para formatear dinero (Soluciona el error de PriceCalculator)
+const formatMoney = (amount: number) => {
+    return amount.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+};
 
 export const generateBudgetPDF = async (order: any, items3D: any[], manualItems: any[]) => {
   const doc = new jsPDF();
@@ -19,7 +23,7 @@ export const generateBudgetPDF = async (order: any, items3D: any[], manualItems:
       doc.text(`Proyecto: ${order.custom_name}`, 150, 38);
   }
 
-  // Datos de tu empresa (Hardcodeados o config)
+  // Datos de tu empresa
   doc.setFontSize(14);
   doc.setTextColor(0);
   doc.text("Mi Empresa S.L.", margin, 20);
@@ -47,24 +51,22 @@ export const generateBudgetPDF = async (order: any, items3D: any[], manualItems:
   doc.text(clientPhone, margin, 72);
 
   // --- IMAGEN DEL PROYECTO (Si existe) ---
-  let startY = 85;
+  const startY = 85;
   if (order.projects?.thumbnail_url) {
     try {
-        // Intentamos cargar la imagen (debe permitir CORS tu bucket de Supabase)
         const img = new Image();
         img.src = order.projects.thumbnail_url;
         img.crossOrigin = "Anonymous";
-        await new Promise((resolve) => { img.onload = resolve; img.onerror = resolve; }); // Esperar carga
-        
-        // Dibujar imagen (ajustando tamaño)
-        doc.addImage(img, 'JPEG', 120, 50, 60, 40); // x, y, w, h
+        await new Promise((resolve) => { img.onload = resolve; img.onerror = resolve; });
+        doc.addImage(img, 'JPEG', 120, 50, 60, 40); 
     } catch (e) {
-        console.warn("No se pudo cargar la imagen para el PDF", e);
+        console.warn("No se pudo cargar imagen PDF", e);
     }
   }
 
   // --- TABLA DE ITEMS ---
-  const tableRows = [];
+  // Solución al error de TypeScript: Definimos explícitamente que es un array de cualquier cosa
+  const tableRows: any[] = [];
 
   // 1. Items 3D
   items3D.forEach(item => {
@@ -72,7 +74,7 @@ export const generateBudgetPDF = async (order: any, items3D: any[], manualItems:
         item.name,
         'Diseño 3D',
         item.quantity,
-        PriceCalculator.formatMoney(item.unitPrice || item.price)
+        formatMoney(item.unitPrice || item.price) // Usamos la función local
     ]);
   });
 
@@ -82,7 +84,7 @@ export const generateBudgetPDF = async (order: any, items3D: any[], manualItems:
         item.name + (item.dimensions ? ` (${item.dimensions})` : ''),
         'Extra Manual',
         item.quantity,
-        PriceCalculator.formatMoney(item.total_price)
+        formatMoney(item.total_price) // Usamos la función local
     ]);
   });
 
@@ -94,15 +96,13 @@ export const generateBudgetPDF = async (order: any, items3D: any[], manualItems:
     theme: 'striped',
     headStyles: { fillColor: [41, 128, 185] },
     styles: { fontSize: 10 },
-    columnStyles: { 3: { halign: 'right' } } // Alinear precio a la derecha
+    columnStyles: { 3: { halign: 'right' } }
   });
 
   // --- TOTALES ---
   // @ts-ignore
   let finalY = doc.lastAutoTable.finalY + 10;
   
-  // Recalcular base para mostrar en PDF
-  // Ojo: Usamos los valores actuales del pedido que se van a guardar
   const finalPrice = order.total_price;
   const discount = order.profiles?.discount_rate || 0;
   let basePrice = finalPrice;
@@ -110,23 +110,20 @@ export const generateBudgetPDF = async (order: any, items3D: any[], manualItems:
   if (discount > 0 && finalPrice > 0) {
       basePrice = finalPrice / (1 - (discount / 100));
   } else if (finalPrice === 0) {
-      // Si por alguna razón es 0, sumamos los items
-      // (Lógica simplificada para el PDF)
       basePrice = items3D.reduce((a,b) => a + b.totalPrice, 0) + manualItems.reduce((a,b) => a + b.total_price, 0);
   }
 
   doc.setFontSize(10);
   doc.setTextColor(0);
   
-  // Alinear a la derecha (aprox x=140)
   doc.text(`Subtotal:`, 140, finalY);
-  doc.text(PriceCalculator.formatMoney(basePrice), 190, finalY, { align: 'right' });
+  doc.text(formatMoney(basePrice), 190, finalY, { align: 'right' });
   
   if (discount > 0) {
       finalY += 7;
-      doc.setTextColor(230, 126, 34); // Naranja
+      doc.setTextColor(230, 126, 34);
       doc.text(`Descuento Cliente (${discount}%):`, 140, finalY);
-      doc.text(`-${PriceCalculator.formatMoney(basePrice - finalPrice)}`, 190, finalY, { align: 'right' });
+      doc.text(`-${formatMoney(basePrice - finalPrice)}`, 190, finalY, { align: 'right' });
   }
 
   finalY += 10;
@@ -134,15 +131,14 @@ export const generateBudgetPDF = async (order: any, items3D: any[], manualItems:
   doc.setTextColor(0);
   doc.setFont('helvetica', 'bold');
   doc.text(`TOTAL:`, 140, finalY);
-  doc.setTextColor(41, 128, 185); // Azul
-  doc.text(PriceCalculator.formatMoney(finalPrice), 190, finalY, { align: 'right' });
+  doc.setTextColor(41, 128, 185);
+  doc.text(formatMoney(finalPrice), 190, finalY, { align: 'right' });
 
-  // --- PIE DE PAGINA ---
+  // --- PIE ---
   doc.setFontSize(8);
   doc.setTextColor(150);
   doc.setFont('helvetica', 'normal');
   doc.text("Este presupuesto tiene una validez de 15 días.", margin, 280);
 
-  // Devolver como Blob para subir a Supabase
   return doc.output('blob');
 };
