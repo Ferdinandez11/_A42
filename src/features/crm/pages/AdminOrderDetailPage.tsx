@@ -4,7 +4,6 @@ import { supabase } from '../../../lib/supabase';
 import { PriceCalculator, PRICES } from '../../../utils/PriceCalculator';
 import { generateBillOfMaterials } from '../../../utils/budgetUtils';
 
-// --- DATA CATALOGO SIMULADA (Para que el admin pueda añadir) ---
 const CATALOG_ITEMS = [
     { id: 'bench_01', name: 'Banco Clásico', type: 'model', price: 150 },
     { id: 'swing_01', name: 'Columpio Doble', type: 'model', price: 1200 },
@@ -13,7 +12,6 @@ const CATALOG_ITEMS = [
     { id: 'floor_rubber', name: 'Suelo de Caucho', type: 'floor', price: PRICES.FLOOR_M2 },
 ];
 
-// --- ESTILOS ---
 const containerStyle = { display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px', height: '100%', color: '#e0e0e0', fontFamily: 'sans-serif' };
 const cardStyle = { background: '#1e1e1e', borderRadius: '12px', border: '1px solid #333', padding: '20px', display: 'flex', flexDirection: 'column' as const, marginBottom: '20px' };
 const inputStyle = { background: '#252525', border: '1px solid #444', color: 'white', padding: '10px', borderRadius: '6px', width: '100%', marginBottom: '15px' };
@@ -38,6 +36,10 @@ export const AdminOrderDetailPage = () => {
   const [newMessage, setNewMessage] = useState('');
   const [newDate, setNewDate] = useState('');
   
+  // OBSERVACIONES (Historial)
+  const [observations, setObservations] = useState<any[]>([]);
+  const [newObservation, setNewObservation] = useState('');
+
   // Archivos
   const [attachments, setAttachments] = useState<any[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -99,6 +101,14 @@ export const AdminOrderDetailPage = () => {
     // 3. Adjuntos
     const { data: att } = await supabase.from('order_attachments').select('*').eq('order_id', id);
     setAttachments(att || []);
+
+    // 4. Observaciones
+    const { data: obs } = await supabase
+        .from('order_observations')
+        .select('*, profiles(full_name, role)')
+        .eq('order_id', id)
+        .order('created_at', { ascending: false });
+    setObservations(obs || []);
   };
 
   // --- LÓGICA DE ACTUALIZACIÓN PEDIDO ---
@@ -106,7 +116,7 @@ export const AdminOrderDetailPage = () => {
     if (!order) return;
     const { error } = await supabase.from('orders').update({
         status: order.status,
-        custom_name: order.custom_name, // Guardar nombre personalizado
+        custom_name: order.custom_name, 
         estimated_delivery_date: new Date(newDate).toISOString(),
         total_price: order.total_price 
     }).eq('id', id);
@@ -134,6 +144,24 @@ export const AdminOrderDetailPage = () => {
       if(confirm(`Base: ${formatMoney(calculatedBasePrice)}\nDto (${discount}%): -${formatMoney(discountAmount)}\n\nTotal: ${formatMoney(finalPrice)}`)) {
           setOrder({ ...order, total_price: finalPrice }); 
       }
+  };
+
+  // --- OBSERVACIONES (ADMIN) ---
+  const handleAddObservation = async () => {
+    if(!newObservation.trim()) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    const { error } = await supabase.from('order_observations').insert([{
+        order_id: id,
+        user_id: user?.id,
+        content: newObservation
+    }]);
+    
+    if(error) alert("Error: " + error.message);
+    else {
+        setNewObservation('');
+        loadData();
+    }
   };
 
   // --- LÓGICA DE ITEMS MANUALES (ADMIN) ---
@@ -179,7 +207,6 @@ export const AdminOrderDetailPage = () => {
     setNewMessage(''); loadData();
   };
 
-  // --- FALTABA ESTA FUNCIÓN DE SUBIDA PARA EL ADMIN ---
   const handleFileUpload = async (e: any) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -189,11 +216,9 @@ export const AdminOrderDetailPage = () => {
           const fileName = `${Math.random()}.${fileExt}`;
           const filePath = `${id}/${fileName}`;
           
-          // Subir al Bucket
           await supabase.storage.from('attachments').upload(filePath, file);
           const { data: { publicUrl } } = supabase.storage.from('attachments').getPublicUrl(filePath);
           
-          // Guardar referencia
           await supabase.from('order_attachments').insert([{
               order_id: id, file_name: file.name, file_url: publicUrl, uploader_id: (await supabase.auth.getUser()).data.user?.id
           }]);
@@ -275,17 +300,40 @@ export const AdminOrderDetailPage = () => {
                 </div>
             </div>
 
-            {/* OBSERVACIONES DEL CLIENTE (VISIBLES) */}
+            {/* OBSERVACIONES CRONOLÓGICAS */}
             <div style={{...cardStyle, borderLeft:'4px solid #e67e22'}}>
-                <h4 style={{margin:'0 0 10px 0', color:'#e67e22'}}>📝 Observaciones del Cliente</h4>
-                {order.client_notes ? (
-                    <p style={{whiteSpace:'pre-wrap', margin:0, color:'#ddd', fontSize:'14px', background:'#252525', padding:'10px', borderRadius:'6px'}}>{order.client_notes}</p>
-                ) : (
-                    <p style={{color:'#666', fontStyle:'italic'}}>Sin observaciones registradas.</p>
-                )}
+                <h4 style={{margin:'0 0 15px 0', color:'#e67e22'}}>📝 Historial de Observaciones</h4>
+                
+                {/* Lista */}
+                <div style={{maxHeight:'200px', overflowY:'auto', marginBottom:'15px', display:'flex', flexDirection:'column', gap:'10px'}}>
+                    {observations.length === 0 && <p style={{color:'#666', fontStyle:'italic', fontSize:'13px'}}>No hay observaciones registradas.</p>}
+                    {observations.map(obs => (
+                        <div key={obs.id} style={{background:'#252525', padding:'10px', borderRadius:'6px', borderLeft:`3px solid ${obs.profiles?.role === 'admin' ? '#e67e22' : '#3b82f6'}`}}>
+                            <div style={{display:'flex', justifyContent:'space-between', marginBottom:'4px'}}>
+                                <span style={{fontWeight:'bold', fontSize:'12px', color:'white'}}>
+                                    {obs.profiles?.role === 'admin' ? '🏢 Tú (Admin)' : '👤 Cliente'}
+                                </span>
+                                <span style={{fontSize:'11px', color:'#888'}}>{new Date(obs.created_at).toLocaleString()}</span>
+                            </div>
+                            <p style={{margin:0, fontSize:'13px', color:'#ddd', whiteSpace:'pre-wrap'}}>{obs.content}</p>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Input */}
+                <div style={{display:'flex', gap:'10px'}}>
+                    <input 
+                        type="text" 
+                        value={newObservation}
+                        onChange={e => setNewObservation(e.target.value)}
+                        placeholder="Añadir nota interna o mensaje..."
+                        style={{flex:1, padding:'8px', background:'#252525', border:'1px solid #444', color:'white', borderRadius:'6px'}}
+                    />
+                    <button onClick={handleAddObservation} style={{background:'#e67e22', color:'white', border:'none', padding:'0 15px', borderRadius:'6px', cursor:'pointer'}}>Añadir</button>
+                </div>
             </div>
 
-            {/* DESGLOSE DE MATERIALES (VISIBLES Y EDITABLES) */}
+            {/* DESGLOSE DE MATERIALES */}
             <div style={cardStyle}>
                 <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'15px'}}>
                     <h3 style={{margin:0, color:'white'}}>📋 Desglose Materiales</h3>
@@ -335,7 +383,7 @@ export const AdminOrderDetailPage = () => {
                 </div>
             </div>
 
-            {/* ARCHIVOS - AHORA CON BOTÓN DE SUBIDA */}
+            {/* ARCHIVOS */}
             <div style={cardStyle}>
                 <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px'}}>
                     <h3 style={{margin:0, color:'white'}}>📎 Archivos Adjuntos</h3>

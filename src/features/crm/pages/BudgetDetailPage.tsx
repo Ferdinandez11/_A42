@@ -43,8 +43,9 @@ export const BudgetDetailPage = () => {
   
   // Nombres y Notas
   const [customName, setCustomName] = useState('');
-  const [clientNotes, setClientNotes] = useState('');
-  const [savingNotes, setSavingNotes] = useState(false);
+  // OBSERVACIONES (Historial)
+  const [observations, setObservations] = useState<any[]>([]);
+  const [newObservation, setNewObservation] = useState('');
   
   // Archivos
   const [attachments, setAttachments] = useState<any[]>([]);
@@ -86,8 +87,6 @@ export const BudgetDetailPage = () => {
     setItems3D(calculated3DItems);
     setOrder(orderData as any);
     
-    // Inicializar campos de texto
-    if(orderData.client_notes) setClientNotes(orderData.client_notes);
     if(orderData.custom_name) setCustomName(orderData.custom_name);
 
     // Items Manuales
@@ -102,6 +101,14 @@ export const BudgetDetailPage = () => {
     const { data: att } = await supabase.from('order_attachments').select('*').eq('order_id', id);
     setAttachments(att || []);
 
+    // Cargar Historial Observaciones
+    const { data: obs } = await supabase
+        .from('order_observations')
+        .select('*, profiles(full_name, role)')
+        .eq('order_id', id)
+        .order('created_at', { ascending: false }); // Las más nuevas arriba
+    setObservations(obs || []);
+
     setLoading(false);
   };
 
@@ -115,17 +122,28 @@ export const BudgetDetailPage = () => {
   };
   const totals = calculateTotal();
 
-  // --- ACCIONES DATOS (Nombre y Notas) ---
-  const handleSaveInfo = async () => {
-      setSavingNotes(true);
-      const { error } = await supabase.from('orders').update({ 
-          client_notes: clientNotes,
-          custom_name: customName // Guardamos el nombre personalizado
-      }).eq('id', id);
+  // --- ACCIONES DATOS ---
+  const handleSaveName = async () => {
+      const { error } = await supabase.from('orders').update({ custom_name: customName }).eq('id', id);
+      if(error) alert("Error: " + error.message);
+      else alert("✅ Nombre guardado");
+  };
+
+  const handleAddObservation = async () => {
+      if(!newObservation.trim()) return;
+      const { data: { user } } = await supabase.auth.getUser();
       
-      setSavingNotes(false);
-      if(error) alert("Error al guardar: " + error.message);
-      else alert("✅ Información guardada correctamente");
+      const { error } = await supabase.from('order_observations').insert([{
+          order_id: id,
+          user_id: user?.id,
+          content: newObservation
+      }]);
+      
+      if(error) alert("Error: " + error.message);
+      else {
+          setNewObservation('');
+          loadOrderData();
+      }
   };
 
   // --- ACCIONES ITEMS ---
@@ -284,14 +302,19 @@ export const BudgetDetailPage = () => {
                 {/* CAMPO NOMBRE PERSONALIZADO */}
                 <div style={{marginTop:'15px'}}>
                     <label style={{color:'#aaa', fontSize:'12px', display:'block', marginBottom:'5px'}}>Nombre del Proyecto / Referencia Personal:</label>
-                    <input 
-                        type="text" 
-                        value={customName}
-                        onChange={e => setCustomName(e.target.value)}
-                        placeholder="Ej: Reforma Parque Infantil Comunidad..."
-                        disabled={!isPending && !isDecisionTime}
-                        style={{width:'100%', padding:'10px', background:'#252525', border:'1px solid #444', borderRadius:'6px', color:'white'}}
-                    />
+                    <div style={{display:'flex', gap:'10px'}}>
+                        <input 
+                            type="text" 
+                            value={customName}
+                            onChange={e => setCustomName(e.target.value)}
+                            placeholder="Ej: Reforma Parque Infantil Comunidad..."
+                            disabled={!isPending && !isDecisionTime}
+                            style={{flex:1, padding:'10px', background:'#252525', border:'1px solid #444', borderRadius:'6px', color:'white'}}
+                        />
+                        {(isPending || isDecisionTime) && (
+                            <button onClick={handleSaveName} style={{background:'#333', border:'1px solid #555', color:'white', borderRadius:'6px', padding:'0 15px', cursor:'pointer'}}>💾</button>
+                        )}
+                    </div>
                 </div>
                 
                 <p style={{color:'#888', marginTop:'10px', fontSize:'13px'}}>Solicitado el: {new Date(order.created_at).toLocaleString()}</p>
@@ -300,23 +323,40 @@ export const BudgetDetailPage = () => {
                 )}
             </div>
 
-            {/* OBSERVACIONES DEL CLIENTE */}
+            {/* OBSERVACIONES CRONOLÓGICAS (NUEVO) */}
             <div style={cardStyle}>
-                <h3 style={sectionHeaderStyle}>📝 Mis Observaciones</h3>
-                {isPending || isDecisionTime ? (
-                    <>
-                        <textarea 
-                            value={clientNotes} 
-                            onChange={e => setClientNotes(e.target.value)}
-                            placeholder="Añade detalles sobre accesos, colores, restricciones..."
-                            style={{width:'100%', minHeight:'80px', background:'#252525', color:'white', border:'1px solid #444', borderRadius:'6px', padding:'10px', marginBottom:'10px'}}
+                <h3 style={sectionHeaderStyle}>📝 Historial de Observaciones</h3>
+                
+                {/* Lista de observaciones anteriores */}
+                <div style={{maxHeight:'200px', overflowY:'auto', marginBottom:'15px', display:'flex', flexDirection:'column', gap:'10px'}}>
+                    {observations.length === 0 && <p style={{color:'#666', fontStyle:'italic', fontSize:'13px'}}>No hay observaciones registradas.</p>}
+                    {observations.map(obs => (
+                        <div key={obs.id} style={{background:'#252525', padding:'10px', borderRadius:'6px', borderLeft:`3px solid ${obs.profiles?.role === 'admin' ? '#e67e22' : '#3b82f6'}`}}>
+                            <div style={{display:'flex', justifyContent:'space-between', marginBottom:'4px'}}>
+                                <span style={{fontWeight:'bold', fontSize:'12px', color:'white'}}>
+                                    {obs.profiles?.role === 'admin' ? '🏢 Administrador' : '👤 Tú'}
+                                </span>
+                                <span style={{fontSize:'11px', color:'#888'}}>{new Date(obs.created_at).toLocaleString()}</span>
+                            </div>
+                            <p style={{margin:0, fontSize:'13px', color:'#ddd', whiteSpace:'pre-wrap'}}>{obs.content}</p>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Input nueva observación */}
+                {(isPending || isDecisionTime) ? (
+                    <div style={{display:'flex', gap:'10px'}}>
+                        <input 
+                            type="text" 
+                            value={newObservation}
+                            onChange={e => setNewObservation(e.target.value)}
+                            placeholder="Añadir nueva observación o nota..."
+                            style={{flex:1, padding:'10px', background:'#252525', border:'1px solid #444', color:'white', borderRadius:'6px'}}
                         />
-                        <button onClick={handleSaveInfo} disabled={savingNotes} style={{alignSelf:'flex-end', background:'#3b82f6', color:'white', border:'none', padding:'8px 15px', borderRadius:'4px', cursor:'pointer'}}>
-                            {savingNotes ? 'Guardando...' : 'Guardar Datos (Nombre y Notas)'}
-                        </button>
-                    </>
+                        <button onClick={handleAddObservation} style={{background:'#3b82f6', color:'white', border:'none', padding:'0 20px', borderRadius:'6px', cursor:'pointer'}}>Añadir</button>
+                    </div>
                 ) : (
-                    <p style={{color:'#ccc', whiteSpace:'pre-wrap', fontStyle:'italic'}}>{clientNotes || 'Sin observaciones.'}</p>
+                    <p style={{fontSize:'12px', color:'#666'}}>* No se pueden añadir más observaciones en este estado.</p>
                 )}
             </div>
 
