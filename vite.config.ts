@@ -9,8 +9,15 @@ export default defineConfig({
   // 1. TU CONFIGURACIÓN ACTUAL (Vital para Three.js)
   resolve: {
     alias: {
-      // Fuerza a que cualquier import de 'three' use la misma copia de la librería
-      'three': path.resolve(__dirname, './node_modules/three')
+      // Mantener this para evitar varias copias de Three
+      three: path.resolve(__dirname, './node_modules/three'),
+
+      '@': path.resolve(__dirname, './src'),
+      '@features': path.resolve(__dirname, './src/features'),
+      '@stores': path.resolve(__dirname, './src/stores'),
+      '@lib': path.resolve(__dirname, './src/lib'),
+      '@utils': path.resolve(__dirname, './src/utils'),
+      '@components': path.resolve(__dirname, './src/components')
     }
   },
 
