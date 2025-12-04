@@ -157,7 +157,7 @@ const {
   };
 
   return (
-    <div className="relative flex flex-col items-center">
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center">
       {/* Vistas Popup */}
       {showViews && (
         <div className="absolute bottom-full mb-4 glass-panel flex-row animate-in slide-in-from-bottom-2 fade-in duration-200">
