@@ -48,44 +48,47 @@ export class InteractionManager {
 
       this.transformControl.rotationSnap = Math.PI / 12;
 
+      // NO capas raras → mismo layer que todo lo demás
       this.engine.scene.add(this.transformControl);
 
-      // Solo bloquear / desbloquear órbita
+      // --- Evento cuando empieza/termina drag ---
       this.transformControl.addEventListener(
         "dragging-changed",
         (event: any) => {
+          const editor = useEditorStore.getState();
+
           this.isDraggingGizmo = event.value;
           this.engine.sceneManager.controls.enabled = !event.value;
 
           const obj = this.transformControl?.object;
           if (!obj) return;
 
-          if (!event.value) {
-            // Al soltar, volvemos a chequear colisiones finales
-            this.engine.checkSafetyCollisions();
-          } else {
-            // Guardamos posición inicial para posible "rebote"
+          if (event.value) {
+            // Empezar drag → snapshot para UNDO
             this.dragStartPosition.copy(obj.position);
-            useEditorStore.getState().saveSnapshot();
+            editor.saveSnapshot();
+          } else {
+            // Terminar drag
+            if (this.engine.isObjectColliding(obj)) {
+              // Rebote si choca zona de seguridad
+              this.animateRevert(obj, this.dragStartPosition);
+            } else {
+              if (obj.userData.isFloorMarker) {
+                this.engine.toolsManager.updateFloorFromMarkers(obj);
+              } else if (obj.userData.isItem) {
+                this.engine.objectManager.adjustObjectToGround(obj);
+                this.syncTransformToStore(obj);
+              }
+            }
           }
         }
       );
 
-      // Cada vez que cambia el objeto (drag en curso)
+      // Ajustar al suelo mientras se mueve
       this.transformControl.addEventListener("objectChange", () => {
         const obj = this.transformControl?.object;
-        if (!obj) return;
-
-        if (obj.userData.isFloorMarker) {
-          // Editando vértices de suelo
-          this.engine.toolsManager.updateFloorFromMarkers(obj);
-          return;
-        }
-
-        if (obj.userData.isItem) {
-          // Ajuste al suelo + sincronizar con store
+        if (obj && obj.userData.isItem && !this.isDraggingGizmo) {
           this.engine.objectManager.adjustObjectToGround(obj);
-          this.syncTransformToStore(obj);
         }
       });
 
@@ -140,17 +143,6 @@ export class InteractionManager {
     this.pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
     this.raycaster.setFromCamera(this.pointer, this.engine.activeCamera);
-
-    // ⚠️ Si clicamos sobre el gizmo, dejamos que THREE lo gestione
-    if (this.transformControl && this.transformControl.visible) {
-      const gizmoHits = this.raycaster.intersectObject(
-        this.transformControl,
-        true
-      );
-      if (gizmoHits.length > 0) {
-        return;
-      }
-    }
 
     const editor = useEditorStore.getState();
     const catalog = useCatalogStore.getState();
@@ -214,6 +206,7 @@ export class InteractionManager {
           intersects[0].point.z,
           catalog.selectedProduct,
           (uuid) => {
+            // Seleccionamos el nuevo objeto y entramos en edición
             selectionStore.selectItem(uuid);
             editor.setMode("editing");
           }
@@ -276,6 +269,7 @@ export class InteractionManager {
         if (target && target.userData?.isItem) {
           this.selectObject(target);
 
+          // Buscar el SceneItem correspondiente EN EL EDITOR STORE
           const floor = useEditorStore
             .getState()
             .items.find(

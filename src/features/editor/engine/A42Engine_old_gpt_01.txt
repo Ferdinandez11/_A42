@@ -390,7 +390,6 @@ export class A42Engine {
         this.toolsManager.clearFloorEditMarkers();
       }
     }
-
   }
 
   // -------------------------------------------------------
