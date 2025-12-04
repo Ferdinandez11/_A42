@@ -1,34 +1,37 @@
 // --- START OF FILE src/features/editor/ui/FenceProperties.tsx ---
 import { Fence, Palette } from "lucide-react";
 import { FENCE_PRESETS } from "../data/fence_presets";
+
 import { CadControl } from "./CadControl";
 
-// Nuevo: estos stores son los correctos
+// Stores correctos
 import { useEditorStore } from "@/stores/editor/useEditorStore";
 import { useSelectionStore } from "@/stores/selection/useSelectionStore";
 
 export const FenceProperties = () => {
-  const { fenceConfig, updateItemFenceConfig } = useEditorStore();
-  const { selectedItemId } = useSelectionStore();
-  const { items } = useEditorStore.getState();
+  // Suscripción reactiva correcta
+  const items = useEditorStore((s) => s.items);
+  const updateItemFenceConfig = useEditorStore((s) => s.updateItemFenceConfig);
 
-  // Encontrar item seleccionado
-  const selectedItem = selectedItemId
-    ? items.find((i) => i.uuid === selectedItemId)
-    : null;
+  const selectedItemId = useSelectionStore((s) => s.selectedItemId);
 
-  // Asegurar que el item es una valla. Si no, NO renderizar.
-  if (!selectedItem || selectedItem.type !== "fence") return null;
+  // Buscar el item seleccionado
+  const selectedItem = items.find((i) => i.uuid === selectedItemId);
+console.log("%c[FENCE-PROPS] Render", "color: #3bf");
+console.log(" selectedItemId:", selectedItemId);
+console.log(" selectedItem:", selectedItem);
+console.log(" type:", selectedItem?.type);
+  // Si no hay item o no es valla → no renderizar
+  if (!selectedItem || selectedItem.type !== "fence") {
+    return null;
+    
+  }
 
-    const currentConfig =
-    selectedItem.fenceConfig !== undefined
-      ? selectedItem.fenceConfig
-      : fenceConfig;
-
+  const currentConfig = selectedItem.fenceConfig!;
   const currentPreset =
     FENCE_PRESETS[currentConfig.presetId] || FENCE_PRESETS["wood"];
 
-  // Cambiar preset de valla
+  // Cambiar preset
   const handlePresetChange = (key: string) => {
     const preset = FENCE_PRESETS[key];
 
@@ -49,9 +52,16 @@ export const FenceProperties = () => {
     hex: string
   ) => {
     const colorInt = parseInt(hex.replace("#", "0x"));
-    const newColors = { ...currentConfig.colors, [key]: colorInt };
 
-    updateItemFenceConfig(selectedItem.uuid, { colors: newColors });
+    const newColors = {
+      ...currentConfig.colors,
+      [key]: colorInt,
+    };
+
+    updateItemFenceConfig(selectedItem.uuid, {
+      presetId: currentConfig.presetId,
+      colors: newColors,
+    });
   };
 
   const toHex = (num: number) =>
@@ -60,6 +70,7 @@ export const FenceProperties = () => {
   return (
     <div className="absolute top-20 right-4 bg-neutral-900/95 backdrop-blur-md border border-neutral-700 rounded-xl p-4 shadow-xl z-20 w-80 animate-in fade-in slide-in-from-right-2">
 
+      {/* Panel CAD */}
       <CadControl />
 
       <h3 className="text-white text-sm font-bold mb-4 flex items-center gap-2 border-b border-white/10 pb-2">
@@ -95,7 +106,7 @@ export const FenceProperties = () => {
           <Palette size={12} /> Personalización
         </label>
 
-        {/* POSTES */}
+        {/* Postes */}
         <div className="flex items-center justify-between">
           <span className="text-xs text-neutral-300">Postes / Estructura</span>
           <input
@@ -106,7 +117,7 @@ export const FenceProperties = () => {
           />
         </div>
 
-        {/* LAMAS PRINCIPALES */}
+        {/* Lamas principales */}
         <div className="flex items-center justify-between">
           <span className="text-xs text-neutral-300">
             {currentPreset.isSolidPanel ? "Panel" : "Lamas Principales"}
@@ -119,7 +130,7 @@ export const FenceProperties = () => {
           />
         </div>
 
-        {/* MULTICOLOR */}
+        {/* Multicolor */}
         {currentPreset.multiColor && (
           <>
             <div className="flex items-center justify-between">
@@ -151,4 +162,4 @@ export const FenceProperties = () => {
     </div>
   );
 };
-// --- END OF FILE src/features/editor/ui/FenceProperties.tsx ---
+// --- END OF FILE ---

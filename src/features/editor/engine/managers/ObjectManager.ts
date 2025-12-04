@@ -30,11 +30,26 @@ export class ObjectManager {
     this.textureLoader = new THREE.TextureLoader();
 
     this.floorMaterials = {
-      rubber_red: new THREE.MeshStandardMaterial({ color: 0xa04040, roughness: 0.9 }),
-      rubber_green: new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.9 }),
-      rubber_blue: new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.9 }),
-      grass: new THREE.MeshStandardMaterial({ color: 0x4ade80, roughness: 1 }),
-      concrete: new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.8 }),
+      rubber_red: new THREE.MeshStandardMaterial({
+        color: 0xa04040,
+        roughness: 0.9,
+      }),
+      rubber_green: new THREE.MeshStandardMaterial({
+        color: 0x22c55e,
+        roughness: 0.9,
+      }),
+      rubber_blue: new THREE.MeshStandardMaterial({
+        color: 0x3b82f6,
+        roughness: 0.9,
+      }),
+      grass: new THREE.MeshStandardMaterial({
+        color: 0x4ade80,
+        roughness: 1,
+      }),
+      concrete: new THREE.MeshStandardMaterial({
+        color: 0x9ca3af,
+        roughness: 0.8,
+      }),
     };
   }
 
@@ -64,22 +79,13 @@ export class ObjectManager {
       model.rotation.fromArray(item.rotation);
       model.scale.fromArray(item.scale);
 
-      // 🔥 userData completo (NECESARIO PARA SELECCIÓN + GIZMO)
+      // 👇 SOLO el grupo raíz es el "item" seleccionable
       model.userData = {
         isItem: true,
         type: "model",
         uuid: item.uuid,
         productId: item.productId,
       };
-
-      model.traverse((child) => {
-        if ((child as THREE.Mesh).isMesh) {
-          child.userData.isItem = true;
-          child.userData.type = "model";
-          child.userData.uuid = item.uuid;
-          child.userData.productId = item.productId;
-        }
-      });
 
       // Zonas de seguridad
       const editor = useEditorStore.getState();
@@ -100,7 +106,8 @@ export class ObjectManager {
           mesh.receiveShadow = true;
 
           const name = mesh.name.toLowerCase();
-          const mat = (mesh.material as THREE.Material).name?.toLowerCase() ?? "";
+          const mat =
+            (mesh.material as THREE.Material).name?.toLowerCase() ?? "";
 
           if (
             name.includes("zona") ||
@@ -114,6 +121,7 @@ export class ObjectManager {
             mesh.visible = isZonesVisible;
             mesh.userData.isSafetyZone = true;
             mesh.castShadow = false;
+            mesh.receiveShadow = false;
           }
         }
       });
@@ -181,7 +189,6 @@ export class ObjectManager {
     mesh.uuid = item.uuid;
     mesh.receiveShadow = true;
 
-    // 🔥 userData correcto para selección + edición de vértices
     mesh.userData = {
       isItem: true,
       type: "floor",
@@ -210,7 +217,7 @@ export class ObjectManager {
 
     fence.uuid = item.uuid;
 
-    // 🔥 userData correcto
+    // 👇 SOLO el grupo raíz tiene isItem
     fence.userData = {
       isItem: true,
       type: "fence",
@@ -220,27 +227,26 @@ export class ObjectManager {
       fenceConfig: item.fenceConfig,
     };
 
-    // También en hijos (instanced meshes)
-    fence.traverse((child) => {
-      child.userData.isItem = true;
-      child.userData.type = "fence";
-      child.userData.uuid = item.uuid;
-    });
-
     this.scene.add(fence);
   }
 
   // ----------------------------------------------------------
-  //  CREACIÓN DE VALLA (instanced meshes)
+  //  CREAR VALLA (instanced meshes)
   // ----------------------------------------------------------
 
-  public createFenceObject(points: THREE.Vector3[], config: FenceConfig): THREE.Group | null {
+  public createFenceObject(
+    points: THREE.Vector3[],
+    config: FenceConfig
+  ): THREE.Group | null {
     if (!points || points.length < 2) return null;
 
     const preset = FENCE_PRESETS[config.presetId] || FENCE_PRESETS["wood"];
     const colors = config.colors;
 
-    const parts: Record<string, { geo: THREE.BufferGeometry; matrices: THREE.Matrix4[]; colors: number[] }> = {};
+    const parts: Record<
+      string,
+      { geo: THREE.BufferGeometry; matrices: THREE.Matrix4[]; colors: number[] }
+    > = {};
     const temp = new THREE.Object3D();
 
     const addPart = (
@@ -264,27 +270,51 @@ export class ObjectManager {
       parts[key].colors.push(colorHex);
     };
 
-    // GEOMETRÍAS BASE
+    // POSTES
     let postGeo: THREE.BufferGeometry;
     if (preset.postType === "round") {
-      postGeo = new THREE.CylinderGeometry(preset.postRadius!, preset.postRadius!, preset.postHeight, 16);
+      postGeo = new THREE.CylinderGeometry(
+        preset.postRadius!,
+        preset.postRadius!,
+        preset.postHeight,
+        16
+      );
       postGeo.translate(0, preset.postHeight / 2, 0);
     } else {
-      postGeo = new THREE.BoxGeometry(preset.postWidth!, preset.postHeight, preset.postWidth!);
+      postGeo = new THREE.BoxGeometry(
+        preset.postWidth!,
+        preset.postHeight,
+        preset.postWidth!
+      );
       postGeo.translate(0, preset.postHeight / 2, 0);
     }
 
+    // RIELES
     let railGeo: THREE.BufferGeometry | null = null;
     if (preset.railType === "frame") {
       if (preset.railShape === "square") {
-        railGeo = new THREE.BoxGeometry(preset.railThickness!, preset.railThickness!, 1);
+        railGeo = new THREE.BoxGeometry(
+          preset.railThickness!,
+          preset.railThickness!,
+          1
+        );
       } else {
-        railGeo = new THREE.CylinderGeometry(preset.railRadius!, preset.railRadius!, 1, 12);
+        railGeo = new THREE.CylinderGeometry(
+          preset.railRadius!,
+          preset.railRadius!,
+          1,
+          12
+        );
         railGeo.rotateX(Math.PI / 2);
       }
     }
 
-    const slatGeo = new THREE.BoxGeometry(preset.slatThickness, 1, preset.slatWidth);
+    // LAMAS
+    const slatGeo = new THREE.BoxGeometry(
+      preset.slatThickness,
+      1,
+      preset.slatWidth
+    );
 
     const topRailY = preset.postHeight - 0.12;
     const botRailY = 0.12;
@@ -317,18 +347,40 @@ export class ObjectManager {
         const P1 = new THREE.Vector3().lerpVectors(A, B, t1);
         const PC = new THREE.Vector3().lerpVectors(P0, P1, 0.5);
 
-        addPart("post", postGeo, P0, new THREE.Euler(0, angle, 0), new THREE.Vector3(1, 1, 1), colors.post);
+        // Poste inicio de módulo
+        addPart(
+          "post",
+          postGeo,
+          P0,
+          new THREE.Euler(0, angle, 0),
+          new THREE.Vector3(1, 1, 1),
+          colors.post
+        );
 
+        // Rieles
         if (railGeo) {
           const railLen = Math.max(moduleLen - 0.1, 0.05);
 
-          addPart("rail", railGeo, new THREE.Vector3(PC.x, topRailY, PC.z), new THREE.Euler(0, angle, 0),
-            new THREE.Vector3(1, 1, railLen), colors.post);
+          addPart(
+            "rail",
+            railGeo,
+            new THREE.Vector3(PC.x, topRailY, PC.z),
+            new THREE.Euler(0, angle, 0),
+            new THREE.Vector3(1, 1, railLen),
+            colors.post
+          );
 
-          addPart("rail", railGeo, new THREE.Vector3(PC.x, botRailY, PC.z), new THREE.Euler(0, angle, 0),
-            new THREE.Vector3(1, 1, railLen), colors.post);
+          addPart(
+            "rail",
+            railGeo,
+            new THREE.Vector3(PC.x, botRailY, PC.z),
+            new THREE.Euler(0, angle, 0),
+            new THREE.Vector3(1, 1, railLen),
+            colors.post
+          );
         }
 
+        // Panel o lamas
         if (preset.isSolidPanel) {
           const panelLen = moduleLen - 0.1;
           addPart(
@@ -369,7 +421,14 @@ export class ObjectManager {
     }
 
     const last = points[points.length - 1];
-    addPart("post", postGeo, last, new THREE.Euler(0, 0, 0), new THREE.Vector3(1, 1, 1), colors.post);
+    addPart(
+      "post",
+      postGeo,
+      last,
+      new THREE.Euler(0, 0, 0),
+      new THREE.Vector3(1, 1, 1),
+      colors.post
+    );
 
     const group = new THREE.Group();
 
@@ -377,7 +436,10 @@ export class ObjectManager {
       const { geo, matrices, colors } = parts[key];
       const count = matrices.length;
 
-      const mat = new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0.1 });
+      const mat = new THREE.MeshStandardMaterial({
+        roughness: 0.5,
+        metalness: 0.1,
+      });
       const mesh = new THREE.InstancedMesh(geo, mat, count);
 
       for (let i = 0; i < count; i++) {
@@ -423,7 +485,6 @@ export class ObjectManager {
 
       this.adjustObjectToGround(model);
 
-      // Seguridad
       const editor = useEditorStore.getState();
       const isZonesVisible = editor.safetyZonesVisible;
 
@@ -442,7 +503,8 @@ export class ObjectManager {
           mesh.receiveShadow = true;
 
           const name = mesh.name.toLowerCase();
-          const mat = (mesh.material as THREE.Material).name?.toLowerCase() ?? "";
+          const mat =
+            (mesh.material as THREE.Material).name?.toLowerCase() ?? "";
 
           if (
             name.includes("zona") ||
@@ -460,7 +522,7 @@ export class ObjectManager {
         }
       });
 
-      // Pop animation
+      // Animación pop
       const targetScale = model.scale.clone();
       model.scale.set(0, 0, 0);
       let t = 0;
@@ -480,20 +542,12 @@ export class ObjectManager {
       const uuid = THREE.MathUtils.generateUUID();
       model.uuid = uuid;
 
-      // 🔥 CLAVE PARA QUE EL GIZMO FUNCIONE
       model.userData = {
         isItem: true,
         type: "model",
         uuid,
         productId: product.id,
       };
-
-      model.traverse((child) => {
-        child.userData.isItem = true;
-        child.userData.type = "model";
-        child.userData.uuid = uuid;
-        child.userData.productId = product.id;
-      });
 
       useEditorStore.getState().addItem({
         uuid,
@@ -518,7 +572,6 @@ export class ObjectManager {
 
       this.scene.add(model);
       afterPlace?.(uuid);
-
     } catch (e) {
       console.error("Error placing object:", e);
     }

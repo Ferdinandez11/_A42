@@ -1,3 +1,4 @@
+// --- START OF FILE src/features/editor/Editor3D.tsx ---
 import React, { useEffect, useRef } from "react";
 import { A42Engine } from "./engine/A42Engine";
 
@@ -8,13 +9,20 @@ import { FloorProperties } from "./ui/FloorProperties";
 import { FenceProperties } from "./ui/FenceProperties";
 import { InputModal } from "./ui/InputModal";
 import { QRModal } from "./ui/QRModal";
-import { Catalog } from "./ui/Catalog";
+
 import { useEditorStore } from "@/stores/editor/useEditorStore";
 import { useSelectionStore } from "@/stores/selection/useSelectionStore";
 import { useProjectStore } from "@/stores/project/useProjectStore";
 
-
-import { Euro, Move, RotateCw, Scaling, Trash2, Copy, QrCode } from "lucide-react";
+import {
+  Euro,
+  Move,
+  RotateCw,
+  Scaling,
+  Trash2,
+  Copy,
+  QrCode,
+} from "lucide-react";
 
 export const Editor3D = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -34,8 +42,12 @@ export const Editor3D = () => {
     totalPrice,
   } = useEditorStore();
 
-  const { selectedItemId, duplicateSelection, removeSelection, measuredDistance } =
-    useSelectionStore();
+  const {
+    selectedItemId,
+    duplicateSelection,
+    removeSelection,
+    measuredDistance,
+  } = useSelectionStore();
 
   const { isReadOnlyMode } = useProjectStore();
 
@@ -61,7 +73,31 @@ export const Editor3D = () => {
     else engine.setBackgroundColor(backgroundColor);
 
     return () => engine.dispose();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // --------------------------
+  // SYNC SELECCIÓN ↔ GIZMO
+  // --------------------------
+  useEffect(() => {
+    const eng = engineRef.current;
+    if (!eng) return;
+
+    const im = eng.interactionManager;
+    if (!im) return;
+
+    if (!selectedItemId) {
+      im.selectObject(null);
+      return;
+    }
+
+    const obj = eng.scene.getObjectByProperty("uuid", selectedItemId);
+    if (obj) {
+      im.selectObject(obj);
+    } else {
+      im.selectObject(null);
+    }
+  }, [selectedItemId]);
 
   // --------------------------
   // REACTIONS
@@ -93,7 +129,7 @@ export const Editor3D = () => {
     if (!pendingView) return;
     engineRef.current?.setView(pendingView);
     clearPendingView();
-  }, [pendingView]);
+  }, [pendingView, clearPendingView]);
 
   useEffect(() => {
     if (backgroundColor === "#111111") engineRef.current?.setSkyVisible(true);
@@ -103,29 +139,25 @@ export const Editor3D = () => {
   // --------------------------
   // POINTER HANDLING
   // --------------------------
-const handlePointerDown = (e: React.PointerEvent) => {
-  engineRef.current?.onMouseDown(e.nativeEvent);
-};
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest("button,a,input")) return;
+    engineRef.current?.onMouseDown(e.nativeEvent);
+  };
 
-<div
-  ref={containerRef}
-  onPointerDown={handlePointerDown}
-  onContextMenu={(e) => e.preventDefault()}
-  className="absolute inset-0 z-0"
-/>
   // --------------------------
   // GIZMO ACTIONS
   // --------------------------
   const setGizmoMode = (m: "translate" | "rotate" | "scale") =>
     engineRef.current?.setGizmoMode(m);
 
+  // Aseguramos que el gizmo use la cámara actual
   useEffect(() => {
-      const eng = engineRef.current;
-      if (!eng) return;
+    const eng = engineRef.current;
+    if (!eng) return;
 
-      eng.switchCamera(cameraType);
-      eng.interactionManager.updateCamera(eng.activeCamera); // 👈 CLAVE
-    }, [cameraType]);
+    eng.switchCamera(cameraType);
+    eng.interactionManager.updateCamera(eng.activeCamera);
+  }, [cameraType]);
 
   return (
     <div className="w-screen h-screen relative bg-neutral-900 overflow-hidden">
@@ -191,7 +223,6 @@ const handlePointerDown = (e: React.PointerEvent) => {
         </div>
       )}
 
-      {mode === "catalog" && <Catalog />}
       <Toolbar />
       <QRModal isOpen={qrVisible} onClose={() => setQRVisible(false)} />
 
@@ -203,3 +234,4 @@ const handlePointerDown = (e: React.PointerEvent) => {
     </div>
   );
 };
+// --- END OF FILE src/features/editor/Editor3D.tsx ---
