@@ -43,7 +43,7 @@ export const AdminCalendarPage = () => {
   const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [orders, setOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
