@@ -53,10 +53,14 @@ export class InteractionManager {
           const obj = this.transformControl?.object;
           if (!obj) return;
 
+          const editor = useEditorStore.getState();
+
           if (event.value) {
+            // empezar drag -> guardamos snapshot para UNDO
             this.dragStartPosition.copy(obj.position);
-            useEditorStore.getState().saveSnapshot();
+            editor.saveSnapshot();
           } else {
+            // terminar drag
             if (this.engine.isObjectColliding(obj)) {
               this.animateRevert(obj, this.dragStartPosition);
             } else {
@@ -120,6 +124,7 @@ export class InteractionManager {
 
     const editor = useEditorStore.getState();
     const catalog = useCatalogStore.getState();
+    const selection = useSelectionStore.getState();
 
     const mode = editor.mode;
 
@@ -127,11 +132,12 @@ export class InteractionManager {
     if (mode === "drawing_floor") {
       const intersects = this.raycaster.intersectObject(this.interactionPlane);
       if (intersects.length > 0) {
-        if (event.button === 0)
+        if (event.button === 0) {
           this.engine.toolsManager.addDraftPoint(intersects[0].point);
-        else if (event.button === 2) {
-          if (this.engine.toolsManager.floorPoints.length >= 3)
+        } else if (event.button === 2) {
+          if (this.engine.toolsManager.floorPoints.length >= 3) {
             this.engine.toolsManager.createSolidFloor();
+          }
         }
       }
       return;
@@ -141,9 +147,9 @@ export class InteractionManager {
     if (mode === "drawing_fence") {
       const intersects = this.raycaster.intersectObject(this.interactionPlane);
       if (intersects.length > 0) {
-        if (event.button === 0)
+        if (event.button === 0) {
           this.engine.toolsManager.addFenceDraftPoint(intersects[0].point);
-        else if (event.button === 2) {
+        } else if (event.button === 2) {
           this.engine.toolsManager.createSolidFence();
         }
       }
@@ -161,11 +167,13 @@ export class InteractionManager {
           i.object.visible &&
           (i.object.userData.isItem || i.object === this.interactionPlane)
       );
-      if (hit) this.engine.toolsManager.handleMeasurementClick(hit.point);
-      else {
+      if (hit) {
+        this.engine.toolsManager.handleMeasurementClick(hit.point);
+      } else {
         const planeHit = this.raycaster.intersectObject(this.interactionPlane);
-        if (planeHit.length > 0)
+        if (planeHit.length > 0) {
           this.engine.toolsManager.handleMeasurementClick(planeHit[0].point);
+        }
       }
       return;
     }
@@ -180,7 +188,11 @@ export class InteractionManager {
           intersects[0].point.x,
           intersects[0].point.z,
           catalog.selectedProduct,
-          (_uuid) => {}
+          (uuid) => {
+            // Seleccionamos el nuevo objeto y pasamos a modo edición
+            selection.selectItem(uuid);
+            editor.setMode("editing");
+          }
         );
         editor.setMode("idle");
       }
@@ -232,19 +244,16 @@ export class InteractionManager {
           !target.userData?.isItem &&
           target.parent &&
           target.parent !== this.engine.scene
-        )
+        ) {
           target = target.parent;
+        }
 
         if (target && target.userData?.isItem) {
           this.selectObject(target);
 
           const item = editor.items.find((i) => i.uuid === target!.uuid);
 
-          if (
-            target.userData.type === "floor" &&
-            item &&
-            item.points
-          ) {
+          if (target.userData.type === "floor" && item && item.points) {
             this.engine.toolsManager.showFloorEditMarkers(
               target.uuid,
               item.points
@@ -254,6 +263,7 @@ export class InteractionManager {
           }
         }
       } else {
+        // Click en vacío -> deseleccionar
         if (
           this.transformControl?.object &&
           !this.engine.toolsManager.floorEditMarkers.includes(
@@ -267,38 +277,49 @@ export class InteractionManager {
     }
   };
 
-  public selectObject(object: THREE.Object3D | null) {
+public selectObject(object: THREE.Object3D | null) {
   const selection = useSelectionStore.getState();
+  const editor = useEditorStore.getState(); // <-- NECESARIO
 
-    if (!this.transformControl) {
-      selection.selectItem(null);
-      return;
-    }
-
-    if (
-      object &&
-      this.transformControl.object?.uuid === object.uuid &&
-      selection.selectedItemId !== object.uuid
-    ) {
-      selection.selectItem(object.uuid);
-      return;
-    }
-
-    if (this.transformControl.object) {
-      this.transformControl.detach();
-      this.transformControl.visible = false;
-      this.engine.sceneManager.controls.enabled = true;
-    }
-
-    if (!object) {
-      selection.selectItem(null);
-      return;
-    }
-
-    this.transformControl.attach(object);
-    selection.selectItem(object.uuid);
-    this.transformControl.visible = true;
+  // Si no hay transformControl, limpiar selección y modo
+  if (!this.transformControl) {
+    selection.selectItem(null);
+    editor.setMode("idle");
+    return;
   }
+
+  // 🔄 Si hacemos clic en el mismo objeto ya seleccionado → solo actualizamos selección
+  if (
+    object &&
+    this.transformControl.object?.uuid === object.uuid &&
+    selection.selectedItemId !== object.uuid
+  ) {
+    selection.selectItem(object.uuid);
+    editor.setMode("editing");
+    return;
+  }
+
+  // 🧹 Si había algo seleccionado antes, lo quitamos
+  if (this.transformControl.object) {
+    this.transformControl.detach();
+    this.transformControl.visible = false;
+    this.engine.sceneManager.controls.enabled = true;
+  }
+
+  // ❌ SI NO HAY OBJETO → deseleccionar todo
+  if (!object) {
+    selection.selectItem(null);
+    editor.setMode("idle");
+    return;
+  }
+
+  // ✔ SELECCIÓN NUEVA
+  this.transformControl.attach(object);
+  selection.selectItem(object.uuid);
+  editor.setMode("editing");
+
+  this.transformControl.visible = true;
+}
 
   private syncTransformToStore(obj: THREE.Object3D) {
     const editor = useEditorStore.getState();

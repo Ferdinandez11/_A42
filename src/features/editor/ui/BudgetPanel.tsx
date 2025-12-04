@@ -1,19 +1,19 @@
 // --- START OF FILE src/features/editor/ui/BudgetPanel.tsx ---
 import { Trash2, X } from "lucide-react";
 
-import { useAppStore } from "@/stores/useAppStore"; // solo UI
+import { useUIStore } from "@/stores/ui/useUIStore"; // UI toggles
 import { useEditorStore } from "@/stores/editor/useEditorStore"; // items y precios
 import { useSelectionStore } from "@/stores/selection/useSelectionStore"; // selección
 
 export const BudgetPanel = () => {
   // UI (mostrar u ocultar panel)
-  const { budgetVisible, toggleBudget } = useAppStore();
+  const { budgetVisible, toggleBudget } = useUIStore();
 
   // Datos de la escena
   const items = useEditorStore((s) => s.items);
   const totalPrice = useEditorStore((s) => s.totalPrice);
 
-  // Acciones de la escena
+  // Acciones de escena
   const removeItem = useEditorStore((s) => s.removeItem);
   const resetScene = useEditorStore((s) => s.resetScene);
 
@@ -53,7 +53,6 @@ export const BudgetPanel = () => {
                   {item.name || "Sin Nombre"}
                 </span>
 
-                {/* Antes mostrabas item.type, ahora productId */}
                 <span className="text-xs text-neutral-500 uppercase font-mono">
                   {item.productId}
                 </span>
