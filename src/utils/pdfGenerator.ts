@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-//22
+
 
 // Función auxiliar local para formatear dinero
 const formatMoney = (amount: number) => {
