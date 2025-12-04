@@ -2,7 +2,7 @@
 import * as THREE from "three";
 import { ARButton } from "three/examples/jsm/webxr/ARButton.js";
 
-import type { SceneItem, CameraView } from "@/types/editor";
+import type { SceneItem, CameraView, CameraType } from "@/types/editor";
 
 import { SceneManager } from "./managers/SceneManager";
 import { ObjectManager } from "./managers/ObjectManager";
@@ -28,12 +28,13 @@ export class A42Engine {
 
   private clock: THREE.Clock;
   private savedBackground: THREE.Color | THREE.Texture | null = null;
-  private wasSkyVisible: boolean = true;
+  private wasSkyVisible = true;
   private transparentElements: HTMLElement[] = [];
 
   constructor(container: HTMLElement) {
     this.clock = new THREE.Clock();
 
+    // --- CORE MANAGERS ---
     this.sceneManager = new SceneManager(container);
     this.sceneManager.renderer.xr.enabled = true;
 
@@ -45,13 +46,18 @@ export class A42Engine {
     this.exportManager = new ExportManager(this);
     this.pdfManager = new PDFManager(this);
 
+    // --- GLOBAL EVENTS ---
     window.addEventListener("resize", this.onWindowResize);
     window.addEventListener("keydown", this.onKeyDown);
 
+    // Exponer para debug
     // @ts-ignore
     window.editorEngine = this;
   }
 
+  // -------------------------------------------------------
+  // GETTERS CÓMODOS
+  // -------------------------------------------------------
   public get scene() {
     return this.sceneManager.scene;
   }
@@ -62,10 +68,16 @@ export class A42Engine {
     return this.sceneManager.renderer;
   }
 
+  // -------------------------------------------------------
+  // INPUT RATÓN DESDE REACT
+  // -------------------------------------------------------
   public onMouseDown = (event: MouseEvent) => {
     this.interactionManager.onMouseDown(event);
   };
 
+  // -------------------------------------------------------
+  // AJUSTES DE ESCENA
+  // -------------------------------------------------------
   public setBackgroundColor(color: string) {
     this.sceneManager.setBackgroundColor(color);
   }
@@ -84,8 +96,14 @@ export class A42Engine {
     this.sceneManager.setFrameVisible(visible);
   }
 
-  public switchCamera(type: "perspective" | "orthographic") {
+  // -------------------------------------------------------
+  // CÁMARAS / VISTAS
+  // -------------------------------------------------------
+  public switchCamera(type: CameraType) {
     this.sceneManager.switchCamera(type);
+
+    // actualizar cámara en control orbital y gizmo
+    this.sceneManager.controls.object = this.sceneManager.activeCamera;
     this.interactionManager.updateCamera(this.sceneManager.activeCamera);
   }
 
@@ -93,10 +111,14 @@ export class A42Engine {
     this.sceneManager.setView(view);
   }
 
+  // -------------------------------------------------------
+  // TOOLS / GIZMO
+  // -------------------------------------------------------
   public clearTools() {
     this.toolsManager.clearTools();
     if (this.interactionManager.transformControl) {
       this.interactionManager.transformControl.detach();
+      this.interactionManager.transformControl.visible = false;
     }
   }
 
@@ -104,6 +126,9 @@ export class A42Engine {
     this.interactionManager.setGizmoMode(mode);
   }
 
+  // -------------------------------------------------------
+  // SAFETY ZONES
+  // -------------------------------------------------------
   public updateSafetyZones(visible: boolean) {
     this.scene.traverse((obj) => {
       if (obj.userData?.isSafetyZone) {
@@ -111,8 +136,6 @@ export class A42Engine {
       }
     });
   }
-
-  // ---------------- SAFETY COLLISIONS ----------------
 
   public checkSafetyCollisions() {
     const { safetyZonesVisible } = useEditorStore.getState();
@@ -195,15 +218,16 @@ export class A42Engine {
     return false;
   }
 
-  // ---------------- AR INIT ----------------
-
+  // -------------------------------------------------------
+  // AR INIT
+  // -------------------------------------------------------
   private async initAR() {
     if (!("xr" in navigator)) return;
     try {
       // @ts-ignore
       const isSupported = await navigator.xr.isSessionSupported("immersive-ar");
       if (!isSupported) return;
-    } catch (e) {
+    } catch {
       return;
     }
 
@@ -284,9 +308,12 @@ export class A42Engine {
     document.body.appendChild(arContainer);
   }
 
-  // ---------------- SYNC ESCENA <-> STORE ----------------
-
+  // -------------------------------------------------------
+  // SYNC ESCENA <-> STORE
+  //  (MODELO 1: NO RECREAR SI NO HACE FALTA)
+  // -------------------------------------------------------
   public async syncSceneFromStore(storeItems: SceneItem[]) {
+    // mapa de objetos de escena actuales
     const sceneItemsMap = new Map<string, THREE.Object3D>();
     this.scene.children.forEach((child) => {
       if (child.userData?.isItem && child.uuid) {
@@ -296,8 +323,9 @@ export class A42Engine {
 
     for (const item of storeItems) {
       const sceneObj = sceneItemsMap.get(item.uuid);
+
       if (sceneObj) {
-        // FLOOR
+        // ---------- FLOOR ----------
         if (item.type === "floor") {
           const hasChanged =
             JSON.stringify(sceneObj.userData.points) !==
@@ -315,7 +343,7 @@ export class A42Engine {
           }
         }
 
-        // FENCE
+        // ---------- FENCE ----------
         if (item.type === "fence") {
           const hasConfigChanged =
             JSON.stringify(sceneObj.userData.fenceConfig) !==
@@ -332,12 +360,13 @@ export class A42Engine {
           }
         }
 
-        // MODEL / TRANSFORM
+        // ---------- MODEL / TRANSFORM ----------
         sceneObj.position.fromArray(item.position);
         sceneObj.rotation.fromArray(item.rotation);
         sceneObj.scale.fromArray(item.scale);
         sceneItemsMap.delete(item.uuid);
       } else {
+        // No existe en escena → crearlo
         if (item.type === "model" && item.modelUrl) {
           await this.objectManager.recreateModel(item);
         } else if (item.type === "floor" && item.points) {
@@ -351,8 +380,10 @@ export class A42Engine {
     // Eliminar objetos que sobran
     for (const [uuid, obj] of sceneItemsMap) {
       this.scene.remove(obj);
+
       if (this.interactionManager.transformControl?.object?.uuid === uuid) {
         this.interactionManager.transformControl.detach();
+        this.interactionManager.transformControl.visible = false;
       }
       if (this.toolsManager.activeFloorId === uuid) {
         this.toolsManager.activeFloorId = null;
@@ -361,8 +392,9 @@ export class A42Engine {
     }
   }
 
-  // ---------------- INPUT / TECLAS ----------------
-
+  // -------------------------------------------------------
+  // INPUT / TECLAS
+  // -------------------------------------------------------
   private onKeyDown = (e: KeyboardEvent) => {
     if (this.walkManager.isEnabled) return;
 
@@ -404,8 +436,9 @@ export class A42Engine {
     this.sceneManager.onWindowResize();
   };
 
-  // ---------------- CICLO VIDA ----------------
-
+  // -------------------------------------------------------
+  // CICLO VIDA
+  // -------------------------------------------------------
   public init() {
     this.initAR();
     this.renderer.setAnimationLoop(this.render);

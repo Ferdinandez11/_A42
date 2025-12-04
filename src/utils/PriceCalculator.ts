@@ -1,5 +1,5 @@
 // --- START OF FILE src/utils/PriceCalculator.ts ---
-import type { SceneItem } from '../stores/useAppStore';
+import type { SceneItem } from '@/types/editor';
 
 // PRECIOS BASE (Configuración centralizada)
 export const PRICES = {
@@ -9,14 +9,11 @@ export const PRICES = {
 
 export class PriceCalculator {
 
-    // --- MÉTODOS PÚBLICOS ---
-
     /** Obtiene el precio total de un ítem */
     static getItemPrice(item: SceneItem): number {
         // 1. Suelos (Área)
         if (item.type === 'floor' && item.points) {
             const area = this.calculateArea(item.points);
-            // Si el item tiene precio específico usamos ese, si no, el de tarifa base
             const unitPrice = item.price > 0 ? item.price : PRICES.FLOOR_M2;
             return parseFloat((area * unitPrice).toFixed(2));
         } 
@@ -50,8 +47,9 @@ export class PriceCalculator {
         return items.reduce((total, item) => total + this.getItemPrice(item), 0);
     }
 
-    // --- MATEMÁTICAS INTERNAS (Privadas) ---
-
+    // -------------------------------------------------
+    // FUNCIONES INTERNAS
+    // -------------------------------------------------
     private static calculateArea(points: { x: number, z: number }[]): number {
         if (!points || points.length < 3) return 0;
         let area = 0;
@@ -75,3 +73,4 @@ export class PriceCalculator {
         return length;
     }
 }
+// --- END OF FILE src/utils/PriceCalculator.ts ---

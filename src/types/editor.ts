@@ -54,7 +54,8 @@ export type EditorMode =
   | "placing_item"
   | "drawing_floor"
   | "drawing_fence"
-  | "measuring";
+  | "measuring"
+  | "catalog";
 
 export type CameraView = "top" | "front" | "side" | "iso";
 export type CameraType = "perspective" | "orthographic";

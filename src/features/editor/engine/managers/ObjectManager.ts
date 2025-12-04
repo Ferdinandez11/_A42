@@ -5,14 +5,12 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { useEditorStore } from "@/stores/editor/useEditorStore";
 import { FENCE_PRESETS } from "@/features/editor/data/fence_presets";
 
-// Tipos reales del editor
 import type {
   SceneItem,
   FenceConfig,
   FloorMaterialType,
 } from "@/types/editor";
 
-// Tipo real del catálogo
 import type { Product } from "@/services/catalogService";
 
 type PlaceableProduct = Product & { initialScale?: [number, number, number] };
@@ -31,28 +29,12 @@ export class ObjectManager {
     this.loader = new GLTFLoader();
     this.textureLoader = new THREE.TextureLoader();
 
-    // Materiales de suelo predefinidos
     this.floorMaterials = {
-      rubber_red: new THREE.MeshStandardMaterial({
-        color: 0xa04040,
-        roughness: 0.9,
-      }),
-      rubber_green: new THREE.MeshStandardMaterial({
-        color: 0x22c55e,
-        roughness: 0.9,
-      }),
-      rubber_blue: new THREE.MeshStandardMaterial({
-        color: 0x3b82f6,
-        roughness: 0.9,
-      }),
-      grass: new THREE.MeshStandardMaterial({
-        color: 0x4ade80,
-        roughness: 1,
-      }),
-      concrete: new THREE.MeshStandardMaterial({
-        color: 0x9ca3af,
-        roughness: 0.8,
-      }),
+      rubber_red: new THREE.MeshStandardMaterial({ color: 0xa04040, roughness: 0.9 }),
+      rubber_green: new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.9 }),
+      rubber_blue: new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.9 }),
+      grass: new THREE.MeshStandardMaterial({ color: 0x4ade80, roughness: 1 }),
+      concrete: new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.8 }),
     };
   }
 
@@ -68,7 +50,7 @@ export class ObjectManager {
   }
 
   // ----------------------------------------------------------
-  //  RECREAR OBJETO 'model' DESDE SceneItem
+  //  RECREAR OBJETO 'model'
   // ----------------------------------------------------------
 
   public async recreateModel(item: SceneItem) {
@@ -82,12 +64,22 @@ export class ObjectManager {
       model.rotation.fromArray(item.rotation);
       model.scale.fromArray(item.scale);
 
+      // 🔥 userData completo (NECESARIO PARA SELECCIÓN + GIZMO)
       model.userData = {
         isItem: true,
         type: "model",
         uuid: item.uuid,
         productId: item.productId,
       };
+
+      model.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh) {
+          child.userData.isItem = true;
+          child.userData.type = "model";
+          child.userData.uuid = item.uuid;
+          child.userData.productId = item.productId;
+        }
+      });
 
       // Zonas de seguridad
       const editor = useEditorStore.getState();
@@ -119,10 +111,9 @@ export class ObjectManager {
             mat.includes("safety")
           ) {
             mesh.material = safetyMat.clone();
+            mesh.visible = isZonesVisible;
             mesh.userData.isSafetyZone = true;
             mesh.castShadow = false;
-            mesh.receiveShadow = false;
-            mesh.visible = isZonesVisible;
           }
         }
       });
@@ -154,7 +145,6 @@ export class ObjectManager {
 
     geometry.rotateX(-Math.PI / 2);
 
-    // Texturas UV
     const pos = geometry.attributes.position;
     const uv = geometry.attributes.uv;
 
@@ -191,6 +181,7 @@ export class ObjectManager {
     mesh.uuid = item.uuid;
     mesh.receiveShadow = true;
 
+    // 🔥 userData correcto para selección + edición de vértices
     mesh.userData = {
       isItem: true,
       type: "floor",
@@ -218,251 +209,196 @@ export class ObjectManager {
     if (!fence) return;
 
     fence.uuid = item.uuid;
-    fence.userData.isItem = true;
-    fence.userData.type = "fence";
-    fence.userData.productId = item.productId;
-    fence.userData.points = item.points;
-    fence.userData.fenceConfig = item.fenceConfig;
+
+    // 🔥 userData correcto
+    fence.userData = {
+      isItem: true,
+      type: "fence",
+      uuid: item.uuid,
+      productId: item.productId,
+      points: item.points,
+      fenceConfig: item.fenceConfig,
+    };
+
+    // También en hijos (instanced meshes)
+    fence.traverse((child) => {
+      child.userData.isItem = true;
+      child.userData.type = "fence";
+      child.userData.uuid = item.uuid;
+    });
 
     this.scene.add(fence);
   }
 
-public createFenceObject(points: THREE.Vector3[], config: FenceConfig): THREE.Group | null {
+  // ----------------------------------------------------------
+  //  CREACIÓN DE VALLA (instanced meshes)
+  // ----------------------------------------------------------
+
+  public createFenceObject(points: THREE.Vector3[], config: FenceConfig): THREE.Group | null {
     if (!points || points.length < 2) return null;
 
     const preset = FENCE_PRESETS[config.presetId] || FENCE_PRESETS["wood"];
     const colors = config.colors;
 
-    const parts: Record<string, { geo: THREE.BufferGeometry, matrices: THREE.Matrix4[], colors: number[] }> = {};
+    const parts: Record<string, { geo: THREE.BufferGeometry; matrices: THREE.Matrix4[]; colors: number[] }> = {};
     const temp = new THREE.Object3D();
 
     const addPart = (
-        key: string,
-        geo: THREE.BufferGeometry,
-        pos: THREE.Vector3,
-        rot: THREE.Euler,
-        scl: THREE.Vector3,
-        colorHex: number
+      key: string,
+      geo: THREE.BufferGeometry,
+      pos: THREE.Vector3,
+      rot: THREE.Euler,
+      scl: THREE.Vector3,
+      colorHex: number
     ) => {
-        if (!parts[key]) {
-            parts[key] = { geo, matrices: [], colors: [] };
-        }
+      if (!parts[key]) {
+        parts[key] = { geo, matrices: [], colors: [] };
+      }
 
-        temp.position.copy(pos);
-        temp.rotation.copy(rot);
-        temp.scale.copy(scl);
-        temp.updateMatrix();
+      temp.position.copy(pos);
+      temp.rotation.copy(rot);
+      temp.scale.copy(scl);
+      temp.updateMatrix();
 
-        parts[key].matrices.push(temp.matrix.clone());
-        parts[key].colors.push(colorHex);
+      parts[key].matrices.push(temp.matrix.clone());
+      parts[key].colors.push(colorHex);
     };
 
-    // ---------------------------------------
-    // GEOMETRÍAS BASE (POST / RAIL / SLAT)
-    // ---------------------------------------
-
-    // POSTE
+    // GEOMETRÍAS BASE
     let postGeo: THREE.BufferGeometry;
     if (preset.postType === "round") {
-        postGeo = new THREE.CylinderGeometry(
-            preset.postRadius!,
-            preset.postRadius!,
-            preset.postHeight,
-            16
-        );
-        postGeo.translate(0, preset.postHeight / 2, 0);
+      postGeo = new THREE.CylinderGeometry(preset.postRadius!, preset.postRadius!, preset.postHeight, 16);
+      postGeo.translate(0, preset.postHeight / 2, 0);
     } else {
-        postGeo = new THREE.BoxGeometry(
-            preset.postWidth!,
-            preset.postHeight,
-            preset.postWidth!
-        );
-        postGeo.translate(0, preset.postHeight / 2, 0);
+      postGeo = new THREE.BoxGeometry(preset.postWidth!, preset.postHeight, preset.postWidth!);
+      postGeo.translate(0, preset.postHeight / 2, 0);
     }
 
-    // RAIL
     let railGeo: THREE.BufferGeometry | null = null;
     if (preset.railType === "frame") {
-        if (preset.railShape === "square") {
-            railGeo = new THREE.BoxGeometry(
-                preset.railThickness!,
-                preset.railThickness!,
-                1
-            );
-        } else {
-            railGeo = new THREE.CylinderGeometry(
-                preset.railRadius!,
-                preset.railRadius!,
-                1,
-                12
-            );
-            railGeo.rotateX(Math.PI / 2);
-        }
+      if (preset.railShape === "square") {
+        railGeo = new THREE.BoxGeometry(preset.railThickness!, preset.railThickness!, 1);
+      } else {
+        railGeo = new THREE.CylinderGeometry(preset.railRadius!, preset.railRadius!, 1, 12);
+        railGeo.rotateX(Math.PI / 2);
+      }
     }
 
-    // SLAT
-    const slatGeo = new THREE.BoxGeometry(
-        preset.slatThickness,
-        1,
-        preset.slatWidth
-    );
+    const slatGeo = new THREE.BoxGeometry(preset.slatThickness, 1, preset.slatWidth);
 
-    // Alturas
     const topRailY = preset.postHeight - 0.12;
     const botRailY = 0.12;
     const slatHeight = topRailY - botRailY - 0.08;
     const slatCenterY = (topRailY + botRailY) * 0.5;
 
     const slatColorList = [
-        colors.slatA,
-        colors.slatB ?? colors.slatA,
-        colors.slatC ?? colors.slatA
+      colors.slatA,
+      colors.slatB ?? colors.slatA,
+      colors.slatC ?? colors.slatA,
     ];
 
-    // ---------------------------------------
-    // RECORRER SEGMENTOS
-    // ---------------------------------------
     for (let i = 0; i < points.length - 1; i++) {
-        const A = points[i];
-        const B = points[i + 1];
-        const dist = A.distanceTo(B);
+      const A = points[i];
+      const B = points[i + 1];
+      const dist = A.distanceTo(B);
 
-        const dir = new THREE.Vector3().subVectors(B, A).normalize();
-        const angle = Math.atan2(dir.x, dir.z);
+      const dir = new THREE.Vector3().subVectors(B, A).normalize();
+      const angle = Math.atan2(dir.x, dir.z);
 
-        // Segmento subdividido en módulos de ~2.0m
-        const module = 2.0;
-        const count = Math.max(1, Math.ceil(dist / module));
-        const moduleLen = dist / count;
+      const module = 2.0;
+      const count = Math.max(1, Math.ceil(dist / module));
+      const moduleLen = dist / count;
 
-        for (let m = 0; m < count; m++) {
-            const t0 = m / count;
-            const t1 = (m + 1) / count;
+      for (let m = 0; m < count; m++) {
+        const t0 = m / count;
+        const t1 = (m + 1) / count;
 
-            const P0 = new THREE.Vector3().lerpVectors(A, B, t0);
-            const P1 = new THREE.Vector3().lerpVectors(A, B, t1);
-            const PC = new THREE.Vector3().lerpVectors(P0, P1, 0.5);
+        const P0 = new THREE.Vector3().lerpVectors(A, B, t0);
+        const P1 = new THREE.Vector3().lerpVectors(A, B, t1);
+        const PC = new THREE.Vector3().lerpVectors(P0, P1, 0.5);
 
-            // POSTE EN EL START DE CADA MÓDULO
-            addPart(
-                "post",
-                postGeo,
-                P0,
-                new THREE.Euler(0, angle, 0),
-                new THREE.Vector3(1, 1, 1),
-                colors.post
-            );
+        addPart("post", postGeo, P0, new THREE.Euler(0, angle, 0), new THREE.Vector3(1, 1, 1), colors.post);
 
-            // ----------------------------
-            // RIELES
-            // ----------------------------
-            if (railGeo) {
-                // Longitud real del rail sin meterse en el poste
-                const railLen = Math.max(moduleLen - 0.1, 0.05);
+        if (railGeo) {
+          const railLen = Math.max(moduleLen - 0.1, 0.05);
 
-                addPart(
-                    "rail",
-                    railGeo,
-                    new THREE.Vector3(PC.x, topRailY, PC.z),
-                    new THREE.Euler(0, angle, 0),
-                    new THREE.Vector3(1, 1, railLen),
-                    colors.post
-                );
+          addPart("rail", railGeo, new THREE.Vector3(PC.x, topRailY, PC.z), new THREE.Euler(0, angle, 0),
+            new THREE.Vector3(1, 1, railLen), colors.post);
 
-                addPart(
-                    "rail",
-                    railGeo,
-                    new THREE.Vector3(PC.x, botRailY, PC.z),
-                    new THREE.Euler(0, angle, 0),
-                    new THREE.Vector3(1, 1, railLen),
-                    colors.post
-                );
-            }
-
-            // ----------------------------
-            // SLATS / PANEL
-            // ----------------------------
-            if (preset.isSolidPanel) {
-                // Panel continuo
-                const panelLen = moduleLen - 0.1;
-                addPart(
-                    "slat",
-                    slatGeo,
-                    new THREE.Vector3(PC.x, slatCenterY, PC.z),
-                    new THREE.Euler(0, angle, 0),
-                    new THREE.Vector3(1, slatHeight, panelLen / preset.slatWidth),
-                    slatColorList[0]
-                );
-            } else {
-                // Slats individuales
-                let slatCount: number;
-                if (preset.fixedCount) {
-                    slatCount = preset.fixedCount;
-                } else {
-                    const unit = preset.slatWidth + (preset.slatGap ?? 0.05);
-                    slatCount = Math.max(1, Math.floor(moduleLen / unit));
-                }
-
-                // Distribución uniforme
-                for (let s = 0; s < slatCount; s++) {
-                    const tSlat = (s + 0.5) / slatCount;
-                    const Pslat = new THREE.Vector3().lerpVectors(P0, P1, tSlat);
-                    Pslat.y = slatCenterY;
-
-                    const color = slatColorList[s % slatColorList.length];
-
-                    addPart(
-                        "slat",
-                        slatGeo,
-                        Pslat,
-                        new THREE.Euler(0, angle, 0),
-                        new THREE.Vector3(1, slatHeight, 1),
-                        color
-                    );
-                }
-            }
+          addPart("rail", railGeo, new THREE.Vector3(PC.x, botRailY, PC.z), new THREE.Euler(0, angle, 0),
+            new THREE.Vector3(1, 1, railLen), colors.post);
         }
+
+        if (preset.isSolidPanel) {
+          const panelLen = moduleLen - 0.1;
+          addPart(
+            "slat",
+            slatGeo,
+            new THREE.Vector3(PC.x, slatCenterY, PC.z),
+            new THREE.Euler(0, angle, 0),
+            new THREE.Vector3(1, slatHeight, panelLen / preset.slatWidth),
+            slatColorList[0]
+          );
+        } else {
+          let slatCount: number;
+          if (preset.fixedCount) {
+            slatCount = preset.fixedCount;
+          } else {
+            const unit = preset.slatWidth + (preset.slatGap ?? 0.05);
+            slatCount = Math.max(1, Math.floor(moduleLen / unit));
+          }
+
+          for (let s = 0; s < slatCount; s++) {
+            const tSlat = (s + 0.5) / slatCount;
+            const Pslat = new THREE.Vector3().lerpVectors(P0, P1, tSlat);
+            Pslat.y = slatCenterY;
+
+            const color = slatColorList[s % slatColorList.length];
+
+            addPart(
+              "slat",
+              slatGeo,
+              Pslat,
+              new THREE.Euler(0, angle, 0),
+              new THREE.Vector3(1, slatHeight, 1),
+              color
+            );
+          }
+        }
+      }
     }
 
-    // Último poste
     const last = points[points.length - 1];
     addPart("post", postGeo, last, new THREE.Euler(0, 0, 0), new THREE.Vector3(1, 1, 1), colors.post);
 
-    // ---------------------------------------
-    // INSTANCIADO FINAL
-    // ---------------------------------------
     const group = new THREE.Group();
 
     for (const key in parts) {
-        const { geo, matrices, colors } = parts[key];
-        const count = matrices.length;
+      const { geo, matrices, colors } = parts[key];
+      const count = matrices.length;
 
-        const mat = new THREE.MeshStandardMaterial({
-            roughness: 0.5,
-            metalness: 0.1
-        });
+      const mat = new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0.1 });
+      const mesh = new THREE.InstancedMesh(geo, mat, count);
 
-        const mesh = new THREE.InstancedMesh(geo, mat, count);
+      for (let i = 0; i < count; i++) {
+        mesh.setMatrixAt(i, matrices[i]);
+        mesh.setColorAt(i, new THREE.Color(colors[i]));
+      }
 
-        for (let i = 0; i < count; i++) {
-            mesh.setMatrixAt(i, matrices[i]);
-            mesh.setColorAt(i, new THREE.Color(colors[i]));
-        }
+      mesh.instanceMatrix!.needsUpdate = true;
+      mesh.instanceColor!.needsUpdate = true;
 
-        mesh.instanceMatrix!.needsUpdate = true;
-        mesh.instanceColor!.needsUpdate = true;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
 
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-
-        group.add(mesh);
+      group.add(mesh);
     }
 
     return group;
-}
+  }
 
   // ----------------------------------------------------------
-  //  COLOCAR OBJETO NUEVO DESDE EL CATÁLOGO
+  //  COLOCAR OBJETO NUEVO (CATÁLOGO)
   // ----------------------------------------------------------
 
   public async placeObject(
@@ -487,7 +423,7 @@ public createFenceObject(points: THREE.Vector3[], config: FenceConfig): THREE.Gr
 
       this.adjustObjectToGround(model);
 
-      // seguridad
+      // Seguridad
       const editor = useEditorStore.getState();
       const isZonesVisible = editor.safetyZonesVisible;
 
@@ -524,7 +460,7 @@ public createFenceObject(points: THREE.Vector3[], config: FenceConfig): THREE.Gr
         }
       });
 
-      // pop animation
+      // Pop animation
       const targetScale = model.scale.clone();
       model.scale.set(0, 0, 0);
       let t = 0;
@@ -544,6 +480,21 @@ public createFenceObject(points: THREE.Vector3[], config: FenceConfig): THREE.Gr
       const uuid = THREE.MathUtils.generateUUID();
       model.uuid = uuid;
 
+      // 🔥 CLAVE PARA QUE EL GIZMO FUNCIONE
+      model.userData = {
+        isItem: true,
+        type: "model",
+        uuid,
+        productId: product.id,
+      };
+
+      model.traverse((child) => {
+        child.userData.isItem = true;
+        child.userData.type = "model";
+        child.userData.uuid = uuid;
+        child.userData.productId = product.id;
+      });
+
       useEditorStore.getState().addItem({
         uuid,
         productId: product.id,
@@ -562,13 +513,12 @@ public createFenceObject(points: THREE.Vector3[], config: FenceConfig): THREE.Gr
         url_inst: product.url_inst,
 
         description: product.description,
-
         data: product,
       });
 
       this.scene.add(model);
-
       afterPlace?.(uuid);
+
     } catch (e) {
       console.error("Error placing object:", e);
     }

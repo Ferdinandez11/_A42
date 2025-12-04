@@ -8,7 +8,7 @@ import { FloorProperties } from "./ui/FloorProperties";
 import { FenceProperties } from "./ui/FenceProperties";
 import { InputModal } from "./ui/InputModal";
 import { QRModal } from "./ui/QRModal";
-
+import { Catalog } from "./ui/Catalog";
 import { useEditorStore } from "@/stores/editor/useEditorStore";
 import { useSelectionStore } from "@/stores/selection/useSelectionStore";
 import { useProjectStore } from "@/stores/project/useProjectStore";
@@ -103,11 +103,16 @@ export const Editor3D = () => {
   // --------------------------
   // POINTER HANDLING
   // --------------------------
-  const handlePointerDown = (e: React.PointerEvent) => {
-    if ((e.target as HTMLElement).closest("button,a,input")) return;
-    engineRef.current?.onMouseDown(e.nativeEvent);
-  };
+const handlePointerDown = (e: React.PointerEvent) => {
+  engineRef.current?.onMouseDown(e.nativeEvent);
+};
 
+<div
+  ref={containerRef}
+  onPointerDown={handlePointerDown}
+  onContextMenu={(e) => e.preventDefault()}
+  className="absolute inset-0 z-0"
+/>
   // --------------------------
   // GIZMO ACTIONS
   // --------------------------
@@ -186,6 +191,7 @@ export const Editor3D = () => {
         </div>
       )}
 
+      {mode === "catalog" && <Catalog />}
       <Toolbar />
       <QRModal isOpen={qrVisible} onClose={() => setQRVisible(false)} />
 
