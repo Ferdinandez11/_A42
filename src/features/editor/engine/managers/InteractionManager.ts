@@ -115,12 +115,22 @@ export class InteractionManager {
   }
 
   public onMouseDown = (event: MouseEvent) => {
-    if (this.transformControl && this.isDraggingGizmo) return;
+// 🛑 NUEVO: si el click cae en el gizmo, no hacemos nada más
+if (
+  this.transformControl &&
+  this.transformControl.visible &&
+  this.transformControl.object !== undefined &&
+  this.transformControl.object !== null
+) {
+  const gizmoHits = this.raycaster.intersectObject(
+    this.transformControl,
+    true
+  );
+  if (gizmoHits.length > 0) {
+    return;
+  }
+}
 
-    const rect = this.engine.renderer.domElement.getBoundingClientRect();
-    this.pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    this.pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-    this.raycaster.setFromCamera(this.pointer, this.engine.activeCamera);
 
     const editor = useEditorStore.getState();
     const catalog = useCatalogStore.getState();
@@ -277,49 +287,49 @@ export class InteractionManager {
     }
   };
 
-public selectObject(object: THREE.Object3D | null) {
-  const selection = useSelectionStore.getState();
-  const editor = useEditorStore.getState(); // <-- NECESARIO
+  public selectObject(object: THREE.Object3D | null) {
+    const selection = useSelectionStore.getState();
+    const editor = useEditorStore.getState(); // <-- NECESARIO
 
-  // Si no hay transformControl, limpiar selección y modo
-  if (!this.transformControl) {
-    selection.selectItem(null);
-    editor.setMode("idle");
-    return;
-  }
+    // Si no hay transformControl, limpiar selección y modo
+    if (!this.transformControl) {
+      selection.selectItem(null);
+      editor.setMode("idle");
+      return;
+    }
 
-  // 🔄 Si hacemos clic en el mismo objeto ya seleccionado → solo actualizamos selección
-  if (
-    object &&
-    this.transformControl.object?.uuid === object.uuid &&
-    selection.selectedItemId !== object.uuid
-  ) {
+    // 🔄 Si hacemos clic en el mismo objeto ya seleccionado → solo actualizamos selección
+    if (
+      object &&
+      this.transformControl.object?.uuid === object.uuid &&
+      selection.selectedItemId !== object.uuid
+    ) {
+      selection.selectItem(object.uuid);
+      editor.setMode("editing");
+      return;
+    }
+
+    // 🧹 Si había algo seleccionado antes, lo quitamos
+    if (this.transformControl.object) {
+      this.transformControl.detach();
+      this.transformControl.visible = false;
+      this.engine.sceneManager.controls.enabled = true;
+    }
+
+    // ❌ SI NO HAY OBJETO → deseleccionar todo
+    if (!object) {
+      selection.selectItem(null);
+      editor.setMode("idle");
+      return;
+    }
+
+    // ✔ SELECCIÓN NUEVA
+    this.transformControl.attach(object);
     selection.selectItem(object.uuid);
     editor.setMode("editing");
-    return;
+
+    this.transformControl.visible = true;
   }
-
-  // 🧹 Si había algo seleccionado antes, lo quitamos
-  if (this.transformControl.object) {
-    this.transformControl.detach();
-    this.transformControl.visible = false;
-    this.engine.sceneManager.controls.enabled = true;
-  }
-
-  // ❌ SI NO HAY OBJETO → deseleccionar todo
-  if (!object) {
-    selection.selectItem(null);
-    editor.setMode("idle");
-    return;
-  }
-
-  // ✔ SELECCIÓN NUEVA
-  this.transformControl.attach(object);
-  selection.selectItem(object.uuid);
-  editor.setMode("editing");
-
-  this.transformControl.visible = true;
-}
 
   private syncTransformToStore(obj: THREE.Object3D) {
     const editor = useEditorStore.getState();

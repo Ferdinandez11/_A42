@@ -114,6 +114,14 @@ export const Editor3D = () => {
   const setGizmoMode = (m: "translate" | "rotate" | "scale") =>
     engineRef.current?.setGizmoMode(m);
 
+  useEffect(() => {
+      const eng = engineRef.current;
+      if (!eng) return;
+
+      eng.switchCamera(cameraType);
+      eng.interactionManager.updateCamera(eng.activeCamera); // 👈 CLAVE
+    }, [cameraType]);
+
   return (
     <div className="w-screen h-screen relative bg-neutral-900 overflow-hidden">
       <div
