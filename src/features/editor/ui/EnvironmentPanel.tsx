@@ -1,6 +1,6 @@
 // --- START OF FILE src/features/editor/ui/EnvironmentPanel.tsx ---
 //import React from 'react';
-import { useAppStore } from '../../../stores/useAppStore';
+import { useEditorStore } from "@/stores/editor/useEditorStore";
 import { X, Sun, MountainSnow } from 'lucide-react';
 
 export const EnvironmentPanel = () => {
@@ -11,7 +11,7 @@ export const EnvironmentPanel = () => {
     setSunPosition, 
     backgroundColor, 
     setBackgroundColor 
-  } = useAppStore();
+  } = useEditorStore();
 
   if (!envPanelVisible) return null;
 

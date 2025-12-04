@@ -10,7 +10,7 @@ import { InputModal } from "./ui/InputModal";
 import { QRModal } from "./ui/QRModal";
 
 import { useEditorStore } from "@/stores/editor/useEditorStore";
-import { useSelectionStore } from "@/stores/editor/useSelectionStore";
+import { useSelectionStore } from "@/stores/selection/useSelectionStore";
 import { useProjectStore } from "@/stores/project/useProjectStore";
 
 

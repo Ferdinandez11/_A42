@@ -2,15 +2,17 @@ import { create } from "zustand";
 import { supabase } from "@/lib/supabase";
 
 import type { SceneItem, FenceConfig } from "@/types/editor";
+import { useSceneStore } from "@/stores/scene/useSceneStore";
 import { useEditorStore } from "@/stores/editor/useEditorStore";
 
 interface ProjectState {
+  user: any | null;
+
   currentProjectId: string | null;
   currentProjectName: string | null;
   isReadOnlyMode: boolean;
 
-  items: SceneItem[];
-  totalPrice: number;
+  setUser: (user: any | null) => void;
 
   setProjectInfo: (id: string | null, name: string | null) => void;
   resetProject: () => void;
@@ -19,16 +21,20 @@ interface ProjectState {
 }
 
 export const useProjectStore = create<ProjectState>((set) => ({
+  user: null,
+
   currentProjectId: null,
   currentProjectName: null,
   isReadOnlyMode: false,
 
-  items: [],
-  totalPrice: 0,
+  // -------------------------------------
+  // USER
+  // -------------------------------------
+  setUser: (user) => set({ user }),
 
-  // -----------------------------------------
+  // -------------------------------------
   // SET PROJECT INFO (ID + NAME)
-  // -----------------------------------------
+  // -------------------------------------
   setProjectInfo: (id, name) =>
     set({
       currentProjectId: id,
@@ -36,21 +42,22 @@ export const useProjectStore = create<ProjectState>((set) => ({
       isReadOnlyMode: false,
     }),
 
-  // -----------------------------------------
-  // RESET (NUEVO PROYECTO)
-  // -----------------------------------------
-  resetProject: () =>
+  // -------------------------------------
+  // RESET PROJECT (NUEVO PROYECTO)
+  // -------------------------------------
+  resetProject: () => {
+    useSceneStore.getState().resetScene(); // limpiamos escena
+
     set({
       currentProjectId: null,
       currentProjectName: null,
-      items: [],
-      totalPrice: 0,
       isReadOnlyMode: false,
-    }),
+    });
+  },
 
-  // -----------------------------------------
+  // -------------------------------------
   // LOAD PROJECT
-  // -----------------------------------------
+  // -------------------------------------
   loadProjectFromURL: async (projectId: string) => {
     const { data: project, error } = await supabase
       .from("projects")
@@ -83,10 +90,15 @@ export const useProjectStore = create<ProjectState>((set) => ({
       0
     );
 
-    // --- UPDATE EDITOR STORE ---
-    useEditorStore.setState({
+    // --- UPDATE SCENE STORE ---
+    useSceneStore.setState({
       items,
       fenceConfig: fence,
+      totalPrice,
+    });
+
+    // --- UPDATE EDITOR STORE ---
+    useEditorStore.setState({
       cameraType: scene.camera || "perspective",
     });
 
@@ -94,8 +106,6 @@ export const useProjectStore = create<ProjectState>((set) => ({
     set({
       currentProjectId: project.id,
       currentProjectName: project.name,
-      items,
-      totalPrice,
       isReadOnlyMode: true,
     });
   },

@@ -2,20 +2,34 @@ import React, { useState, useRef } from 'react';
 import { 
   MousePointer2, Grid3X3, Component, Trees, Grid, Undo2, Redo2, Eye, Box, ArrowUp, ArrowRight, GalleryVerticalEnd, Square, Sun, Upload, Ruler, Footprints, Video, Camera, Film, Download, FileText, ShieldAlert, FileDown, Save, LayoutDashboard
 } from 'lucide-react';
-import { useAppStore } from '../../../stores/useAppStore';
+import { useEditorStore } from "@/stores/editor/useEditorStore";
+import { useSceneStore } from "@/stores/scene/useSceneStore";
+import { useProjectStore } from "@/stores/project/useProjectStore";
 import { supabase } from '../../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import './Editor.css';
 
 export const Toolbar = () => {
   const navigate = useNavigate();
-  const { 
-    mode, setMode, gridVisible, toggleGrid, undo, redo, past, future, 
-    cameraType, setCameraType, triggerView, toggleEnvPanel, envPanelVisible, 
-    setMeasurementResult, addItem, safetyZonesVisible, toggleSafetyZones,
-    user, requestInput, items, fenceConfig, totalPrice, currentProjectId, currentProjectName, setProjectInfo,
-    isReadOnlyMode // 💡 IMPORTANTE: Leemos el estado de solo lectura
-  } = useAppStore();
+const {
+  mode, setMode, gridVisible, toggleGrid,
+  undo, redo, past, future,
+  cameraType, setCameraType, triggerView,
+  envPanelVisible, toggleEnvPanel,
+  setMeasurementResult,
+  safetyZonesVisible, toggleSafetyZones,
+  requestInput,
+} = useEditorStore();
+
+const {
+  items, addItem, fenceConfig, totalPrice,
+  removeItem, resetScene,
+} = useSceneStore();
+
+const {
+  user, currentProjectId, currentProjectName,
+  isReadOnlyMode, setProjectInfo,
+} = useProjectStore();
 
   const [showViews, setShowViews] = useState(false);
   const [isRecording, setIsRecording] = useState(false);

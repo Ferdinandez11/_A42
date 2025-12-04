@@ -1,7 +1,8 @@
 // --- START OF FILE src/features/editor/ui/Catalog.tsx ---
 import { useEffect, useState, useMemo } from 'react';
 import { Search, X } from 'lucide-react'; // Importamos iconos
-import { useAppStore } from '../../../stores/useAppStore';
+import { useEditorStore } from '@/stores/editor/useEditorStore';
+import { useCatalogStore } from '@/stores/catalog/useCatalogStore';
 import { 
   loadCatalogData, 
   getCatalogDB, 
@@ -12,7 +13,8 @@ import {
 } from '../../../services/catalogService';
 
 export const Catalog = () => {
-  const { setMode, setSelectedProduct } = useAppStore();
+  const { setMode } = useEditorStore();
+  const { setSelectedProduct } = useCatalogStore();
   const [catalogDB, setCatalogDB] = useState<CatalogDB | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

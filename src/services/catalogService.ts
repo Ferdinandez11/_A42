@@ -1,6 +1,6 @@
 // --- START OF FILE src/catalog/catalogService.ts ---
 
-import type { ProductDefinition } from '../stores/useAppStore'; 
+import type { ProductDefinition } from "@/types/catalog";
 
 // Extendemos el tipo para que TypeScript no se queje de la descripción si no está en el store original
 export type Product = ProductDefinition & { description?: string };

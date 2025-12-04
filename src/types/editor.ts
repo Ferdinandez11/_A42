@@ -1,4 +1,19 @@
-// --- COMMON TYPES ---
+// ===============================
+//  SHARED EDITOR TYPES
+// ===============================
+
+// ---- Scene Item Types ----
+export type FloorMaterialType =
+  | "rubber_red"
+  | "rubber_green"
+  | "rubber_blue"
+  | "grass"
+  | "concrete";
+
+export interface FenceConfig {
+  presetId: string;
+  colors: { post: number; slatA: number; slatB?: number; slatC?: number };
+}
 
 export interface SceneItem {
   uuid: string;
@@ -13,8 +28,9 @@ export interface SceneItem {
   type: "model" | "floor" | "fence";
 
   modelUrl?: string;
-  points?: { x: number; z: number }[];
 
+  // floor
+  points?: { x: number; z: number }[];
   floorMaterial?: FloorMaterialType;
   textureUrl?: string;
   textureScale?: number;
@@ -22,17 +38,18 @@ export interface SceneItem {
 
   fenceConfig?: FenceConfig;
 
+  // misc data
   data?: any;
 }
 
-export type FloorMaterialType =
-  | "rubber_red"
-  | "rubber_green"
-  | "rubber_blue"
-  | "grass"
-  | "concrete";
+// ---- Editor State Types ----
 
-export interface FenceConfig {
-  presetId: string;
-  colors: { post: number; slatA: number; slatB?: number; slatC?: number };
-}
+export type EditorMode =
+  | "idle"
+  | "placing_item"
+  | "editing"
+  | "measuring";
+
+export type CameraView = "top" | "front" | "side" | "iso";
+export type CameraType = "perspective" | "orthographic";
+

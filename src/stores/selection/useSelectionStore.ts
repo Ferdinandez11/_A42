@@ -1,6 +1,7 @@
 import { create } from "zustand";
-import { useEditorStore } from "./useEditorStore";
+import { useEditorStore } from "../editor/useEditorStore";
 import { useProjectStore } from "../project/useProjectStore";
+import type { SceneItem } from "@/types/editor";
 
 interface SelectionState {
   selectedItemId: string | null;
@@ -8,7 +9,6 @@ interface SelectionState {
   measuredDistance: number | null;
   measuredAngle: number | null;
 
-  // --- Actions ---
   selectItem: (uuid: string | null) => void;
   clearSelection: () => void;
 
@@ -74,7 +74,7 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
     if (!selectedId) return;
 
     const editor = useEditorStore.getState();
-    const item = editor.items.find((i) => i.uuid === selectedId);
+    const item = editor.items.find((i: SceneItem) => i.uuid === selectedId);
     if (!item) return;
 
     const cloned = structuredClone(item);
@@ -108,7 +108,7 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
     const editor = useEditorStore.getState();
 
     useEditorStore.setState({
-      items: editor.items.filter((i) => i.uuid !== selectedId),
+      items: editor.items.filter((i: SceneItem) => i.uuid !== selectedId),
     });
 
     set({ selectedItemId: null });

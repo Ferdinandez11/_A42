@@ -1,10 +1,10 @@
 // --- START OF FILE src/features/editor/ui/InputModal.tsx ---
 import React, { useState, useEffect, useRef } from 'react';
-import { useAppStore } from '../../../stores/useAppStore';
+import { useEditorStore } from "@/stores/editor/useEditorStore";
 import { X, Check } from 'lucide-react';
 
 export const InputModal = () => {
-  const { inputModal, closeInputModal } = useAppStore();
+  const { inputModal, closeInputModal } = useEditorStore();
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
