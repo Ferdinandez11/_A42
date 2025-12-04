@@ -28,7 +28,11 @@ export interface SceneItem {
   type: "model" | "floor" | "fence";
 
   modelUrl?: string;
-
+  url_tech?: string;
+  url_cert?: string;
+  url_inst?: string;
+  description?: string;
+  
   // floor
   points?: { x: number; z: number }[];
   floorMaterial?: FloorMaterialType;
@@ -46,8 +50,10 @@ export interface SceneItem {
 
 export type EditorMode =
   | "idle"
-  | "placing_item"
   | "editing"
+  | "placing_item"
+  | "drawing_floor"
+  | "drawing_fence"
   | "measuring";
 
 export type CameraView = "top" | "front" | "side" | "iso";
