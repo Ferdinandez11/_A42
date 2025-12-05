@@ -1,25 +1,70 @@
-// --- START OF FILE useCatalogStore.ts ---
 import { create } from "zustand";
+import type { ProductDefinition } from "@/types/catalog";
 
 interface CatalogState {
-  isOpen: boolean;
-  selectedProduct: any;
+  // Catálogo ya cargado y normalizado
+  catalog: ProductDefinition[];
 
-  openCatalog: () => void;
-  closeCatalog: () => void;
-  toggleCatalog: () => void;
+  // Estado de navegación
+  currentLine: string | null;
+  currentCategory: string | null;
 
-  selectProduct: (product: any) => void;
+  // Buscador
+  searchTerm: string;
+
+  // Producto actualmente seleccionado en el catálogo
+  selectedProduct: ProductDefinition | null;
+
+  // ==== ACTIONS ====
+  setCatalog: (items: ProductDefinition[]) => void;
+
+  setLine: (line: string | null) => void;
+  setCategory: (category: string | null) => void;
+
+  setSearchTerm: (term: string) => void;
+
+  selectProduct: (product: ProductDefinition | null) => void;
+
+  clearNavigation: () => void;
+  clearSearch: () => void;
 }
 
 export const useCatalogStore = create<CatalogState>((set) => ({
-  isOpen: false,
+  // === DEFAULT STATE ===
+  catalog: [],
+
+  currentLine: null,
+  currentCategory: null,
+
+  searchTerm: "",
+
   selectedProduct: null,
 
-  openCatalog: () => set({ isOpen: true }),
-  closeCatalog: () => set({ isOpen: false }),
-  toggleCatalog: () => set((s) => ({ isOpen: !s.isOpen })),
+  // === ACTIONS ===
+  setCatalog: (items) => set({ catalog: items }),
+
+  setLine: (line) =>
+    set({
+      currentLine: line,
+      currentCategory: null, // reset category when line changes
+      searchTerm: "",
+    }),
+
+  setCategory: (category) =>
+    set({
+      currentCategory: category,
+      searchTerm: "",
+    }),
+
+  setSearchTerm: (term) => set({ searchTerm: term }),
 
   selectProduct: (product) => set({ selectedProduct: product }),
+
+  clearNavigation: () =>
+    set({
+      currentLine: null,
+      currentCategory: null,
+    }),
+
+  clearSearch: () => set({ searchTerm: "" }),
 }));
-// --- END OF FILE ---

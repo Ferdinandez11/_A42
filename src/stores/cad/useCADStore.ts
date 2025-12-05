@@ -1,16 +1,17 @@
-// --- FILE: src/stores/cad/useCADStore.ts ---
 import { create } from "zustand";
 
-interface CADState {
+export interface CADState {
+  // Índices de vértices seleccionados en una geometría
   selectedVertices: number[];
+
+  // Distancia calculada entre dos puntos (modo medición)
   distance: number | null;
+
+  // Ángulo calculado cuando aplica
   angle: number | null;
 
-  setSelectedVertices: (
-    indices: number[],
-    distance: number | null,
-    angle: number | null
-  ) => void;
+  // === ACTIONS ===
+  setSelectedVertices: (indices: number[], distance: number | null, angle: number | null) => void;
 
   clear: () => void;
 }

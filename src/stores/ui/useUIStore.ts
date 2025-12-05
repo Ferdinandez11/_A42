@@ -1,88 +1,59 @@
 import { create } from "zustand";
 
-interface InputModalState {
-  isOpen: boolean;
-  title: string;
-  defaultValue: string;
-  resolve: ((value: string | null) => void) | null;
+interface GlobalUIState {
+  // --- APP GLOBAL (NO EDITOR 3D) ---
+  sidebarOpen: boolean;
+  loading: boolean;
+  toast: {
+    message: string;
+    type: "success" | "error" | "info" | null;
+    visible: boolean;
+  };
+
+  // === ACTIONS ===
+  toggleSidebar: () => void;
+
+  setLoading: (state: boolean) => void;
+
+  showToast: (message: string, type?: "success" | "error" | "info") => void;
+  hideToast: () => void;
 }
 
-interface UIState {
-  // --- PANEL STATES ---
-  gridVisible: boolean;
-  budgetVisible: boolean;
-  envPanelVisible: boolean;
-  safetyZonesVisible: boolean;
+export const useUIStore = create<GlobalUIState>((set) => ({
+  // === DEFAULT STATE ===
+  sidebarOpen: false,
+  loading: false,
 
-  // --- MODALS ---
-  inputModal: InputModalState;
-  qrModalOpen: boolean;
-
-  // --- ACTIONS ---
-  toggleGrid: () => void;
-  toggleBudget: () => void;
-  toggleEnvPanel: () => void;
-  toggleSafetyZones: () => void;
-
-  openQRModal: () => void;
-  closeQRModal: () => void;
-
-  requestInput: (title: string, defaultValue?: string) => Promise<string | null>;
-  closeInputModal: (value: string | null) => void;
-}
-
-export const useUIStore = create<UIState>((set, get) => ({
-  // --- INITIAL UI VALUES ---
-  gridVisible: false,
-  budgetVisible: false,
-  envPanelVisible: false,
-  safetyZonesVisible: false,
-
-  qrModalOpen: false,
-
-  inputModal: {
-    isOpen: false,
-    title: "",
-    defaultValue: "",
-    resolve: null,
+  toast: {
+    message: "",
+    type: null,
+    visible: false,
   },
 
-  // --- TOGGLES ---
-  toggleGrid: () => set((s) => ({ gridVisible: !s.gridVisible })),
-  toggleBudget: () => set((s) => ({ budgetVisible: !s.budgetVisible })),
-  toggleEnvPanel: () => set((s) => ({ envPanelVisible: !s.envPanelVisible })),
-  toggleSafetyZones: () =>
-    set((s) => ({ safetyZonesVisible: !s.safetyZonesVisible })),
+  // === ACTIONS ===
 
-  // --- QR MODAL ---
-  openQRModal: () => set({ qrModalOpen: true }),
-  closeQRModal: () => set({ qrModalOpen: false }),
+  toggleSidebar: () =>
+    set((s) => ({
+      sidebarOpen: !s.sidebarOpen,
+    })),
 
-  // --- INPUT MODAL (PROMISE-BASED) ---
-  requestInput: (title, defaultValue = "") => {
-    return new Promise((resolve) => {
-      set({
-        inputModal: {
-          isOpen: true,
-          title,
-          defaultValue,
-          resolve,
-        },
-      });
-    });
-  },
+  setLoading: (state) => set({ loading: state }),
 
-  closeInputModal: (value) => {
-    const { resolve } = get().inputModal;
-    if (resolve) resolve(value);
-
+  showToast: (message, type = "info") =>
     set({
-      inputModal: {
-        isOpen: false,
-        title: "",
-        defaultValue: "",
-        resolve: null,
+      toast: {
+        message,
+        type,
+        visible: true,
       },
-    });
-  },
+    }),
+
+  hideToast: () =>
+    set({
+      toast: {
+        message: "",
+        type: null,
+        visible: false,
+      },
+    }),
 }));

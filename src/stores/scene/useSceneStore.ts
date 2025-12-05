@@ -1,203 +1,103 @@
-// --- FILE: src/stores/scene/useSceneStore.ts ---
 import { create } from "zustand";
-import type { SceneItem, FenceConfig, FloorMaterialType } from "@/types/editor";
-import { FENCE_PRESETS } from "@/features/editor/data/fence_presets";
+import type { Vector3Array } from "@/types/editor";
 
-interface SceneState {
-  // --- STATE ---
-  items: SceneItem[];
-  totalPrice: number;
-  
-  // Config global temporal (para la próxima valla que dibujes)
-  fenceConfig: FenceConfig;
+export interface SceneItem {
+  uuid: string;
+  productId: string;
+  name: string;
 
-  // History
-  past: SceneItem[][];
-  future: SceneItem[][];
+  // Precio actual según catálogo o cálculo paramétrico
+  price: number;
 
-  // --- ACTIONS (CRUD) ---
-  addItem: (item: SceneItem) => void;
-  removeItem: (uuid: string) => void;
-  
-  // Actualizaciones parciales
-  updateItemTransform: (uuid: string, pos: number[], rot: number[], scale: number[]) => void;
-  updateFloorMaterial: (uuid: string, material: FloorMaterialType) => void;
-  updateFloorTexture: (uuid: string, url: string | undefined, scale: number, rotation: number) => void;
-  updateFloorPoints: (uuid: string, points: { x: number; z: number }[]) => void;
-  updateFencePoints: (uuid: string, points: { x: number; z: number }[]) => void;
-  
-  // Configuración de vallas
-  setFenceConfig: (config: Partial<FenceConfig>) => void;
-  updateItemFenceConfig: (uuid: string, config: Partial<FenceConfig>) => void;
+  // Transformaciones básicas
+  position: Vector3Array; // [x, y, z]
+  rotation: Vector3Array; // [x, y, z]
+  scale: Vector3Array;    // [x, y, z]
 
-  // Gestión de escena
-  resetScene: () => void;
-  setItems: (items: SceneItem[]) => void; // Útil para cargar proyectos
+  // Metadata opcional
+  description?: string;
+  url_tech?: string;
+  url_cert?: string;
+  url_inst?: string;
 
-  // History Actions
-  saveSnapshot: () => void;
-  undo: () => void;
-  redo: () => void;
+  // Datos del catálogo completo si se necesita
+  data?: any;
+
+  // Campos especiales (suelos y vallas)
+  type?: "model" | "floor" | "fence";
+  info?: string; // Ej: "12 m²" o "6 m"
 }
 
-export const useSceneStore = create<SceneState>((set, get) => ({
+interface SceneState {
+  items: SceneItem[];
+
+  // === ACTIONS ===
+  addItem: (item: SceneItem) => void;
+  updateItem: (uuid: string, partial: Partial<SceneItem>) => void;
+  removeItem: (uuid: string) => void;
+
+  clearScene: () => void;
+
+  // Sync para transforms (motor 3D → store)
+  setItemTransform: (
+    uuid: string,
+    position: Vector3Array,
+    rotation: Vector3Array,
+    scale: Vector3Array
+  ) => void;
+
+  // Reemplaza todos los items (cargar proyecto)
+  setItems: (items: SceneItem[]) => void;
+}
+
+export const useSceneStore = create<SceneState>((set) => ({
   items: [],
-  totalPrice: 0,
-  
-  fenceConfig: {
-    presetId: "wood",
-    colors: FENCE_PRESETS["wood"].defaultColors,
-  },
 
-  past: [],
-  future: [],
-
-  // --- INTERNAL HELPER ---
-  saveSnapshot: () => {
-    const snapshot = structuredClone(get().items);
-    set((state) => ({
-      past: [...state.past.slice(-19), snapshot],
-      future: [],
-    }));
-  },
-
-  // --- ACTIONS ---
-  
-  addItem: (item) => {
-    get().saveSnapshot();
+  // =====================================================
+  // ADD ITEM
+  // =====================================================
+  addItem: (item) =>
     set((s) => ({
       items: [...s.items, item],
-      totalPrice: s.totalPrice + (item.price || 0),
-    }));
-  },
+    })),
 
-  removeItem: (uuid) => {
-    get().saveSnapshot();
-    set((s) => {
-      const newItems = s.items.filter((i) => i.uuid !== uuid);
-      return {
-        items: newItems,
-        totalPrice: newItems.reduce((sum, i) => sum + i.price, 0),
-      };
-    });
-  },
-
-  updateItemTransform: (uuid, pos, rot, scale) =>
+  // =====================================================
+  // UPDATE ITEM
+  // =====================================================
+  updateItem: (uuid, partial) =>
     set((s) => ({
-      items: s.items.map((i) =>
-        i.uuid === uuid
-          ? {
-              ...i,
-              position: pos as [number, number, number],
-              rotation: rot as [number, number, number],
-              scale: scale as [number, number, number],
-            }
-          : i
+      items: s.items.map((it) =>
+        it.uuid === uuid ? { ...it, ...partial } : it
       ),
     })),
 
-  updateFloorMaterial: (uuid, material) =>
+  // =====================================================
+  // REMOVE ITEM
+  // =====================================================
+  removeItem: (uuid) =>
     set((s) => ({
-      items: s.items.map((i) =>
-        i.uuid === uuid && i.type === "floor"
-          ? { ...i, floorMaterial: material, textureUrl: undefined }
-          : i
+      items: s.items.filter((it) => it.uuid !== uuid),
+    })),
+
+  // =====================================================
+  // SET TRANSFORMS (motor 3D → estado limpio)
+  // =====================================================
+  setItemTransform: (uuid, position, rotation, scale) =>
+    set((s) => ({
+      items: s.items.map((it) =>
+        it.uuid === uuid
+          ? { ...it, position, rotation, scale }
+          : it
       ),
     })),
 
-  updateFloorTexture: (uuid, url, scale, rotation) =>
-    set((s) => ({
-      items: s.items.map((i) =>
-        i.uuid === uuid && i.type === "floor"
-          ? {
-              ...i,
-              textureUrl: url,
-              textureScale: scale,
-              textureRotation: rotation,
-              floorMaterial: undefined,
-            }
-          : i
-      ),
-    })),
+  // =====================================================
+  // REEMPLAZAR ESCENA ENTERA (al cargar proyecto)
+  // =====================================================
+  setItems: (items) => set({ items }),
 
-  updateFloorPoints: (uuid, points) => {
-    // Nota: A veces no queremos snapshot en cada micro-movimiento, 
-    // pero para simplificar lo dejamos así o lo gestionamos desde el manager.
-    set((s) => ({
-      items: s.items.map((i) =>
-        i.uuid === uuid && i.type === "floor" ? { ...i, points } : i
-      ),
-    }));
-  },
-
-  updateFencePoints: (uuid, points) => {
-    set((s) => ({
-      items: s.items.map((i) =>
-        i.uuid === uuid && i.type === "fence" ? { ...i, points } : i
-      ),
-    }));
-  },
-
-  setFenceConfig: (config) =>
-    set((s) => ({
-      fenceConfig: { ...s.fenceConfig, ...config },
-    })),
-
-  updateItemFenceConfig: (uuid, config) => {
-    get().saveSnapshot();
-    set((s) => ({
-      items: s.items.map((i) => {
-        if (i.uuid === uuid && i.type === "fence") {
-          return {
-            ...i,
-            fenceConfig: { ...i.fenceConfig, ...config },
-          };
-        }
-        return i;
-      }),
-    }));
-  },
-
-  // --- HISTORY ---
-  undo: () => {
-    const { past, items, future } = get();
-    if (past.length === 0) return;
-
-    const prev = past[past.length - 1];
-    set({
-      items: prev,
-      past: past.slice(0, -1),
-      future: [items, ...future],
-      totalPrice: prev.reduce((s, i) => s + i.price, 0),
-    });
-  },
-
-  redo: () => {
-    const { past, items, future } = get();
-    if (future.length === 0) return;
-
-    const next = future[0];
-    set({
-      items: next,
-      past: [...past, items],
-      future: future.slice(1),
-      totalPrice: next.reduce((s, i) => s + i.price, 0),
-    });
-  },
-
-  resetScene: () =>
-    set({
-      items: [],
-      totalPrice: 0,
-      past: [],
-      future: [],
-    }),
-
-  setItems: (newItems) => 
-    set({
-        items: newItems,
-        totalPrice: newItems.reduce((s, i) => s + i.price, 0),
-        past: [],
-        future: []
-    })
+  // =====================================================
+  // LIMPIAR ESCENA
+  // =====================================================
+  clearScene: () => set({ items: [] }),
 }));

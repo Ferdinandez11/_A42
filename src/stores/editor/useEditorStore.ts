@@ -1,70 +1,73 @@
-// --- FILE: src/stores/editor/useEditorStore.ts ---
 import { create } from "zustand";
-import type { EditorMode, CameraType, CameraView } from "@/types/editor";
 
-
-interface InputModalState {
-  isOpen: boolean;
-  title: string;
-  defaultValue: string;
-  resolve: ((value: string | null) => void) | null;
-}
+export type ToolMode =
+  | "select"
+  | "move"
+  | "rotate"
+  | "scale"
+  | "floor"
+  | "fence"
+  | "catalog"
+  | "none";
 
 interface EditorState {
-  // UI STATE
-  mode: EditorMode;
-  
+  // UI
   gridVisible: boolean;
-  budgetVisible: boolean;
-  envPanelVisible: boolean;
+  skyVisible: boolean;
   safetyZonesVisible: boolean;
+  envPanelVisible: boolean;
+  budgetVisible: boolean;
+  qrModalOpen: boolean;
 
-  sunPosition: { azimuth: number; elevation: number };
+  // Tool mode
+  activeTool: ToolMode;
+
+  // Background
   backgroundColor: string;
 
-  cameraType: CameraType;
-  pendingView: CameraView | null;
+  // Sun position (for Sky)
+  sunPosition: number;
 
-  measurementResult: number | null;
+  // Modals
+  inputModal: {
+    isOpen: boolean;
+    title: string;
+    defaultValue: string;
+    resolve: ((value: string | null) => void) | null;
+  };
 
-  inputModal: InputModalState;
-
-  // ACTIONS (Solo UI y Modos)
-  setMode: (mode: EditorMode) => void;
+  // ==== ACTIONS ====
+  setActiveTool: (tool: ToolMode) => void;
 
   toggleGrid: () => void;
-  toggleBudget: () => void;
+  toggleSky: () => void;
   toggleEnvPanel: () => void;
   toggleSafetyZones: () => void;
+  toggleBudget: () => void;
 
-  setSunPosition: (azimuth: number, elevation: number) => void;
   setBackgroundColor: (color: string) => void;
+  setSunPosition: (pos: number) => void;
 
-  setMeasurementResult: (dist: number | null) => void;
-
-  setCameraType: (type: CameraType) => void;
-  triggerView: (view: CameraView) => void;
-  clearPendingView: () => void;
+  openQRModal: () => void;
+  closeQRModal: () => void;
 
   requestInput: (title: string, defaultValue?: string) => Promise<string | null>;
   closeInputModal: (value: string | null) => void;
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
-  mode: "idle",
-
-  gridVisible: false,
-  budgetVisible: false,
-  envPanelVisible: false,
+  // === DEFAULT STATE ===
+  gridVisible: true,
+  skyVisible: true,
   safetyZonesVisible: false,
+  envPanelVisible: false,
+  budgetVisible: false,
+  qrModalOpen: false,
 
-  sunPosition: { azimuth: 180, elevation: 45 },
-  backgroundColor: "#111111",
+  activeTool: "select",
 
-  cameraType: "perspective",
-  pendingView: null,
-
-  measurementResult: null,
+  backgroundColor: "#222222",
+  sunPosition: 45,
 
   inputModal: {
     isOpen: false,
@@ -73,27 +76,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     resolve: null,
   },
 
-  setMode: (mode) => {
-    // Limpiamos herramientas del motor si cambiamos de modo
-     set({ mode });
-  },
+  // === ACTIONS ===
+  setActiveTool: (tool) => set({ activeTool: tool }),
 
   toggleGrid: () => set((s) => ({ gridVisible: !s.gridVisible })),
-  toggleBudget: () => set((s) => ({ budgetVisible: !s.budgetVisible })),
+  toggleSky: () => set((s) => ({ skyVisible: !s.skyVisible })),
   toggleEnvPanel: () => set((s) => ({ envPanelVisible: !s.envPanelVisible })),
   toggleSafetyZones: () =>
     set((s) => ({ safetyZonesVisible: !s.safetyZonesVisible })),
-
-  setSunPosition: (azimuth, elevation) =>
-    set({ sunPosition: { azimuth, elevation } }),
+  toggleBudget: () => set((s) => ({ budgetVisible: !s.budgetVisible })),
 
   setBackgroundColor: (color) => set({ backgroundColor: color }),
+  setSunPosition: (pos) => set({ sunPosition: pos }),
 
-  setMeasurementResult: (dist) => set({ measurementResult: dist }),
-
-  setCameraType: (type) => set({ cameraType: type }),
-  triggerView: (view) => set({ pendingView: view }),
-  clearPendingView: () => set({ pendingView: null }),
+  openQRModal: () => set({ qrModalOpen: true }),
+  closeQRModal: () => set({ qrModalOpen: false }),
 
   requestInput: (title, defaultValue = "") =>
     new Promise((resolve) => {
@@ -108,8 +105,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
 
   closeInputModal: (value) => {
-    const resolver = get().inputModal.resolve;
-    resolver?.(value);
+    const { resolve } = get().inputModal;
+    if (resolve) resolve(value);
 
     set({
       inputModal: {

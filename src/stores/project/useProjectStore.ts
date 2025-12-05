@@ -1,112 +1,57 @@
 import { create } from "zustand";
-import { supabase } from "@/lib/supabase";
-
-import type { SceneItem, FenceConfig } from "@/types/editor";
-import { useSceneStore } from "@/stores/scene/useSceneStore";
-import { useEditorStore } from "@/stores/editor/useEditorStore";
 
 interface ProjectState {
-  user: any | null;
+  // Identificación
+  projectId: string | null;
+  projectName: string;
 
-  currentProjectId: string | null;
-  currentProjectName: string | null;
-  isReadOnlyMode: boolean;
+  // Metadata opcional
+  thumbnailUrl?: string | null;
+  totalPrice?: number | null;
 
-  setUser: (user: any | null) => void;
+  // Modo de acceso
+  isReadOnly: boolean;
 
-  setProjectInfo: (id: string | null, name: string | null) => void;
-  resetProject: () => void;
+  // === ACTIONS ===
+  setProjectInfo: (id: string | null, name: string) => void;
+  setProjectName: (name: string) => void;
+  setThumbnail: (url: string | null) => void;
+  setTotalPrice: (price: number) => void;
 
-  loadProjectFromURL: (projectId: string) => Promise<void>;
+  setReadOnly: (state: boolean) => void;
+
+  clearProject: () => void;
 }
 
 export const useProjectStore = create<ProjectState>((set) => ({
-  user: null,
+  // === DEFAULT STATE ===
+  projectId: null,
+  projectName: "",
+  thumbnailUrl: null,
+  totalPrice: null,
+  isReadOnly: false,
 
-  currentProjectId: null,
-  currentProjectName: null,
-  isReadOnlyMode: false,
-
-  // -------------------------------------
-  // USER
-  // -------------------------------------
-  setUser: (user) => set({ user }),
-
-  // -------------------------------------
-  // SET PROJECT INFO (ID + NAME)
-  // -------------------------------------
+  // === ACTIONS ===
   setProjectInfo: (id, name) =>
     set({
-      currentProjectId: id,
-      currentProjectName: name,
-      isReadOnlyMode: false,
+      projectId: id,
+      projectName: name,
     }),
 
-  // -------------------------------------
-  // RESET PROJECT (NUEVO PROYECTO)
-  // -------------------------------------
-  resetProject: () => {
-    useSceneStore.getState().resetScene(); // limpiamos escena
+  setProjectName: (name) => set({ projectName: name }),
 
+  setThumbnail: (url) => set({ thumbnailUrl: url }),
+
+  setTotalPrice: (price) => set({ totalPrice: price }),
+
+  setReadOnly: (state) => set({ isReadOnly: state }),
+
+  clearProject: () =>
     set({
-      currentProjectId: null,
-      currentProjectName: null,
-      isReadOnlyMode: false,
-    });
-  },
-
-  // -------------------------------------
-  // LOAD PROJECT
-  // -------------------------------------
-  loadProjectFromURL: async (projectId: string) => {
-    const { data: project, error } = await supabase
-      .from("projects")
-      .select("id, name, data")
-      .eq("id", projectId)
-      .single();
-
-    if (error || !project) {
-      console.error("❌ Error al cargar proyecto:", error?.message);
-      return;
-    }
-
-    const scene = project.data || {};
-
-    // Items
-    const items: SceneItem[] = Array.isArray(scene.items)
-      ? scene.items
-      : [];
-
-    // Fence config
-    const fence: FenceConfig =
-      scene.fenceConfig || {
-        presetId: "wood",
-        colors: { post: 0, slatA: 0 },
-      };
-
-    // Price calc
-    const totalPrice = items.reduce(
-      (sum, i) => sum + (i.price || 0),
-      0
-    );
-
-    // --- UPDATE SCENE STORE ---
-    useSceneStore.setState({
-      items,
-      fenceConfig: fence,
-      totalPrice,
-    });
-
-    // --- UPDATE EDITOR STORE ---
-    useEditorStore.setState({
-      cameraType: scene.camera || "perspective",
-    });
-
-    // --- UPDATE PROJECT STORE ---
-    set({
-      currentProjectId: project.id,
-      currentProjectName: project.name,
-      isReadOnlyMode: true,
-    });
-  },
+      projectId: null,
+      projectName: "",
+      thumbnailUrl: null,
+      totalPrice: null,
+      isReadOnly: false,
+    }),
 }));
