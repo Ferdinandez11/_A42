@@ -1,20 +1,24 @@
-// --- START OF FILE src/features/editor/ui/BudgetPanel.tsx ---
+// --- FIXED FILE: src/features/editor/ui/BudgetPanel.tsx ---
+
 import { Trash2, X } from "lucide-react";
 
-import { useUIStore } from "@/stores/ui/useUIStore"; // UI toggles
-import { useSceneStore } from "@/stores/scene/useSceneStore"; // 🔥 items y acciones
-import { useSelectionStore } from "@/stores/selection/useSelectionStore"; 
+import { useEditorStore } from "@/stores/editor/useEditorStore";
+import { useSceneStore } from "@/stores/scene/useSceneStore";
+import { useSelectionStore } from "@/stores/selection/useSelectionStore";
 
 export const BudgetPanel = () => {
-  const { budgetVisible, toggleBudget } = useUIStore();
+  // Editor UI
+  const budgetVisible = useEditorStore((s) => s.budgetVisible);
+  const toggleBudget = useEditorStore((s) => s.toggleBudget);
 
-  // Datos de la escena desde SceneStore
+  // Scene data
   const items = useSceneStore((s) => s.items);
-  const totalPrice = useSceneStore((s) => s.totalPrice);
+  const totalPrice = useSceneStore((s) => s.totalPrice ?? 0);
   const removeItem = useSceneStore((s) => s.removeItem);
   const resetScene = useSceneStore((s) => s.resetScene);
 
-  const selectItem = useSelectionStore((s) => s.selectItem);
+  // Selection
+  const selectItem = useSelectionStore((s) => s.select);
 
   if (!budgetVisible) return null;
 
@@ -83,7 +87,7 @@ export const BudgetPanel = () => {
         {items.length > 0 && (
           <button
             onClick={() => {
-              if (window.confirm("¿Borrar todo?")) resetScene();
+              if (confirm("¿Borrar todo?")) resetScene();
             }}
             className="w-full py-2 bg-red-900/30 hover:bg-red-600 text-red-200 hover:text-white rounded-lg text-sm font-medium transition-all flex justify-center items-center gap-2 border border-red-900/50"
           >
@@ -95,4 +99,5 @@ export const BudgetPanel = () => {
     </div>
   );
 };
-// --- END OF FILE ---
+
+// --- END FIXED FILE ---

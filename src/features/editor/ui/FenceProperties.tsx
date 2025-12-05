@@ -4,29 +4,31 @@ import { FENCE_PRESETS } from "../data/fence_presets";
 
 import { CadControl } from "./CadControl";
 
-// 🔥 CAMBIO CLAVE: Usamos useSceneStore para los datos
+// Stores
 import { useSceneStore } from "@/stores/scene/useSceneStore";
 import { useSelectionStore } from "@/stores/selection/useSelectionStore";
 
 export const FenceProperties = () => {
-  const selectedItemId = useSelectionStore((s) => s.selectedItemId);
+  // ✔ TU SELECTION STORE REAL: selectedUUID
+  const selectedUUID = useSelectionStore((s) => s.selectedUUID);
 
-  // Leemos items y la acción de actualizar desde SceneStore
+  // ✔ datos generales de escena
   const items = useSceneStore((s) => s.items);
   const updateItemFenceConfig = useSceneStore((s) => s.updateItemFenceConfig);
 
-  // Buscamos el item seleccionado
-  const selectedItem = items.find((i) => i.uuid === selectedItemId);
+  // Buscar item seleccionado
+  const selectedItem = items.find((i) => i.uuid === selectedUUID);
 
-  // 🔥 Type Guard: Si no hay item, o no es valla, o no tiene config -> no renderizar
+  // Si no es valla o no tiene config, no mostrar panel
   if (!selectedItem || selectedItem.type !== "fence" || !selectedItem.fenceConfig) {
     return null;
   }
 
   const currentConfig = selectedItem.fenceConfig;
-  const currentPreset = FENCE_PRESETS[currentConfig.presetId] || FENCE_PRESETS["wood"];
+  const currentPreset =
+    FENCE_PRESETS[currentConfig.presetId] || FENCE_PRESETS["wood"];
 
-  // Cambiar preset
+  // --- Cambiar preset ---
   const handlePresetChange = (key: string) => {
     const preset = FENCE_PRESETS[key];
 
@@ -41,7 +43,7 @@ export const FenceProperties = () => {
     updateItemFenceConfig(selectedItem.uuid, newConfig);
   };
 
-  // Cambiar color
+  // --- Cambiar color individual ---
   const handleColorChange = (
     key: "post" | "slatA" | "slatB" | "slatC",
     hex: string
@@ -59,8 +61,7 @@ export const FenceProperties = () => {
     });
   };
 
-  const toHex = (num: number) =>
-    "#" + num.toString(16).padStart(6, "0");
+  const toHex = (num: number) => "#" + num.toString(16).padStart(6, "0");
 
   return (
     <div className="absolute top-20 right-4 bg-neutral-900/95 backdrop-blur-md border border-neutral-700 rounded-xl p-4 shadow-xl z-20 w-80 animate-in fade-in slide-in-from-right-2">

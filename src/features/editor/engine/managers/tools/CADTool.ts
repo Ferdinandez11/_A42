@@ -5,7 +5,6 @@ import { useCADStore } from "@/stores/cad/useCADStore";
 export class CADTool {
   private scene: THREE.Scene;
   private markers: THREE.Mesh[] = [];
-  private activeId: string | null = null;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -14,14 +13,14 @@ export class CADTool {
   public reset() {
     this.markers.forEach((m) => this.scene.remove(m));
     this.markers = [];
-    this.activeId = null;
 
     useCADStore.getState().setSelectedVertices([], null, null);
   }
 
   public setMarkers(itemUuid: string, worldPositions: THREE.Vector3[]) {
+    void itemUuid; // <- evita warning con erasableSyntaxOnly
+
     this.reset();
-    this.activeId = itemUuid;
 
     worldPositions.forEach((pos, index) => {
       const m = new THREE.Mesh(
@@ -35,6 +34,7 @@ export class CADTool {
     });
   }
 
+
   public updateDistances() {
     const store = useCADStore.getState();
     const indices = store.selectedVertices;
@@ -45,13 +45,16 @@ export class CADTool {
     if (indices.length >= 2) {
       const a = this.getMarker(indices[0]);
       const b = this.getMarker(indices[1]);
-      if (a && b) distance = a.position.distanceTo(b.position);
+      if (a && b) {
+        distance = a.position.distanceTo(b.position);
+      }
     }
 
     if (indices.length === 3) {
       const p0 = this.getMarker(indices[0])?.position;
       const p1 = this.getMarker(indices[1])?.position;
       const p2 = this.getMarker(indices[2])?.position;
+
       if (p0 && p1 && p2) {
         const v1 = new THREE.Vector3().subVectors(p0, p1).normalize();
         const v2 = new THREE.Vector3().subVectors(p2, p1).normalize();

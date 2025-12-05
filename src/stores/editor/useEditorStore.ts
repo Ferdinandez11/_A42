@@ -1,25 +1,18 @@
 import { create } from "zustand";
 import type { CameraView, CameraType } from "@/types/editor";
 
-export type ToolMode =
-  | "select"
-  | "move"
-  | "rotate"
-  | "scale"
-  | "floor"
-  | "fence"
-  | "catalog"
-  | "none";
-
+// Modo principal del editor (armonizado)
 export type EditorMode =
   | "idle"
+  | "placing_item"
   | "drawing_floor"
   | "drawing_fence"
   | "catalog"
-  | "measuring";
+  | "measuring"
+  | "editing";
 
 interface EditorState {
-  // UI
+  // UI toggles
   gridVisible: boolean;
   skyVisible: boolean;
   safetyZonesVisible: boolean;
@@ -27,14 +20,11 @@ interface EditorState {
   budgetVisible: boolean;
   qrModalOpen: boolean;
 
-  // Tool mode “antiguo”
-  activeTool: ToolMode;
-
-  // Nuevo: modo de editor de alto nivel (para Toolbar / Editor3D)
+  // Editor mode
   mode: EditorMode;
   setMode: (mode: EditorMode) => void;
 
-  // Cámara y vistas
+  // Cámara
   cameraType: CameraType;
   setCameraType: (type: CameraType) => void;
 
@@ -42,45 +32,44 @@ interface EditorState {
   triggerView: (view: CameraView) => void;
   clearPendingView: () => void;
 
-  // Background
+  // Fondo
   backgroundColor: string;
+  setBackgroundColor: (color: string) => void;
 
-  // Sol / Sky (de momento solo un número, p.ej. elevación)
-  sunPosition: number;
+  // Sol
+  sunPosition: { azimuth: number; elevation: number };
+  setSun: (azimuth: number, elevation: number) => void;
+
+  // Alias para componentes antiguos
+  setSunPosition: (azimuth: number, elevation: number) => void;
 
   // Medición
   measurementResult: number | null;
   setMeasurementResult: (value: number | null) => void;
 
-  // Modals
+  // Input modal
   inputModal: {
     isOpen: boolean;
     title: string;
     defaultValue: string;
     resolve: ((value: string | null) => void) | null;
   };
+  requestInput: (title: string, defaultValue?: string) => Promise<string | null>;
+  closeInputModal: (value: string | null) => void;
 
-  // ==== ACTIONS EXISTENTES ====
-  setActiveTool: (tool: ToolMode) => void;
-
+  // Toggles
   toggleGrid: () => void;
   toggleSky: () => void;
   toggleEnvPanel: () => void;
   toggleSafetyZones: () => void;
   toggleBudget: () => void;
 
-  setBackgroundColor: (color: string) => void;
-  setSunPosition: (pos: number) => void;
-
   openQRModal: () => void;
   closeQRModal: () => void;
-
-  requestInput: (title: string, defaultValue?: string) => Promise<string | null>;
-  closeInputModal: (value: string | null) => void;
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
-  // === DEFAULT STATE ===
+  // UI defaults
   gridVisible: true,
   skyVisible: true,
   safetyZonesVisible: false,
@@ -88,51 +77,42 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   budgetVisible: false,
   qrModalOpen: false,
 
-  activeTool: "select",
-
-  // Nuevo estado de modo
+  // Editor mode
   mode: "idle",
+  setMode: (mode) => set({ mode }),
 
-  // Cámara por defecto
+  // Cámara
   cameraType: "perspective",
+  setCameraType: (type) => set({ cameraType: type }),
+
   pendingView: null,
+  triggerView: (view) => set({ pendingView: view }),
+  clearPendingView: () => set({ pendingView: null }),
 
+  // Fondo
   backgroundColor: "#222222",
-  sunPosition: 45,
+  setBackgroundColor: (color: string) => set({ backgroundColor: color }),
 
+  // Sol (estándar profesional)
+  sunPosition: { azimuth: 180, elevation: 45 },
+  setSun: (azimuth, elevation) =>
+    set({ sunPosition: { azimuth, elevation } }),
+
+  // Alias para compatibilidad (EnvironmentPanel usa este)
+  setSunPosition: (azimuth, elevation) =>
+    set({ sunPosition: { azimuth, elevation } }),
+
+  // Medición
   measurementResult: null,
+  setMeasurementResult: (value) => set({ measurementResult: value }),
 
+  // Input modal
   inputModal: {
     isOpen: false,
     title: "",
     defaultValue: "",
     resolve: null,
   },
-
-  // === ACTIONS ===
-  setActiveTool: (tool) => set({ activeTool: tool }),
-
-  setMode: (mode) => set({ mode }),
-
-  setCameraType: (type) => set({ cameraType: type }),
-
-  triggerView: (view) => set({ pendingView: view }),
-  clearPendingView: () => set({ pendingView: null }),
-
-  toggleGrid: () => set((s) => ({ gridVisible: !s.gridVisible })),
-  toggleSky: () => set((s) => ({ skyVisible: !s.skyVisible })),
-  toggleEnvPanel: () => set((s) => ({ envPanelVisible: !s.envPanelVisible })),
-  toggleSafetyZones: () =>
-    set((s) => ({ safetyZonesVisible: !s.safetyZonesVisible })),
-  toggleBudget: () => set((s) => ({ budgetVisible: !s.budgetVisible })),
-
-  setBackgroundColor: (color) => set({ backgroundColor: color }),
-  setSunPosition: (pos) => set({ sunPosition: pos }),
-
-  setMeasurementResult: (value) => set({ measurementResult: value }),
-
-  openQRModal: () => set({ qrModalOpen: true }),
-  closeQRModal: () => set({ qrModalOpen: false }),
 
   requestInput: (title, defaultValue = "") =>
     new Promise((resolve) => {
@@ -147,8 +127,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
 
   closeInputModal: (value) => {
-    const { resolve } = get().inputModal;
-    if (resolve) resolve(value);
+    const res = get().inputModal.resolve;
+    if (res) res(value);
 
     set({
       inputModal: {
@@ -159,4 +139,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       },
     });
   },
+
+  // Toggles
+  toggleGrid: () => set((s) => ({ gridVisible: !s.gridVisible })),
+  toggleSky: () => set((s) => ({ skyVisible: !s.skyVisible })),
+  toggleEnvPanel: () => set((s) => ({ envPanelVisible: !s.envPanelVisible })),
+  toggleSafetyZones: () =>
+    set((s) => ({ safetyZonesVisible: !s.safetyZonesVisible })),
+  toggleBudget: () => set((s) => ({ budgetVisible: !s.budgetVisible })),
+
+  openQRModal: () => set({ qrModalOpen: true }),
+  closeQRModal: () => set({ qrModalOpen: false }),
 }));

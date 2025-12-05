@@ -1,3 +1,4 @@
+// --- FIXED FILE: src/features/editor/ui/QRModal.tsx ---
 import React from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { X, Save, LogIn, Smartphone } from "lucide-react";
@@ -13,23 +14,24 @@ interface QRModalProps {
 export const QRModal: React.FC<QRModalProps> = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
 
-  // --- auth store ---
+  // Auth store
   const { user } = useAuthStore();
 
-  // --- editor/project store ---
-  const { currentProjectId } = useProjectStore();
+  // Project store (correct keys)
+  const { projectId } = useProjectStore();
 
   if (!isOpen) return null;
 
-  const shareUrl = currentProjectId
-    ? `${window.location.origin}/?project_id=${currentProjectId}`
+  const shareUrl = projectId
+    ? `${window.location.origin}/?project_id=${projectId}`
     : "";
 
-  const isProjectSaved = !!currentProjectId;
+  const isProjectSaved = !!projectId;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div className="bg-neutral-900 border border-neutral-700 rounded-2xl p-8 shadow-2xl max-w-sm w-full relative flex flex-col items-center gap-6 text-center">
+        
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-neutral-400 hover:text-white transition-colors"
@@ -37,7 +39,6 @@ export const QRModal: React.FC<QRModalProps> = ({ isOpen, onClose }) => {
           <X size={24} />
         </button>
 
-        {/* PROYECTO GUARDADO → MOSTRAR QR */}
         {isProjectSaved ? (
           <>
             <div className="space-y-1">
@@ -47,6 +48,7 @@ export const QRModal: React.FC<QRModalProps> = ({ isOpen, onClose }) => {
                   Mobile Ready
                 </span>
               </div>
+
               <h2 className="text-2xl font-bold text-white">Escanear Proyecto</h2>
               <p className="text-sm text-neutral-400">
                 Abre la cámara de tu móvil para ver el diseño.
@@ -60,7 +62,7 @@ export const QRModal: React.FC<QRModalProps> = ({ isOpen, onClose }) => {
             <div className="text-xs text-neutral-500 px-4 break-all">
               ID:
               <span className="font-mono text-neutral-400 ml-1">
-                {currentProjectId}
+                {projectId}
               </span>
             </div>
 
@@ -71,7 +73,6 @@ export const QRModal: React.FC<QRModalProps> = ({ isOpen, onClose }) => {
             )}
           </>
         ) : user ? (
-          // PROYECTO SIN GUARDAR → PEDIR GUARDAR
           <>
             <div className="w-16 h-16 bg-yellow-500/10 rounded-full flex items-center justify-center text-yellow-500 mb-2">
               <Save size={32} />
@@ -89,7 +90,6 @@ export const QRModal: React.FC<QRModalProps> = ({ isOpen, onClose }) => {
             </button>
           </>
         ) : (
-          // NO GUARDADO + NO LOGIN → PEDIR LOGIN
           <>
             <div className="w-16 h-16 bg-neutral-800 rounded-full flex items-center justify-center text-neutral-400 mb-2">
               <LogIn size={32} />

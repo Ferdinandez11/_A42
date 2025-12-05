@@ -1,3 +1,4 @@
+// --- FILE: src/stores/scene/useSceneStore.ts ---
 import { create } from "zustand";
 import type { Vector3Array } from "@/types/editor";
 
@@ -6,45 +7,66 @@ export interface SceneItem {
   productId: string;
   name: string;
 
-  // Precio actual según catálogo o cálculo paramétrico
   price: number;
 
-  // Transformaciones básicas
-  position: Vector3Array; // [x, y, z]
-  rotation: Vector3Array; // [x, y, z]
-  scale: Vector3Array;    // [x, y, z]
+  position: Vector3Array;
+  rotation: Vector3Array;
+  scale: Vector3Array;
 
-  // Metadata opcional
   description?: string;
   url_tech?: string;
   url_cert?: string;
   url_inst?: string;
 
-  // Datos del catálogo completo si se necesita
   data?: any;
 
-  // Campos especiales (suelos y vallas)
   type?: "model" | "floor" | "fence";
-  info?: string; // Ej: "12 m²" o "6 m"
+  info?: string;
+
+  // ⭐ FENCE SUPPORT
+  fenceConfig?: {
+    presetId: string;
+    colors: {
+      post: number;
+      slatA: number;
+      slatB?: number;
+      slatC?: number;
+    };
+  };
+
+  // ⭐ FLOOR SUPPORT
+  floorMaterial?: string;
+  textureUrl?: string;
+  textureScale?: number;
+  textureRotation?: number;
 }
 
 interface SceneState {
   items: SceneItem[];
+  totalPrice: number;
 
-  // Historial (por ahora solo para que compile la UI)
   past: SceneItem[][];
   future: SceneItem[][];
   undo: () => void;
   redo: () => void;
 
-  // === ACTIONS ===
   addItem: (item: SceneItem) => void;
   updateItem: (uuid: string, partial: Partial<SceneItem>) => void;
   removeItem: (uuid: string) => void;
 
-  clearScene: () => void;
+  updateItemFenceConfig: (uuid: string, cfg: any) => void;
 
-  // Sync para transforms (motor 3D → store)
+  updateFloorMaterial: (uuid: string, material: string) => void;
+  updateFloorTexture: (
+    uuid: string,
+    url?: string,
+    scale?: number,
+    rotation?: number
+  ) => void;
+
+  clearScene: () => void;
+  resetScene: () => void;
+
   setItemTransform: (
     uuid: string,
     position: Vector3Array,
@@ -52,68 +74,122 @@ interface SceneState {
     scale: Vector3Array
   ) => void;
 
-  // Reemplaza todos los items (cargar proyecto)
   setItems: (items: SceneItem[]) => void;
 }
 
 export const useSceneStore = create<SceneState>((set) => ({
   items: [],
+  totalPrice: 0,
 
   past: [],
   future: [],
 
-  undo: () => {
-    // TODO: implementar histórico real si lo necesitas
-  },
-  redo: () => {
-    // TODO: implementar histórico real si lo necesitas
-  },
+  undo: () => {},
+  redo: () => {},
 
   // =====================================================
   // ADD ITEM
   // =====================================================
   addItem: (item) =>
-    set((s) => ({
-      items: [...s.items, item],
-    })),
+    set((s) => {
+      const items = [...s.items, item];
+      return {
+        items,
+        totalPrice: items.reduce((sum, it) => sum + (it.price ?? 0), 0),
+      };
+    }),
 
   // =====================================================
   // UPDATE ITEM
   // =====================================================
   updateItem: (uuid, partial) =>
-    set((s) => ({
-      items: s.items.map((it) =>
+    set((s) => {
+      const items = s.items.map((it) =>
         it.uuid === uuid ? { ...it, ...partial } : it
-      ),
-    })),
+      );
+      return {
+        items,
+        totalPrice: items.reduce((sum, it) => sum + (it.price ?? 0), 0),
+      };
+    }),
+
+  // =====================================================
+  // FENCE CONFIG
+  // =====================================================
+  updateItemFenceConfig: (uuid, newConfig) =>
+    set((s) => {
+      const items = s.items.map((it) =>
+        it.uuid === uuid ? { ...it, fenceConfig: newConfig } : it
+      );
+      return {
+        items,
+        totalPrice: items.reduce((sum, it) => sum + (it.price ?? 0), 0),
+      };
+    }),
+
+  // =====================================================
+  // FLOOR MATERIAL
+  // =====================================================
+  updateFloorMaterial: (uuid, material) =>
+    set((s) => {
+      const items = s.items.map((it) =>
+        it.uuid === uuid ? { ...it, floorMaterial: material } : it
+      );
+      return { items, totalPrice: s.totalPrice };
+    }),
+
+  // =====================================================
+  // FLOOR TEXTURE (image + scale + rotation)
+  // =====================================================
+  updateFloorTexture: (uuid, url, scale, rotation) =>
+    set((s) => {
+      const items = s.items.map((it) =>
+        it.uuid === uuid
+          ? {
+              ...it,
+              textureUrl: url ?? it.textureUrl,
+              textureScale: scale ?? it.textureScale ?? 1,
+              textureRotation: rotation ?? it.textureRotation ?? 0,
+            }
+          : it
+      );
+      return { items, totalPrice: s.totalPrice };
+    }),
 
   // =====================================================
   // REMOVE ITEM
   // =====================================================
   removeItem: (uuid) =>
-    set((s) => ({
-      items: s.items.filter((it) => it.uuid !== uuid),
-    })),
+    set((s) => {
+      const items = s.items.filter((it) => it.uuid !== uuid);
+      return {
+        items,
+        totalPrice: items.reduce((sum, it) => sum + (it.price ?? 0), 0),
+      };
+    }),
 
   // =====================================================
-  // SET TRANSFORMS (motor 3D → estado limpio)
+  // TRANSFORM
   // =====================================================
   setItemTransform: (uuid, position, rotation, scale) =>
     set((s) => ({
       items: s.items.map((it) =>
-        it.uuid === uuid
-          ? { ...it, position, rotation, scale }
-          : it
+        it.uuid === uuid ? { ...it, position, rotation, scale } : it
       ),
     })),
 
   // =====================================================
-  // REEMPLAZAR ESCENA ENTERA (al cargar proyecto)
+  // SET ITEMS (LOAD PROJECT)
   // =====================================================
-  setItems: (items) => set({ items }),
+  setItems: (items) =>
+    set({
+      items,
+      totalPrice: items.reduce((sum, it) => sum + (it.price ?? 0), 0),
+    }),
 
   // =====================================================
-  // LIMPIAR ESCENA
+  // CLEAR SCENE
   // =====================================================
-  clearScene: () => set({ items: [] }),
+  clearScene: () => set({ items: [], totalPrice: 0 }),
+  resetScene: () => set({ items: [], totalPrice: 0 }),
 }));

@@ -4,8 +4,6 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
 import type { A42Engine } from "../A42Engine";
-
-// 👇 Usamos el tipo SceneItem del STORE, no el de /types/editor
 type StoreSceneItem = import("@/stores/scene/useSceneStore").SceneItem;
 
 import { useEditorStore } from "@/stores/editor/useEditorStore";
@@ -14,7 +12,7 @@ import { useUserStore } from "@/stores/user/useUserStore";
 import { PriceCalculator } from "@/utils/PriceCalculator";
 
 // ======================================================================================
-// 1) HELPER — SceneState (guardar y restaurar estado sin contaminar el motor)
+// 1) HELPER — Scene State Saver
 // ======================================================================================
 class PDFSceneState {
   private engine: A42Engine;
@@ -68,7 +66,6 @@ class PDFSceneState {
     this.engine.sceneManager.controls.enabled = true;
     this.engine.sceneManager.controls.update();
 
-    // 👇 A42Engine ahora expone setSky y setGrid
     this.engine.setSky(this.skyVisible);
 
     const shouldGrid = useEditorStore.getState().gridVisible;
@@ -79,7 +76,7 @@ class PDFSceneState {
 }
 
 // ======================================================================================
-// 2) HELPER — PDFRenderer (capturas limpias sin lógica repetida)
+// 2) HELPER — PDF Renderer
 // ======================================================================================
 class PDFRenderer {
   private engine: A42Engine;
@@ -100,7 +97,6 @@ class PDFRenderer {
   }
 
   capture(format: "image/jpeg" | "image/png" = "image/jpeg"): string {
-    // 0.92 = calidad
     return this.engine.renderer.domElement.toDataURL(format, 0.92);
   }
 
@@ -135,17 +131,14 @@ class PDFRenderer {
       if (o.userData?.isItem && o.visible) box.expandByObject(o);
     });
     if (box.isEmpty()) {
-      box.setFromCenterAndSize(
-        new THREE.Vector3(),
-        new THREE.Vector3(2, 2, 2)
-      );
+      box.setFromCenterAndSize(new THREE.Vector3(), new THREE.Vector3(2, 2, 2));
     }
     return box;
   }
 }
 
 // ======================================================================================
-// 3) HELPER — PDFLayout (maquetación con jsPDF)
+// 3) HELPER — PDF Layout
 // ======================================================================================
 class PDFLayout {
   private doc: jsPDF;
@@ -202,7 +195,7 @@ class PDFLayout {
 }
 
 // ======================================================================================
-// 4) MAIN — PDFManager (usa las 3 clases anteriores)
+// 4) MAIN — PDFManager
 // ======================================================================================
 export class PDFManager {
   private engine: A42Engine;
@@ -215,9 +208,9 @@ export class PDFManager {
     this.renderer = new PDFRenderer(engine);
   }
 
-  // ======================================================
+  // ============================================
   // PUBLIC API
-  // ======================================================
+  // ============================================
   public async generatePDF() {
     const project = await useEditorStore
       .getState()
@@ -228,41 +221,35 @@ export class PDFManager {
     const doc = new jsPDF();
     const layout = new PDFLayout(doc);
 
-    const items = useSceneStore.getState().items; // StoreSceneItem[]
+    const items = useSceneStore.getState().items;
     const user = useUserStore.getState().user;
 
     this.sceneState.save();
 
     try {
-      // 1) Preparar escena
       this.prepareScene();
 
-      // 2) Portada
       const cover = this.captureCover();
       this.pageCover(doc, layout, project, cover);
 
-      // 3) Vistas técnicas
       const views = this.captureTechnicalViews();
       this.pageTechnicalViews(doc, layout, views);
 
-      // 4) Presupuesto
       if (user) this.pageBudget(doc, layout, items);
 
-      // 5) Fichas de producto
       const unique = this.getUniqueItems(items);
       const fichas = this.captureItemImages(unique);
       this.pageItemSheets(doc, layout, unique, fichas);
 
       doc.save(`${project}_Levipark.pdf`);
     } finally {
-      // Restauración garantizada
       this.sceneState.restore();
     }
   }
 
-  // ======================================================
+  // ============================================
   // PREPARAR ESCENA
-  // ======================================================
+  // ============================================
   private prepareScene() {
     const eng = this.engine;
 
@@ -289,9 +276,9 @@ export class PDFManager {
     });
   }
 
-  // ======================================================
+  // ============================================
   // PORTADA
-  // ======================================================
+  // ============================================
   private captureCover() {
     const eng = this.engine;
 
@@ -306,7 +293,7 @@ export class PDFManager {
   }
 
   private pageCover(
-    doc: jsPDF,
+    _doc: jsPDF,
     layout: PDFLayout,
     project: string,
     img: string
@@ -316,9 +303,9 @@ export class PDFManager {
     layout.footer();
   }
 
-  // ======================================================
+  // ============================================
   // VISTAS TÉCNICAS
-  // ======================================================
+  // ============================================
   private captureTechnicalViews() {
     const eng = this.engine;
     eng.switchCamera("orthographic");
@@ -336,7 +323,12 @@ export class PDFManager {
     cam.updateProjectionMatrix();
 
     const views: Record<string, string> = {};
-    const cfg = [
+
+    const cfg: Array<{
+      name: string;
+      pos: [number, number, number];
+      up: [number, number, number];
+    }> = [
       { name: "front", pos: [0, 0, maxDim * 3], up: [0, 1, 0] },
       { name: "side", pos: [maxDim * 3, 0, 0], up: [0, 1, 0] },
       { name: "top", pos: [0, maxDim * 3, 0], up: [0, 0, -1] },
@@ -349,12 +341,10 @@ export class PDFManager {
 
     this.renderer.setRendererSize(1200, 1200);
 
-    for (const v of cfg) {
-      cam.position.set(
-        center.x + v.pos[0],
-        center.y + v.pos[1],
-        center.z + v.pos[2]
-      );
+    for (let i = 0; i < cfg.length; i++) {
+      const v = cfg[i];
+
+      cam.position.set(center.x + v.pos[0], center.y + v.pos[1], center.z + v.pos[2]);
       cam.up.set(v.up[0], v.up[1], v.up[2]);
       cam.lookAt(center);
       cam.updateProjectionMatrix();
@@ -398,9 +388,9 @@ export class PDFManager {
     layout.footer();
   }
 
-  // ======================================================
+  // ============================================
   // PRESUPUESTO
-  // ======================================================
+  // ============================================
   private pageBudget(
     doc: jsPDF,
     layout: PDFLayout,
@@ -412,17 +402,13 @@ export class PDFManager {
     let total = 0;
 
     const rows = items.map((i) => {
-      // 👇 PriceCalculator espera el tipo de /types/editor → casteamos
       const price = PriceCalculator.getItemPrice(i as any);
       total += price;
       return [
         i.name || "",
         i.productId,
         PriceCalculator.getItemDimensions(i as any),
-        price.toLocaleString("es-ES", {
-          style: "currency",
-          currency: "EUR",
-        }),
+        price.toLocaleString("es-ES", { style: "currency", currency: "EUR" }),
       ];
     });
 
@@ -434,56 +420,27 @@ export class PDFManager {
       startY: 40,
       headStyles: { fillColor: [30, 80, 160] },
       foot: [
-        [
-          "",
-          "",
-          "Base",
-          total.toLocaleString("es-ES", {
-            style: "currency",
-            currency: "EUR",
-          }),
-        ],
-        [
-          "",
-          "",
-          "IVA 21%",
-          iva.toLocaleString("es-ES", {
-            style: "currency",
-            currency: "EUR",
-          }),
-        ],
-        [
-          "",
-          "",
-          "TOTAL",
-          (total + iva).toLocaleString("es-ES", {
-            style: "currency",
-            currency: "EUR",
-          }),
-        ],
+        ["", "", "Base", total.toLocaleString("es-ES", { style: "currency", currency: "EUR" })],
+        ["", "", "IVA 21%", iva.toLocaleString("es-ES", { style: "currency", currency: "EUR" })],
+        ["", "", "TOTAL", (total + iva).toLocaleString("es-ES", { style: "currency", currency: "EUR" })],
       ],
-      footStyles: {
-        fillColor: [240, 240, 240],
-        fontStyle: "bold",
-        textColor: 10,
-      },
       columnStyles: { 3: { halign: "right" } },
     });
 
     layout.footer();
   }
 
-  // ======================================================
+  // ============================================
   // FICHAS DE PRODUCTO
-  // ======================================================
+  // ============================================
   private getUniqueItems(items: StoreSceneItem[]) {
     const map = new Map<string, StoreSceneItem>();
 
-    items.forEach((item) => {
-      const key =
-        item.productId === "custom_upload" ? item.uuid : item.productId;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const key = item.productId === "custom_upload" ? item.uuid : item.productId;
       if (!map.has(key)) map.set(key, item);
-    });
+    }
 
     return map;
   }
@@ -494,19 +451,24 @@ export class PDFManager {
     this.engine.switchCamera("perspective");
     this.renderer.setRendererSize(1024, 768);
 
-    for (const [key, item] of unique) {
+    const iterator = unique.entries();
+    let entry = iterator.next();
+
+    while (!entry.done) {
+      const key = entry.value[0];
+      const item = entry.value[1];
+
       this.setAllObjectsVisibility(false);
       this.setObjectVisibility(item.uuid, true);
 
       const obj = this.engine.scene.getObjectByProperty("uuid", item.uuid);
       if (obj) {
         this.renderer.centerCameraOnObject(obj);
-        this.engine.renderer.render(
-          this.engine.scene,
-          this.engine.activeCamera
-        );
+        this.engine.renderer.render(this.engine.scene, this.engine.activeCamera);
         out[key] = this.renderer.capture("image/png");
       }
+
+      entry = iterator.next();
     }
 
     return out;
@@ -518,13 +480,15 @@ export class PDFManager {
     unique: Map<string, StoreSceneItem>,
     images: Record<string, string>
   ) {
-    for (const [key, item] of unique) {
-      doc.addPage();
+    const iterator = unique.entries();
+    let entry = iterator.next();
 
-      layout.header(
-        item.name || "Ficha Técnica",
-        item.productId.toUpperCase()
-      );
+    while (!entry.done) {
+      const key = entry.value[0];
+      const item = entry.value[1];
+
+      doc.addPage();
+      layout.header(item.name || "Ficha Técnica", item.productId.toUpperCase());
 
       if (images[key]) {
         layout.imageCentered(images[key], 15, 40, 180, 110);
@@ -550,12 +514,14 @@ export class PDFManager {
       doc.text(lines, 15, y + 7);
 
       layout.footer();
+
+      entry = iterator.next();
     }
   }
 
-  // ======================================================
-  // VISIBILIDAD OBJETOS
-  // ======================================================
+  // ============================================
+  // VISIBILIDAD
+  // ============================================
   private setAllObjectsVisibility(v: boolean) {
     this.engine.scene.traverse((o) => {
       if (o.userData?.isItem) o.visible = v;
@@ -565,6 +531,7 @@ export class PDFManager {
   private setObjectVisibility(uuid: string, v: boolean) {
     const obj = this.engine.scene.getObjectByProperty("uuid", uuid);
     if (!obj) return;
+
     obj.visible = v;
     obj.traverse((c) => (c.visible = v));
   }
