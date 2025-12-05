@@ -1,25 +1,23 @@
-// --- FILE: src/features/editor/ui/FloorProperties.tsx ---
 import React, { useRef } from "react";
 import { Palette, Upload, RotateCw, Move } from "lucide-react";
 
-import { useEditorStore } from "@/stores/editor/useEditorStore";
+import { useSceneStore } from "@/stores/scene/useSceneStore"; // 🔥
 import { useSelectionStore } from "@/stores/selection/useSelectionStore";
 import type { FloorMaterialType } from "@/types/editor";
 import { CadControl } from "./CadControl";
 
 export const FloorProperties: React.FC = () => {
-  // Selección (qué item está seleccionado)
   const selectedItemId = useSelectionStore((s) => s.selectedItemId);
 
-  // --- STORE FIX (cada selector independiente → evita bucles infinitos)
-  const items = useEditorStore((s) => s.items);
-  const updateFloorMaterial = useEditorStore((s) => s.updateFloorMaterial);
-  const updateFloorTexture = useEditorStore((s) => s.updateFloorTexture);
-  // -------------------------------------------------------------
+  const items = useSceneStore((s) => s.items);
+  const updateFloorMaterial = useSceneStore((s) => s.updateFloorMaterial);
+  const updateFloorTexture = useSceneStore((s) => s.updateFloorTexture);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selectedItem = items.find((i) => i.uuid === selectedItemId);
+  
+  // 🔥 Type Guard en componente también es útil
   if (!selectedItem || selectedItem.type !== "floor") return null;
 
   const materials: { id: FloorMaterialType; color: string; name: string }[] = [
@@ -33,7 +31,6 @@ export const FloorProperties: React.FC = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const url = URL.createObjectURL(file);
     updateFloorTexture(selectedItem.uuid, url, 1, 0);
   };
@@ -49,14 +46,12 @@ export const FloorProperties: React.FC = () => {
 
   return (
     <div className="absolute top-20 right-4 bg-neutral-900/95 backdrop-blur-md border border-neutral-700 rounded-xl p-4 shadow-xl z-20 w-80 animate-in fade-in slide-in-from-right-2">
-      {/* CAD Control arriba */}
       <CadControl />
 
       <h3 className="text-white text-sm font-bold mb-4 flex items-center gap-2 border-b border-white/10 pb-2">
         <Palette size={16} /> Propiedades del Suelo
       </h3>
 
-      {/* MATERIAL BASE */}
       <div className="mb-4">
         <label className="text-xs text-neutral-400 mb-2 block uppercase font-bold">
           Material Base
@@ -66,7 +61,6 @@ export const FloorProperties: React.FC = () => {
             <button
               key={mat.id}
               onClick={() => {
-                // si pongo material base, quito textura custom
                 updateFloorTexture(selectedItem.uuid, undefined, 1, 0);
                 updateFloorMaterial(selectedItem.uuid, mat.id);
               }}
@@ -83,7 +77,6 @@ export const FloorProperties: React.FC = () => {
         </div>
       </div>
 
-      {/* TEXTURA PERSONALIZADA */}
       <div className="mb-2">
         <label className="text-xs text-neutral-400 mb-2 block uppercase font-bold">
           Textura Personalizada
@@ -107,7 +100,6 @@ export const FloorProperties: React.FC = () => {
 
         {selectedItem.textureUrl && (
           <div className="grid grid-cols-2 gap-3">
-            {/* ESCALA */}
             <div className="bg-neutral-800 p-2 rounded">
               <div className="flex justify-between mb-1">
                 <span className="text-[10px] text-neutral-400 flex items-center gap-1">
@@ -133,7 +125,6 @@ export const FloorProperties: React.FC = () => {
               />
             </div>
 
-            {/* ROTACIÓN */}
             <div className="bg-neutral-800 p-2 rounded">
               <div className="flex justify-between mb-1">
                 <span className="text-[10px] text-neutral-400 flex items-center gap-1">

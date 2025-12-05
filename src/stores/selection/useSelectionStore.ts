@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { useEditorStore } from "../editor/useEditorStore";
+import { useSceneStore } from "../scene/useSceneStore"; // 🔥
 import { useProjectStore } from "../project/useProjectStore";
 import type { SceneItem } from "@/types/editor";
 
@@ -28,9 +28,6 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
   measuredDistance: null,
   measuredAngle: null,
 
-  // -----------------------------
-  // SELECT ITEM
-  // -----------------------------
   selectItem: (uuid) =>
     set({
       selectedItemId: uuid,
@@ -39,9 +36,6 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
       measuredAngle: null,
     }),
 
-  // -----------------------------
-  // CLEAR SELECTION
-  // -----------------------------
   clearSelection: () =>
     set({
       selectedItemId: null,
@@ -50,9 +44,6 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
       measuredAngle: null,
     }),
 
-  // -----------------------------
-  // VERTEX SELECTION (measure tool)
-  // -----------------------------
   setSelectedVertices: (indices, distance, angle) =>
     set({
       selectedVertices: indices,
@@ -60,9 +51,6 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
       measuredAngle: angle,
     }),
 
-  // -----------------------------
-  // DUPLICATE SELECTED ITEM
-  // -----------------------------
   duplicateSelection: () => {
     const { isReadOnlyMode } = useProjectStore.getState();
     if (isReadOnlyMode) {
@@ -73,8 +61,9 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
     const selectedId = get().selectedItemId;
     if (!selectedId) return;
 
-    const editor = useEditorStore.getState();
-    const item = editor.items.find((i: SceneItem) => i.uuid === selectedId);
+    // 🔥 Usamos SceneStore para leer y escribir
+    const scene = useSceneStore.getState();
+    const item = scene.items.find((i: SceneItem) => i.uuid === selectedId);
     if (!item) return;
 
     const cloned = structuredClone(item);
@@ -85,16 +74,11 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
       item.position[2] + 1,
     ];
 
-    useEditorStore.setState({
-      items: [...editor.items, cloned],
-    });
+    useSceneStore.getState().addItem(cloned);
 
     set({ selectedItemId: cloned.uuid });
   },
 
-  // -----------------------------
-  // REMOVE SELECTED ITEM
-  // -----------------------------
   removeSelection: () => {
     const { isReadOnlyMode } = useProjectStore.getState();
     if (isReadOnlyMode) {
@@ -105,11 +89,7 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
     const selectedId = get().selectedItemId;
     if (!selectedId) return;
 
-    const editor = useEditorStore.getState();
-
-    useEditorStore.setState({
-      items: editor.items.filter((i: SceneItem) => i.uuid !== selectedId),
-    });
+    useSceneStore.getState().removeItem(selectedId); // 🔥
 
     set({ selectedItemId: null });
   },

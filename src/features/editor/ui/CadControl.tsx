@@ -1,7 +1,8 @@
 // --- START OF FILE src/features/editor/ui/CadControl.tsx ---
 import { useEffect, useState } from "react";
 import { useSelectionStore } from "@/stores/selection/useSelectionStore";
-import { ArrowLeftRight, Ruler, ScanLine } from "lucide-react";
+// 🔥 Eliminamos importaciones no usadas como ScanLine o Ruler si no se usan
+import { ArrowLeftRight } from "lucide-react";
 
 export const CadControl = () => {
   const selectedVertexIndices = useSelectionStore((s) => s.selectedVertices);
@@ -54,7 +55,35 @@ export const CadControl = () => {
           : "border-blue-500 bg-neutral-800"
       }`}
     >
-      {/* ... resto igual ... */}
+      <div className="flex justify-between items-center mb-2">
+        <span className="text-xs font-bold uppercase text-white">
+          {mode === "ANGLE" ? "📐 Ángulo" : "📏 Distancia"}
+        </span>
+        {mode === "DISTANCE" && (
+          <button
+            onClick={handleSwap}
+            className="p-1 hover:bg-white/10 rounded text-blue-400"
+            title="Cambiar dirección"
+          >
+            <ArrowLeftRight size={14} />
+          </button>
+        )}
+      </div>
+
+      <div className="flex gap-2">
+        <input
+          type="number"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          className="w-full bg-black/30 border border-white/10 rounded px-2 py-1 text-sm text-white font-mono"
+        />
+        <button
+          onClick={handleApply}
+          className="bg-blue-600 hover:bg-blue-500 px-3 rounded text-xs font-bold text-white"
+        >
+          OK
+        </button>
+      </div>
     </div>
   );
 };

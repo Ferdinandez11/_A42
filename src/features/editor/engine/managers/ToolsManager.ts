@@ -2,29 +2,22 @@
 import * as THREE from "three";
 
 import { useEditorStore } from "@/stores/editor/useEditorStore";
+import { useSceneStore } from "@/stores/scene/useSceneStore"; // 🔥 NUEVO
 import { useCADStore } from "@/stores/cad/useCADStore";
 import { useFenceStore } from "@/stores/fence/useFenceStore";
-import type { FloorItem, FenceItem } from "@/types/editor"; // Importamos los tipos
+import type { FloorItem, FenceItem } from "@/types/editor";
 
 export class ToolsManager {
   private scene: THREE.Scene;
-
-  // Floor Tools
   public floorPoints: THREE.Vector3[] = [];
   private floorMarkers: THREE.Mesh[] = [];
   private previewLine: THREE.Line | null = null;
   public floorEditMarkers: THREE.Mesh[] = [];
   public activeFloorId: string | null = null;
-
-  // FENCE TOOLS
   public fencePoints: THREE.Vector3[] = [];
   private fenceMarkers: THREE.Mesh[] = [];
   private fencePreviewLine: THREE.Line | null = null;
-
-  // CAD Selection
   private selectedMarkerIndices: number[] = [];
-
-  // Measure Tools
   private measurePoints: THREE.Vector3[] = [];
   private measureLine: THREE.Line | null = null;
   private measureMarkers: THREE.Mesh[] = [];
@@ -36,26 +29,17 @@ export class ToolsManager {
   public clearTools() {
     this.measureMarkers.forEach((m) => this.scene.remove(m));
     this.measureMarkers = [];
-    if (this.measureLine) {
-      this.scene.remove(this.measureLine);
-      this.measureLine = null;
-    }
+    if (this.measureLine) { this.scene.remove(this.measureLine); this.measureLine = null; }
     this.measurePoints = [];
 
     this.floorMarkers.forEach((m) => this.scene.remove(m));
     this.floorMarkers = [];
-    if (this.previewLine) {
-      this.scene.remove(this.previewLine);
-      this.previewLine = null;
-    }
+    if (this.previewLine) { this.scene.remove(this.previewLine); this.previewLine = null; }
     this.floorPoints = [];
 
     this.fenceMarkers.forEach((m) => this.scene.remove(m));
     this.fenceMarkers = [];
-    if (this.fencePreviewLine) {
-      this.scene.remove(this.fencePreviewLine);
-      this.fencePreviewLine = null;
-    }
+    if (this.fencePreviewLine) { this.scene.remove(this.fencePreviewLine); this.fencePreviewLine = null; }
     this.fencePoints = [];
 
     this.selectedMarkerIndices = [];
@@ -68,9 +52,6 @@ export class ToolsManager {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // DRAWING FLOOR
-  // ---------------------------------------------------------------------------
   public addDraftPoint(point: THREE.Vector3) {
     const p = point.clone();
     p.y = 0.05;
@@ -90,47 +71,26 @@ export class ToolsManager {
 
   public createSolidFloor() {
     if (this.floorPoints.length < 3) return;
-
     const editor = useEditorStore.getState();
     const uuid = THREE.MathUtils.generateUUID();
-
-    // 1. Calcular Centro
     const box = new THREE.Box3().setFromPoints(this.floorPoints);
     const center = new THREE.Vector3();
     box.getCenter(center);
     center.y = 0;
+    const localPoints = this.floorPoints.map((p) => ({ x: p.x - center.x, z: p.z - center.z }));
 
-    // 2. Puntos Relativos
-    const localPoints = this.floorPoints.map((p) => ({ 
-      x: p.x - center.x, 
-      z: p.z - center.z 
-    }));
-
-    // 🔥 CREACIÓN ESTRICTA DEL OBJETO (FloorItem)
     const newFloor: FloorItem = {
-      uuid,
-      productId: "custom_floor",
-      name: "Suelo a medida",
-      price: 100,
-      
-      type: "floor", // Type Guard
-      points: localPoints,
-      floorMaterial: "rubber_red",
-
-      position: [center.x, 0, center.z], 
-      rotation: [0, 0, 0],
-      scale: [1, 1, 1],
+      uuid, productId: "custom_floor", name: "Suelo a medida", price: 100, type: "floor",
+      points: localPoints, floorMaterial: "rubber_red",
+      position: [center.x, 0, center.z], rotation: [0, 0, 0], scale: [1, 1, 1],
     };
 
-    editor.addItem(newFloor);
+    useSceneStore.getState().addItem(newFloor); // 🔥 SceneStore
 
     this.clearTools();
     editor.setMode("idle");
   }
 
-  // ---------------------------------------------------------------------------
-  // DRAWING FENCE
-  // ---------------------------------------------------------------------------
   public addFenceDraftPoint(point: THREE.Vector3) {
     const p = point.clone();
     p.y = 0;
@@ -150,50 +110,27 @@ export class ToolsManager {
 
   public createSolidFence() {
     if (this.fencePoints.length < 2) return;
-
     const fenceStore = useFenceStore.getState();
     const editor = useEditorStore.getState();
     const currentConfig = fenceStore.config;
-
-    // 1. Calcular Centro
     const box = new THREE.Box3().setFromPoints(this.fencePoints);
     const center = new THREE.Vector3();
     box.getCenter(center);
     center.y = 0;
-
-    // 2. Puntos Relativos
-    const points2D = this.fencePoints.map((p) => ({ 
-      x: p.x - center.x, 
-      z: p.z - center.z 
-    }));
-
+    const points2D = this.fencePoints.map((p) => ({ x: p.x - center.x, z: p.z - center.z }));
     const uuid = THREE.MathUtils.generateUUID();
 
-    // 🔥 CREACIÓN ESTRICTA DEL OBJETO (FenceItem)
     const newFence: FenceItem = {
-      uuid,
-      productId: "fence_" + currentConfig.presetId,
-      name: "Valla",
-      price: 100,
-      
-      type: "fence",
-      points: points2D,
-      fenceConfig: JSON.parse(JSON.stringify(currentConfig)),
-
-      position: [center.x, 0, center.z], 
-      rotation: [0, 0, 0],
-      scale: [1, 1, 1],
+      uuid, productId: "fence_" + currentConfig.presetId, name: "Valla", price: 100, type: "fence",
+      points: points2D, fenceConfig: JSON.parse(JSON.stringify(currentConfig)),
+      position: [center.x, 0, center.z], rotation: [0, 0, 0], scale: [1, 1, 1],
     };
 
-    editor.addItem(newFence);
+    useSceneStore.getState().addItem(newFence); // 🔥 SceneStore
 
     this.clearTools();
     editor.setMode("idle");
   }
-
-  // ---------------------------------------------------------------------------
-  // EDIT MARKERS
-  // ---------------------------------------------------------------------------
 
   public clearFloorEditMarkers() {
     this.floorEditMarkers.forEach((m) => this.scene.remove(m));
@@ -205,28 +142,17 @@ export class ToolsManager {
   public showFloorEditMarkers(itemUuid: string, points: { x: number; z: number }[]) {
     this.clearFloorEditMarkers();
     this.activeFloorId = itemUuid;
-
     const parentObj = this.scene.getObjectByProperty('uuid', itemUuid);
     if (!parentObj) return;
-
     parentObj.updateMatrixWorld(true);
-
     points.forEach((pt, index) => {
-      const marker = new THREE.Mesh(
-        new THREE.BoxGeometry(0.4, 0.4, 0.4),
-        new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.8 })
-      );
-
-      // Local -> World
+      const marker = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.8 }));
       const localPos = new THREE.Vector3(pt.x, 0, pt.z);
       localPos.applyMatrix4(parentObj.matrixWorld);
-
       marker.position.copy(localPos);
-      
       marker.userData.isFloorMarker = true;
       marker.userData.pointIndex = index;
       marker.userData.parentUuid = itemUuid;
-      
       this.scene.add(marker);
       this.floorEditMarkers.push(marker);
     });
@@ -234,20 +160,14 @@ export class ToolsManager {
 
   public syncMarkersWithObject(parentObj: THREE.Object3D) {
     if (this.activeFloorId !== parentObj.userData.uuid) return;
-
-    const editor = useEditorStore.getState();
-    const item = editor.items.find(i => i.uuid === parentObj.userData.uuid);
-    
-    // Type Guard para asegurar que tiene puntos
+    const scene = useSceneStore.getState(); // 🔥 SceneStore para leer datos
+    const item = scene.items.find(i => i.uuid === parentObj.userData.uuid);
     if (!item || (item.type !== 'floor' && item.type !== 'fence')) return;
-
     this.floorEditMarkers.forEach(marker => {
       const idx = marker.userData.pointIndex;
       const pointData = item.points[idx]; 
-
       const worldPos = new THREE.Vector3(pointData.x, 0, pointData.z);
       worldPos.applyMatrix4(parentObj.matrixWorld);
-
       marker.position.copy(worldPos);
     });
   }
@@ -255,32 +175,23 @@ export class ToolsManager {
   public updateFloorFromMarkers(marker: THREE.Object3D) {
     const uuid = marker.userData.parentUuid;
     const idx = marker.userData.pointIndex;
-
     const parentObj = this.scene.getObjectByProperty('uuid', uuid);
     if (!parentObj) return;
-
-    const editor = useEditorStore.getState();
-    const items = editor.items;
-    const item = items.find((i) => i.uuid === uuid);
-
-    // Type Guard
+    const scene = useSceneStore.getState(); // 🔥 SceneStore
+    const item = scene.items.find((i) => i.uuid === uuid);
     if (item && (item.type === 'floor' || item.type === 'fence')) {
       const localPos = marker.position.clone();
       const inverseMatrix = parentObj.matrixWorld.clone().invert();
       localPos.applyMatrix4(inverseMatrix);
-
       const newPoints = item.points.map((p) => ({ ...p }));
       newPoints[idx] = { x: localPos.x, z: localPos.z };
-      
       if (item.type === 'floor') {
-        editor.updateFloorPoints(uuid, newPoints);
+        scene.updateFloorPoints(uuid, newPoints);
       } else if (item.type === 'fence') {
-        editor.updateFencePoints(uuid, newPoints);
+        scene.updateFencePoints(uuid, newPoints);
       }
     }
   }
-
-  // --- CAD Logic ---
 
   public selectVertex(index: number, multiSelect: boolean) {
     if (!multiSelect) {
@@ -398,4 +309,4 @@ export class ToolsManager {
     }
   }
 }
-// --- END OF FILE src/features/editor/engine/managers/ToolsManager.ts ---
+// --- END OF FILE ---

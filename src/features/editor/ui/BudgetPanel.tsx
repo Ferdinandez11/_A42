@@ -2,22 +2,18 @@
 import { Trash2, X } from "lucide-react";
 
 import { useUIStore } from "@/stores/ui/useUIStore"; // UI toggles
-import { useEditorStore } from "@/stores/editor/useEditorStore"; // items y precios
-import { useSelectionStore } from "@/stores/selection/useSelectionStore"; // selección
+import { useSceneStore } from "@/stores/scene/useSceneStore"; // 🔥 items y acciones
+import { useSelectionStore } from "@/stores/selection/useSelectionStore"; 
 
 export const BudgetPanel = () => {
-  // UI (mostrar u ocultar panel)
   const { budgetVisible, toggleBudget } = useUIStore();
 
-  // Datos de la escena
-  const items = useEditorStore((s) => s.items);
-  const totalPrice = useEditorStore((s) => s.totalPrice);
+  // Datos de la escena desde SceneStore
+  const items = useSceneStore((s) => s.items);
+  const totalPrice = useSceneStore((s) => s.totalPrice);
+  const removeItem = useSceneStore((s) => s.removeItem);
+  const resetScene = useSceneStore((s) => s.resetScene);
 
-  // Acciones de escena
-  const removeItem = useEditorStore((s) => s.removeItem);
-  const resetScene = useEditorStore((s) => s.resetScene);
-
-  // Selección
   const selectItem = useSelectionStore((s) => s.selectItem);
 
   if (!budgetVisible) return null;
@@ -25,7 +21,6 @@ export const BudgetPanel = () => {
   return (
     <div className="absolute top-20 left-6 bg-neutral-900/95 backdrop-blur-md border border-neutral-700 rounded-xl shadow-2xl w-80 max-h-[70vh] flex flex-col z-30 animate-in fade-in slide-in-from-left-5 duration-200">
 
-      {/* HEADER */}
       <div className="p-4 border-b border-neutral-700 flex justify-between items-center bg-neutral-800/50 rounded-t-xl">
         <h2 className="text-white font-bold text-lg flex items-center gap-2">
           🧾 Presupuesto
@@ -35,7 +30,6 @@ export const BudgetPanel = () => {
         </button>
       </div>
 
-      {/* LISTA */}
       <div className="flex-grow overflow-y-auto p-2 custom-scrollbar space-y-2">
         {items.length === 0 ? (
           <div className="text-center py-8 text-neutral-500 italic">
@@ -78,7 +72,6 @@ export const BudgetPanel = () => {
         )}
       </div>
 
-      {/* FOOTER */}
       <div className="p-4 border-t border-neutral-700 bg-neutral-800/50 rounded-b-xl space-y-3">
         <div className="flex justify-between items-end">
           <span className="text-neutral-400 text-sm">Total Estimado</span>

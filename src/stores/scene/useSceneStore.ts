@@ -1,146 +1,203 @@
-// --- START OF FILE src/stores/scene/useSceneStore.ts ---
+// --- FILE: src/stores/scene/useSceneStore.ts ---
 import { create } from "zustand";
-import type { SceneItem, FenceConfig } from "@/types/editor";
-
-/**
- * Este store contiene SOLO la escena:
- * - items colocados
- * - fenceConfig temporal o global
- * - cálculos simples como totalPrice
- */
+import type { SceneItem, FenceConfig, FloorMaterialType } from "@/types/editor";
+import { FENCE_PRESETS } from "@/features/editor/data/fence_presets";
 
 interface SceneState {
+  // --- STATE ---
   items: SceneItem[];
+  totalPrice: number;
+  
+  // Config global temporal (para la próxima valla que dibujes)
   fenceConfig: FenceConfig;
 
-  // --- DERIVADOS ---
-  totalPrice: number;
+  // History
+  past: SceneItem[][];
+  future: SceneItem[][];
 
-  // --- ACCIONES CRUD ---
+  // --- ACTIONS (CRUD) ---
   addItem: (item: SceneItem) => void;
-  updateItem: (uuid: string, partial: Partial<SceneItem>) => void;
   removeItem: (uuid: string) => void;
+  
+  // Actualizaciones parciales
+  updateItemTransform: (uuid: string, pos: number[], rot: number[], scale: number[]) => void;
+  updateFloorMaterial: (uuid: string, material: FloorMaterialType) => void;
+  updateFloorTexture: (uuid: string, url: string | undefined, scale: number, rotation: number) => void;
+  updateFloorPoints: (uuid: string, points: { x: number; z: number }[]) => void;
+  updateFencePoints: (uuid: string, points: { x: number; z: number }[]) => void;
+  
+  // Configuración de vallas
+  setFenceConfig: (config: Partial<FenceConfig>) => void;
+  updateItemFenceConfig: (uuid: string, config: Partial<FenceConfig>) => void;
 
-  // --- FENCE ---
-  setFenceConfig: (cfg: Partial<FenceConfig>) => void;
-  updateItemFenceConfig: (uuid: string, cfg: Partial<FenceConfig>) => void;
-
-  // --- RESET ---
+  // Gestión de escena
   resetScene: () => void;
+  setItems: (items: SceneItem[]) => void; // Útil para cargar proyectos
+
+  // History Actions
+  saveSnapshot: () => void;
+  undo: () => void;
+  redo: () => void;
 }
 
-export const useSceneStore = create<SceneState>((set) => ({
-  // --- DEFAULT STATE ---
+export const useSceneStore = create<SceneState>((set, get) => ({
   items: [],
-
+  totalPrice: 0,
+  
   fenceConfig: {
     presetId: "wood",
-    colors: {
-      post: 0xffffff,
-      slatA: 0xffffff,
-      slatB: 0xffffff,
-      slatC: 0xffffff,
-    },
+    colors: FENCE_PRESETS["wood"].defaultColors,
   },
 
-  totalPrice: 0,
+  past: [],
+  future: [],
 
-  // -------------------------------------------------------------
-  // ADD ITEM
-  // -------------------------------------------------------------
-  addItem: (item) =>
-    set((state) => {
-      const items = [...state.items, item];
-      const totalPrice = items.reduce((sum, i) => sum + (i.price || 0), 0);
-      return { items, totalPrice };
-    }),
-
-  // -------------------------------------------------------------
-  // UPDATE ITEM
-  // -------------------------------------------------------------
-  updateItem: (uuid, partial) =>
-    set((state) => {
-      const items = state.items.map((i) =>
-        i.uuid === uuid ? { ...i, ...partial } : i
-      );
-      const totalPrice = items.reduce((sum, i) => sum + (i.price || 0), 0);
-      return { items, totalPrice };
-    }),
-
-  // -------------------------------------------------------------
-  // REMOVE ITEM
-  // -------------------------------------------------------------
-  removeItem: (uuid) =>
-    set((state) => {
-      const items = state.items.filter((i) => i.uuid !== uuid);
-      const totalPrice = items.reduce((sum, i) => sum + (i.price || 0), 0);
-      return { items, totalPrice };
-    }),
-
-  // -------------------------------------------------------------
-  // FENCE CONFIG (GLOBAL)
-  // -------------------------------------------------------------
-  setFenceConfig: (cfg) =>
+  // --- INTERNAL HELPER ---
+  saveSnapshot: () => {
+    const snapshot = structuredClone(get().items);
     set((state) => ({
-      fenceConfig: {
-        ...state.fenceConfig,
-        ...cfg,
-        colors: {
-          ...state.fenceConfig.colors,
-          ...(cfg.colors || {}),
-        },
-      },
-    })),
+      past: [...state.past.slice(-19), snapshot],
+      future: [],
+    }));
+  },
 
-  // -------------------------------------------------------------
-  // UPDATE FENCE CONFIG IN ITEM
-  // -------------------------------------------------------------
-updateItemFenceConfig: (uuid, cfg) =>
-  set((state) => {
-    const items = state.items.map((i) => {
-      if (i.uuid !== uuid) return i;
+  // --- ACTIONS ---
+  
+  addItem: (item) => {
+    get().saveSnapshot();
+    set((s) => ({
+      items: [...s.items, item],
+      totalPrice: s.totalPrice + (item.price || 0),
+    }));
+  },
 
-      const safeFence: FenceConfig = {
-        presetId: i.fenceConfig?.presetId ?? "wood",
-        colors: {
-          post: i.fenceConfig?.colors.post ?? 0xffffff,
-          slatA: i.fenceConfig?.colors.slatA ?? 0xffffff,
-          slatB: i.fenceConfig?.colors.slatB ?? 0xffffff,
-          slatC: i.fenceConfig?.colors.slatC ?? 0xffffff,
-        },
-      };
-
+  removeItem: (uuid) => {
+    get().saveSnapshot();
+    set((s) => {
+      const newItems = s.items.filter((i) => i.uuid !== uuid);
       return {
-        ...i,
-        fenceConfig: {
-          presetId: cfg.presetId ?? safeFence.presetId,
-          colors: {
-            ...safeFence.colors,
-            ...(cfg.colors || {}),
-          },
-        },
+        items: newItems,
+        totalPrice: newItems.reduce((sum, i) => sum + i.price, 0),
       };
     });
+  },
 
-    return { items };
-  }),
+  updateItemTransform: (uuid, pos, rot, scale) =>
+    set((s) => ({
+      items: s.items.map((i) =>
+        i.uuid === uuid
+          ? {
+              ...i,
+              position: pos as [number, number, number],
+              rotation: rot as [number, number, number],
+              scale: scale as [number, number, number],
+            }
+          : i
+      ),
+    })),
 
-  // -------------------------------------------------------------
-  // RESET SCENE
-  // -------------------------------------------------------------
+  updateFloorMaterial: (uuid, material) =>
+    set((s) => ({
+      items: s.items.map((i) =>
+        i.uuid === uuid && i.type === "floor"
+          ? { ...i, floorMaterial: material, textureUrl: undefined }
+          : i
+      ),
+    })),
+
+  updateFloorTexture: (uuid, url, scale, rotation) =>
+    set((s) => ({
+      items: s.items.map((i) =>
+        i.uuid === uuid && i.type === "floor"
+          ? {
+              ...i,
+              textureUrl: url,
+              textureScale: scale,
+              textureRotation: rotation,
+              floorMaterial: undefined,
+            }
+          : i
+      ),
+    })),
+
+  updateFloorPoints: (uuid, points) => {
+    // Nota: A veces no queremos snapshot en cada micro-movimiento, 
+    // pero para simplificar lo dejamos así o lo gestionamos desde el manager.
+    set((s) => ({
+      items: s.items.map((i) =>
+        i.uuid === uuid && i.type === "floor" ? { ...i, points } : i
+      ),
+    }));
+  },
+
+  updateFencePoints: (uuid, points) => {
+    set((s) => ({
+      items: s.items.map((i) =>
+        i.uuid === uuid && i.type === "fence" ? { ...i, points } : i
+      ),
+    }));
+  },
+
+  setFenceConfig: (config) =>
+    set((s) => ({
+      fenceConfig: { ...s.fenceConfig, ...config },
+    })),
+
+  updateItemFenceConfig: (uuid, config) => {
+    get().saveSnapshot();
+    set((s) => ({
+      items: s.items.map((i) => {
+        if (i.uuid === uuid && i.type === "fence") {
+          return {
+            ...i,
+            fenceConfig: { ...i.fenceConfig, ...config },
+          };
+        }
+        return i;
+      }),
+    }));
+  },
+
+  // --- HISTORY ---
+  undo: () => {
+    const { past, items, future } = get();
+    if (past.length === 0) return;
+
+    const prev = past[past.length - 1];
+    set({
+      items: prev,
+      past: past.slice(0, -1),
+      future: [items, ...future],
+      totalPrice: prev.reduce((s, i) => s + i.price, 0),
+    });
+  },
+
+  redo: () => {
+    const { past, items, future } = get();
+    if (future.length === 0) return;
+
+    const next = future[0];
+    set({
+      items: next,
+      past: [...past, items],
+      future: future.slice(1),
+      totalPrice: next.reduce((s, i) => s + i.price, 0),
+    });
+  },
+
   resetScene: () =>
     set({
       items: [],
       totalPrice: 0,
-      fenceConfig: {
-        presetId: "wood",
-        colors: {
-          post: 0xffffff,
-          slatA: 0xffffff,
-          slatB: 0xffffff,
-          slatC: 0xffffff,
-        },
-      },
+      past: [],
+      future: [],
     }),
+
+  setItems: (newItems) => 
+    set({
+        items: newItems,
+        totalPrice: newItems.reduce((s, i) => s + i.price, 0),
+        past: [],
+        future: []
+    })
 }));
-// --- END OF FILE src/stores/scene/useSceneStore.ts ---

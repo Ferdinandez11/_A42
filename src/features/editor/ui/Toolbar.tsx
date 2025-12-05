@@ -3,7 +3,7 @@ import {
   MousePointer2, Grid3X3, Component, Trees, Grid, Undo2, Redo2, Eye, Box, ArrowUp, ArrowRight, GalleryVerticalEnd, Square, Sun, Upload, Ruler, Footprints, Video, Camera, Film, Download, FileText, ShieldAlert, FileDown, Save, LayoutDashboard
 } from 'lucide-react';
 import { useEditorStore } from "@/stores/editor/useEditorStore";
-import { useSceneStore } from "@/stores/scene/useSceneStore";
+import { useSceneStore } from "@/stores/scene/useSceneStore"; // 🔥
 import { useProjectStore } from "@/stores/project/useProjectStore";
 import { supabase } from '../../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
@@ -11,25 +11,27 @@ import './Editor.css';
 
 export const Toolbar = () => {
   const navigate = useNavigate();
-const {
-  mode, setMode, gridVisible, toggleGrid,
-  undo, redo, past, future,
-  cameraType, setCameraType, triggerView,
-  envPanelVisible, toggleEnvPanel,
-  setMeasurementResult,
-  safetyZonesVisible, toggleSafetyZones,
-  requestInput,
-} = useEditorStore();
+  
+  // UI Actions
+  const {
+    mode, setMode, gridVisible, toggleGrid,
+    cameraType, setCameraType, triggerView,
+    envPanelVisible, toggleEnvPanel,
+    setMeasurementResult,
+    safetyZonesVisible, toggleSafetyZones,
+    requestInput,
+  } = useEditorStore();
 
-const {
-  items, addItem, fenceConfig, totalPrice,
-  removeItem, resetScene,
-} = useSceneStore();
+  // Data Actions
+  const {
+    items, addItem, fenceConfig, totalPrice,
+    undo, redo, past, future // Undo/Redo movidos aquí
+  } = useSceneStore(); // 🔥
 
-const {
-  user, currentProjectId, currentProjectName,
-  isReadOnlyMode, setProjectInfo,
-} = useProjectStore();
+  const {
+    user, currentProjectId, currentProjectName,
+    isReadOnlyMode, setProjectInfo,
+  } = useProjectStore();
 
   const [showViews, setShowViews] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -43,32 +45,22 @@ const {
     { id: 'catalog', icon: <Trees size={20} />, label: 'Catálogo' },
   ];
 
-  // --- LÓGICA DE GUARDADO ---
   const handleSaveProject = async () => {
-    // Doble seguridad: Si es solo lectura, no hacemos nada
     if (isReadOnlyMode) return alert("Modo de Solo Lectura. No puedes sobrescribir este proyecto.");
     if (!user) return alert("Debes iniciar sesión para guardar.");
 
-    // 1. Captura de pantalla (Miniatura)
     const engine = (window as any).editorEngine;
+    if (!engine || !engine.renderer) return;
     
-    if (!engine || !engine.renderer) {
-        console.error("No se encontró el motor gráfico");
-        return;
-    }
-    
-    // Forzamos un render para asegurar que salga todo
     engine.render(); 
-    const thumbnailBase64 = engine.renderer.domElement.toDataURL('image/jpeg', 0.5); // Calidad media
+    const thumbnailBase64 = engine.renderer.domElement.toDataURL('image/jpeg', 0.5);
 
-    // 2. Preparar datos JSON
     const projectData = {
       items,
       fenceConfig,
       camera: cameraType
     };
 
-    // 3. Determinar Nombre
     let nameToSave = currentProjectName;
     let isOverwrite = false;
 
@@ -91,7 +83,6 @@ const {
     setIsSaving(true);
     try {
       if (isOverwrite && currentProjectId) {
-        // UPDATE
         const { error } = await supabase.from('projects').update({
           name: nameToSave,
           data: projectData,
@@ -99,12 +90,9 @@ const {
           total_price: totalPrice,
           updated_at: new Date()
         }).eq('id', currentProjectId);
-        
         if (error) throw error;
         alert("Proyecto actualizado correctamente.");
-
       } else {
-        // INSERT
         const { data, error } = await supabase.from('projects').insert([{
           user_id: user.id,
           name: nameToSave,
@@ -112,10 +100,8 @@ const {
           thumbnail_url: thumbnailBase64,
           total_price: totalPrice
         }]).select().single();
-
         if (error) throw error;
         alert("Proyecto guardado correctamente.");
-        
         if (data) setProjectInfo(data.id, data.name);
       }
     } catch (err: any) {
@@ -125,12 +111,15 @@ const {
     }
   };
 
-  // --- OTRAS FUNCIONES ---
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]; if (!file) return;
     const url = URL.createObjectURL(file);
     const fileName = file.name.replace('.glb', '').replace('.gltf', '');
-    addItem({ uuid: crypto.randomUUID(), productId: 'custom_upload', name: fileName, price: 0, type: 'model', modelUrl: url, position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] });
+    // Importación con any para simplificar, se recomienda usar ObjectManager directamente
+    addItem({ 
+        uuid: crypto.randomUUID(), productId: 'custom_upload', name: fileName, price: 0, 
+        type: 'model', modelUrl: url, position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] 
+    } as any);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -139,9 +128,7 @@ const {
     else { setMode('measuring'); setShowViews(false); } 
   };
 
-  // Funciones auxiliares usando (window as any) para evitar errores TS
   const getEngine = () => (window as any).editorEngine;
-
   const generatePDF = () => { getEngine()?.pdfManager.generatePDF(); };
   const activateWalkMode = () => { getEngine()?.walkManager.enable(); };
   const takePhoto = () => { getEngine()?.recorderManager.takeScreenshot(); };
@@ -158,7 +145,6 @@ const {
 
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center">
-      {/* Vistas Popup */}
       {showViews && (
         <div className="absolute bottom-full mb-4 glass-panel flex-row animate-in slide-in-from-bottom-2 fade-in duration-200">
            <button className={`tool-btn ${cameraType === 'perspective' ? 'active' : ''}`} onClick={() => setCameraType('perspective')} title="3D"><Eye size={18} /></button>
@@ -172,17 +158,13 @@ const {
       )}
 
       <div className="glass-panel">
-        
-        {/* Botón DASHBOARD */}
         {user && (
            <button className="tool-btn text-blue-400 hover:text-blue-300" onClick={() => navigate(user.email?.includes('admin') || user.email?.includes('levipark') ? '/admin/crm' : '/portal?tab=projects')} title="Ir a Mis Proyectos">
              <LayoutDashboard size={20} /> <span className="tool-label">Portal</span>
            </button>
         )}
-        
         {user && <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />}
 
-        {/* HERRAMIENTAS PRINCIPALES */}
         {tools.map((tool) => (
           <button key={tool.id} className={`tool-btn ${mode === tool.id ? 'active' : ''}`} onClick={() => { setMode(tool.id as any); setShowViews(false); }}>
             {tool.icon} <span className="tool-label">{tool.label}</span>
@@ -191,17 +173,13 @@ const {
 
         <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
 
-        {/* 💡 BOTÓN GUARDAR (BLOQUEADO EN MODO LECTURA) */}
         {user ? (
             <button 
                 className={`tool-btn ${isSaving ? 'text-yellow-400' : ''}`} 
                 onClick={handleSaveProject} 
-                disabled={isSaving || isReadOnlyMode} // <--- BLOQUEO
+                disabled={isSaving || isReadOnlyMode}
                 title={isReadOnlyMode ? "Modo Lectura (No se puede guardar)" : "Guardar Proyecto en Nube"}
-                style={{
-                    opacity: isReadOnlyMode ? 0.5 : 1, // <--- OPACIDAD VISUAL
-                    cursor: isReadOnlyMode ? 'not-allowed' : 'pointer' // <--- CURSOR PROHIBIDO
-                }}
+                style={{ opacity: isReadOnlyMode ? 0.5 : 1, cursor: isReadOnlyMode ? 'not-allowed' : 'pointer' }}
             >
                 <Save size={20} className={isSaving ? 'animate-pulse' : ''} /> 
                 <span className="tool-label">{isSaving ? '...' : 'Guardar'}</span>
@@ -241,7 +219,6 @@ const {
             <Film size={20} /> <span className="tool-label">360º</span>
         </button>
 
-        {/* --- SOLO SI ESTÁ REGISTRADO: DESCARGAS 3D Y CAD --- */}
         {user && (
           <>
             <button className="tool-btn" onClick={exportGLB} title="Exportar 3D (.glb)">

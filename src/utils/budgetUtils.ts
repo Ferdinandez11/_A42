@@ -1,3 +1,4 @@
+// --- START OF FILE src/utils/budgetUtils.ts ---
 import type { SceneItem } from '@/types/editor';
 
 export interface BudgetLineItem {
@@ -19,6 +20,9 @@ export const generateBillOfMaterials = (items: SceneItem[]): BudgetLineItem[] =>
     const key = item.productId;
 
     if (!groupedItems[key]) {
+      // 🔥 Type Guard para sacar la imagen solo si es modelo
+      const imageUrl = item.type === 'model' ? item.modelUrl : undefined;
+
       groupedItems[key] = {
         id: item.productId,
         name: item.name || 'Producto sin nombre',
@@ -26,7 +30,7 @@ export const generateBillOfMaterials = (items: SceneItem[]): BudgetLineItem[] =>
         quantity: 0,
         unitPrice: item.price || 0,
         totalPrice: 0,
-        image: item.modelUrl
+        image: imageUrl
       };
     }
 
@@ -40,3 +44,4 @@ export const generateBillOfMaterials = (items: SceneItem[]): BudgetLineItem[] =>
 export const calculateGrandTotal = (lines: BudgetLineItem[]) => {
   return lines.reduce((acc, line) => acc + line.totalPrice, 0);
 };
+// --- END OF FILE src/utils/budgetUtils.ts ---

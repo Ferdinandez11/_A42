@@ -4,32 +4,27 @@ import { FENCE_PRESETS } from "../data/fence_presets";
 
 import { CadControl } from "./CadControl";
 
-// Stores correctos
-import { useEditorStore } from "@/stores/editor/useEditorStore";
+// 🔥 CAMBIO CLAVE: Usamos useSceneStore para los datos
+import { useSceneStore } from "@/stores/scene/useSceneStore";
 import { useSelectionStore } from "@/stores/selection/useSelectionStore";
 
 export const FenceProperties = () => {
-  // Suscripción reactiva correcta
-  const items = useEditorStore((s) => s.items);
-  const updateItemFenceConfig = useEditorStore((s) => s.updateItemFenceConfig);
-
   const selectedItemId = useSelectionStore((s) => s.selectedItemId);
 
-  // Buscar el item seleccionado
+  // Leemos items y la acción de actualizar desde SceneStore
+  const items = useSceneStore((s) => s.items);
+  const updateItemFenceConfig = useSceneStore((s) => s.updateItemFenceConfig);
+
+  // Buscamos el item seleccionado
   const selectedItem = items.find((i) => i.uuid === selectedItemId);
-console.log("%c[FENCE-PROPS] Render", "color: #3bf");
-console.log(" selectedItemId:", selectedItemId);
-console.log(" selectedItem:", selectedItem);
-console.log(" type:", selectedItem?.type);
-  // Si no hay item o no es valla → no renderizar
-  if (!selectedItem || selectedItem.type !== "fence") {
+
+  // 🔥 Type Guard: Si no hay item, o no es valla, o no tiene config -> no renderizar
+  if (!selectedItem || selectedItem.type !== "fence" || !selectedItem.fenceConfig) {
     return null;
-    
   }
 
-  const currentConfig = selectedItem.fenceConfig!;
-  const currentPreset =
-    FENCE_PRESETS[currentConfig.presetId] || FENCE_PRESETS["wood"];
+  const currentConfig = selectedItem.fenceConfig;
+  const currentPreset = FENCE_PRESETS[currentConfig.presetId] || FENCE_PRESETS["wood"];
 
   // Cambiar preset
   const handlePresetChange = (key: string) => {

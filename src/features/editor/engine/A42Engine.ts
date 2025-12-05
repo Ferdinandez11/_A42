@@ -14,6 +14,7 @@ import { ExportManager } from "./managers/ExportManager";
 import { PDFManager } from "./managers/PDFManager";
 
 import { useEditorStore } from "@/stores/editor/useEditorStore";
+import { useSceneStore } from "@/stores/scene/useSceneStore"; // 🔥 NUEVO IMPORT
 import { useSelectionStore } from "@/stores/selection/useSelectionStore";
 
 export class A42Engine {
@@ -55,9 +56,6 @@ export class A42Engine {
     window.editorEngine = this;
   }
 
-  // -------------------------------------------------------
-  // GETTERS CÓMODOS
-  // -------------------------------------------------------
   public get scene() {
     return this.sceneManager.scene;
   }
@@ -68,16 +66,11 @@ export class A42Engine {
     return this.sceneManager.renderer;
   }
 
-  // -------------------------------------------------------
-  // INPUT RATÓN DESDE REACT
-  // -------------------------------------------------------
+  // 🔥 CORRECCIÓN 1: Usar onPointerDown (el nombre nuevo)
   public onMouseDown = (event: MouseEvent) => {
-    this.interactionManager.onMouseDown(event);
+    this.interactionManager.onPointerDown(event);
   };
 
-  // -------------------------------------------------------
-  // AJUSTES DE ESCENA
-  // -------------------------------------------------------
   public setBackgroundColor(color: string) {
     this.sceneManager.setBackgroundColor(color);
   }
@@ -91,18 +84,12 @@ export class A42Engine {
     this.sceneManager.updateSunPosition(azimuth, elevation);
   }
 
-  // Marco portada PDF
   public togglePDFFraming(visible: boolean) {
     this.sceneManager.setFrameVisible(visible);
   }
 
-  // -------------------------------------------------------
-  // CÁMARAS / VISTAS
-  // -------------------------------------------------------
   public switchCamera(type: CameraType) {
     this.sceneManager.switchCamera(type);
-
-    // actualizar cámara en control orbital y gizmo
     this.sceneManager.controls.object = this.sceneManager.activeCamera;
     this.interactionManager.updateCamera(this.sceneManager.activeCamera);
   }
@@ -111,9 +98,6 @@ export class A42Engine {
     this.sceneManager.setView(view);
   }
 
-  // -------------------------------------------------------
-  // TOOLS / GIZMO
-  // -------------------------------------------------------
   public clearTools() {
     this.toolsManager.clearTools();
     if (this.interactionManager.transformControl) {
@@ -126,9 +110,6 @@ export class A42Engine {
     this.interactionManager.setGizmoMode(mode);
   }
 
-  // -------------------------------------------------------
-  // SAFETY ZONES
-  // -------------------------------------------------------
   public updateSafetyZones(visible: boolean) {
     this.scene.traverse((obj) => {
       if (obj.userData?.isSafetyZone) {
@@ -218,9 +199,6 @@ export class A42Engine {
     return false;
   }
 
-  // -------------------------------------------------------
-  // AR INIT
-  // -------------------------------------------------------
   private async initAR() {
     if (!("xr" in navigator)) return;
     try {
@@ -308,12 +286,7 @@ export class A42Engine {
     document.body.appendChild(arContainer);
   }
 
-  // -------------------------------------------------------
-  // SYNC ESCENA <-> STORE
-  //  (MODELO 1: NO RECREAR SI NO HACE FALTA)
-  // -------------------------------------------------------
   public async syncSceneFromStore(storeItems: SceneItem[]) {
-    // mapa de objetos de escena actuales
     const sceneItemsMap = new Map<string, THREE.Object3D>();
     this.scene.children.forEach((child) => {
       if (child.userData?.isItem && child.uuid) {
@@ -325,7 +298,7 @@ export class A42Engine {
       const sceneObj = sceneItemsMap.get(item.uuid);
 
       if (sceneObj) {
-        // ---------- FLOOR ----------
+        // FLOOR
         if (item.type === "floor") {
           const hasChanged =
             JSON.stringify(sceneObj.userData.points) !==
@@ -343,7 +316,7 @@ export class A42Engine {
           }
         }
 
-        // ---------- FENCE ----------
+        // FENCE
         if (item.type === "fence") {
           const hasConfigChanged =
             JSON.stringify(sceneObj.userData.fenceConfig) !==
@@ -360,13 +333,13 @@ export class A42Engine {
           }
         }
 
-        // ---------- MODEL / TRANSFORM ----------
+        // MODEL / TRANSFORM
         sceneObj.position.fromArray(item.position);
         sceneObj.rotation.fromArray(item.rotation);
         sceneObj.scale.fromArray(item.scale);
         sceneItemsMap.delete(item.uuid);
       } else {
-        // No existe en escena → crearlo
+        // CREATE NEW
         if (item.type === "model" && item.modelUrl) {
           await this.objectManager.recreateModel(item);
         } else if (item.type === "floor" && item.points) {
@@ -377,7 +350,6 @@ export class A42Engine {
       }
     }
 
-    // Eliminar objetos que sobran
     for (const [uuid, obj] of sceneItemsMap) {
       this.scene.remove(obj);
 
@@ -390,24 +362,20 @@ export class A42Engine {
         this.toolsManager.clearFloorEditMarkers();
       }
     }
-
   }
 
-  // -------------------------------------------------------
-  // INPUT / TECLAS
-  // -------------------------------------------------------
   private onKeyDown = (e: KeyboardEvent) => {
     if (this.walkManager.isEnabled) return;
 
     const editor = useEditorStore.getState();
     const selection = useSelectionStore.getState();
+    const scene = useSceneStore.getState(); // 🔥 USAR STORE DE DATOS
 
     if (editor.mode !== "editing") return;
 
-    // CTRL+Z -> undo
     if (e.key === "z" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
-      editor.undo();
+      scene.undo(); // 🔥 Corregido: scene.undo()
       return;
     }
 
@@ -425,7 +393,7 @@ export class A42Engine {
         this.scene.remove(obj);
         this.sceneManager.controls.enabled = true;
 
-        editor.removeItem(obj.uuid);
+        scene.removeItem(obj.uuid); // 🔥 Corregido: scene.removeItem()
         selection.selectItem(null);
         this.toolsManager.activeFloorId = null;
         this.toolsManager.clearFloorEditMarkers();
@@ -437,9 +405,6 @@ export class A42Engine {
     this.sceneManager.onWindowResize();
   };
 
-  // -------------------------------------------------------
-  // CICLO VIDA
-  // -------------------------------------------------------
   public init() {
     this.initAR();
     this.renderer.setAnimationLoop(this.render);
@@ -465,4 +430,4 @@ export class A42Engine {
     this.sceneManager.dispose();
   }
 }
-// --- END OF FILE src/features/editor/engine/A42Engine.ts ---
+// --- END OF FILE ---

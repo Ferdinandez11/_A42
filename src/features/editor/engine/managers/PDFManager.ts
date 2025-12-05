@@ -7,6 +7,7 @@ import type { A42Engine } from "../A42Engine";
 import type { SceneItem } from "@/types/editor";
 
 import { useEditorStore } from "@/stores/editor/useEditorStore";
+import { useSceneStore } from "@/stores/scene/useSceneStore"; // 🔥 NUEVO IMPORT
 import { useUserStore } from "@/stores/user/useUserStore";
 import { PriceCalculator } from "@/utils/PriceCalculator";
 
@@ -29,9 +30,10 @@ export class PDFManager {
 
   public async generatePDF() {
     const editor = useEditorStore.getState();
+    const scene = useSceneStore.getState(); // 🔥 Accedemos a la escena (Datos)
     const { user } = useUserStore.getState();
 
-    const items = editor.items;
+    const items = scene.items; // 🔥 items vienen de SceneStore
 
     const projectName = await editor.requestInput(
       "Nombre del Proyecto:",
@@ -107,7 +109,9 @@ export class PDFManager {
 
     // -- ITEMS (únicos) --
     const uniqueItemsMap = new Map<string, SceneItem>();
-    items.forEach((item) => {
+    
+    // 🔥 CORRECCIÓN TS: Tipado explícito
+    items.forEach((item: SceneItem) => {
       const key = item.productId === "custom_upload" ? item.uuid : item.productId;
       if (!uniqueItemsMap.has(key)) uniqueItemsMap.set(key, item);
     });

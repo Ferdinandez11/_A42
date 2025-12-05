@@ -11,6 +11,7 @@ import { QRModal } from "./ui/QRModal";
 import { Catalog } from "./ui/Catalog";
 
 import { useEditorStore } from "@/stores/editor/useEditorStore";
+import { useSceneStore } from "@/stores/scene/useSceneStore"; // 🔥
 import { useSelectionStore } from "@/stores/selection/useSelectionStore";
 import { useProjectStore } from "@/stores/project/useProjectStore";
 
@@ -29,18 +30,21 @@ export const Editor3D = () => {
   const engineRef = useRef<A42Engine | null>(null);
 
   // --- STORES ---
+  
+  // UI State
   const {
     mode,
     gridVisible,
-    items,
     cameraType,
     pendingView,
     clearPendingView,
     sunPosition,
     backgroundColor,
     safetyZonesVisible,
-    totalPrice,
   } = useEditorStore();
+
+  // Data State
+  const { items, totalPrice } = useSceneStore(); // 🔥
 
   const {
     selectedItemId,
@@ -83,7 +87,6 @@ export const Editor3D = () => {
 
   // --------------------------
   // 🔥 SYNC SELECTION (REACT -> ENGINE)
-  // Este es el arreglo clave para el Gizmo
   // --------------------------
   useEffect(() => {
     if (engineRef.current) {
@@ -141,7 +144,6 @@ export const Editor3D = () => {
         onPointerDown={(e) =>
           engineRef.current?.interactionManager.onPointerDown(e.nativeEvent)
         }
-        // No hace falta pasar move/up, el gizmo lo maneja internamente
         onContextMenu={(e) => e.preventDefault()}
       />
 
