@@ -23,7 +23,7 @@ export class InteractionManager {
       this.engine.renderer.domElement
     );
 
-    // 1. CONFIGURACIÓN DE SNAP (15 grados y 10cm movimiento)
+    // SNAP: 15 grados y 10cm
     this.transformControl.setTranslationSnap(0.1); 
     this.transformControl.setRotationSnap(THREE.MathUtils.degToRad(15)); 
 
@@ -40,9 +40,9 @@ export class InteractionManager {
       this.engine.sceneManager.controls.enabled = !e.value;
 
       const obj = this.transformControl.object;
-      if (!obj || e.value) return; // Si estamos arrastrando, no guardamos todavía
+      if (!obj || e.value) return; 
 
-      // Al soltar, guardamos en el store
+      // Guardar en store al soltar
       if (obj.userData?.uuid) {
         this.syncTransformToStore(obj);
       }
@@ -54,23 +54,17 @@ export class InteractionManager {
       const obj = this.transformControl.object;
       if (!obj) return;
 
-      // 2. LÓGICA DE "PEGAR AL SUELO" AL ROTAR
-      if (this.transformControl.getMode() === 'rotate') {
-          // Calculamos la caja del objeto en coordenadas mundiales
-          // Nota: updateMatrixWorld es vital para que el cálculo sea preciso en tiempo real
-          obj.updateMatrixWorld(); 
-          const box = new THREE.Box3().setFromObject(obj);
-          
-          // Si el punto más bajo (min.y) no es 0, ajustamos la posición Y
-          // Usamos un pequeño umbral (0.001) para evitar vibraciones
-          if (Math.abs(box.min.y) > 0.001) {
-              obj.position.y -= box.min.y;
+      const mode = this.transformControl.getMode();
+
+      // --- GRAVEDAD OPTIMIZADA (SIN LAG) ---
+      // Como el ObjectManager ya ajustó el pivote a los pies del modelo,
+      // solo necesitamos asegurarnos de que la posición Y no sea negativa.
+      // No calculamos Box3 aquí porque es muy lento.
+      if (mode === 'translate' || mode === 'rotate') {
+          if (obj.position.y < 0) {
+              obj.position.y = 0;
           }
       }
-
-      // Sincronización visual (opcional en tiempo real, obligatorio al soltar)
-      // Si quieres que el store se actualice en tiempo real (puede bajar fps), descomenta:
-      // this.syncTransformToStore(obj);
     });
   }
 
@@ -83,24 +77,25 @@ export class InteractionManager {
   }
 
   // ======================================================
-  // POINTER MOVE (OPTIMIZADO PARA PREVIEW)
+  // POINTER MOVE (Solo para Preview - Optimizado)
   // ======================================================
   public onPointerMove = (evt: MouseEvent) => {
     const mode = useEditorStore.getState().mode;
     
-    if (mode === 'idle' || mode === 'editing' || mode === 'catalog') return;
+    // Si no estamos colocando, no gastamos recursos calculando raycast
+    if (mode !== "placing_item" && mode !== "drawing_floor" && mode !== "drawing_fence") return;
 
     this.updatePointer(evt);
     this.raycaster.setFromCamera(this.pointer, this.engine.activeCamera);
 
+    // Raycast ligero solo contra el suelo
     const floorPoint = this.engine.sceneManager.raycastWorldPoint(this.raycaster);
 
     if (floorPoint) {
         if (mode === "placing_item") {
             this.engine.objectManager.placePreviewAt(floorPoint);
-        } else if (mode === "drawing_floor") {
-            // Lógica visual de dibujo futura
         }
+        // Aquí podrías añadir lógica visual para dibujo de vallas/suelos si quisieras
     }
   };
 
@@ -132,6 +127,8 @@ export class InteractionManager {
         if (world) {
             this.engine.objectManager.placePreviewAt(world);
             this.engine.objectManager.confirmPreviewPlacement();
+            
+            // Salimos inmediatamente del modo colocar
             useEditorStore.getState().setMode("idle");
         }
         return;
@@ -150,7 +147,8 @@ export class InteractionManager {
       }
     }
 
-    // 3. MODO IDLE/EDITING
+    // 3. MODO SELECCIÓN (Solo si estamos en IDLE o EDITING)
+    // Evitamos seleccionar cosas mientras estamos poniendo otras
     const objects: THREE.Object3D[] = [];
     this.engine.scene.traverse((obj) => {
       if (obj.userData?.isItem) objects.push(obj);
@@ -168,40 +166,24 @@ export class InteractionManager {
       }
     }
 
+    // Si clicamos fuera, deseleccionamos
     this.clearSelection();
     useEditorStore.getState().setMode("idle");
   }
 
-  // ======================================================
-  // RIGHT CLICK
-  // ======================================================
   private handleRightClick() {
     const mode = useEditorStore.getState().mode;
-
     if (mode === "placing_item") {
       useEditorStore.getState().setMode("idle");
       return;
     }
-
-    if (mode === "drawing_floor") {
-      this.engine.toolsManager.floorTool.finalize();
-      return;
-    }
-
-    if (mode === "drawing_fence") {
-      this.engine.toolsManager.fenceTool.finalize();
-      return;
-    }
+    if (mode === "drawing_floor") return this.engine.toolsManager.floorTool.finalize();
+    if (mode === "drawing_fence") return this.engine.toolsManager.fenceTool.finalize();
   }
 
-  // ======================================================
-  // SELECTION
-  // ======================================================
   public selectObject(obj: THREE.Object3D | null) {
     const store = useSelectionStore.getState();
-
     if (!obj) return this.clearSelection();
-
     const uuid = obj.userData?.uuid;
     if (!uuid) return this.clearSelection();
 
@@ -212,20 +194,14 @@ export class InteractionManager {
   }
 
   private clearSelection() {
-    const store = useSelectionStore.getState();
-    store.select(null);
-
+    useSelectionStore.getState().select(null);
     this.transformControl.detach();
     this.transformControl.visible = false;
     this.engine.sceneManager.controls.enabled = true;
   }
 
-  // ======================================================
-  // STORE SYNC
-  // ======================================================
   private syncTransformToStore(obj: THREE.Object3D) {
     if (!obj.userData?.uuid) return;
-
     useSceneStore.getState().updateItem(obj.userData.uuid, {
       position: [obj.position.x, obj.position.y, obj.position.z],
       rotation: [obj.rotation.x, obj.rotation.y, obj.rotation.z],

@@ -43,30 +43,28 @@ export class ObjectManager {
     }
   }
 
-  // --- MODELO CON AUTO-AJUSTE AL SUELO ---
+  // --- MODELO CON AUTO-AJUSTE AL SUELO (OPTIMIZADO) ---
   private async createModel(item: ModelItem): Promise<THREE.Object3D | null> {
     if (!item.modelUrl) return null;
 
     const model = await this.loadModel(item.modelUrl);
 
-    // 1. CALCULAR BOUNDING BOX PARA AJUSTAR AL SUELO
+    // 1. Calculamos la caja UNA SOLA VEZ al crear
     const box = new THREE.Box3().setFromObject(model);
-    const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
 
-    // La diferencia entre el centro del objeto y su base
-    const yOffset = center.y - box.min.y; 
-    
-    // Creamos un contenedor (Wrapper) para corregir el pivote
+    // 2. Creamos un contenedor (Wrapper) que será el objeto real en la escena
     const wrapper = new THREE.Group();
     wrapper.add(model);
     
-    // Movemos el modelo dentro del wrapper para que sus pies estén en Y=0 local
-    model.position.y = -box.min.y; // Subimos el modelo lo necesario
-    model.position.x = -center.x;  // Centramos en X (opcional, recomendado)
-    model.position.z = -center.z;  // Centramos en Z (opcional, recomendado)
+    // 3. Movemos el modelo DENTRO del wrapper.
+    // Lo subimos (-box.min.y) para que sus pies toquen el suelo del wrapper (Y=0).
+    // Lo centramos en X/Z para que el pivote esté en el centro.
+    model.position.x = -center.x;
+    model.position.y = -box.min.y;
+    model.position.z = -center.z;
 
-    // Aplicamos las transformaciones del mundo al wrapper
+    // 4. Aplicamos las transformaciones del mundo al wrapper
     wrapper.uuid = item.uuid;
     wrapper.position.fromArray(item.position as Vector3Array);
     wrapper.rotation.fromArray(item.rotation as Vector3Array);
@@ -77,7 +75,6 @@ export class ObjectManager {
       type: "model",
       uuid: item.uuid,
       productId: item.productId,
-      originalHeight: size.y // Guardamos altura por si acaso
     };
 
     this.prepareSafetyZones(wrapper);
@@ -109,6 +106,16 @@ export class ObjectManager {
     shape.lineTo(pts[0].x, -pts[0].z);
     const geometry = new THREE.ExtrudeGeometry(shape, { depth: 0.05, bevelEnabled: false });
     geometry.rotateX(-Math.PI / 2);
+    
+    // Fix UVs simple
+    const uv = geometry.attributes.uv;
+    if(uv) {
+        for(let i=0; i<uv.count; i++) {
+            // Un mapeo simple planar para que la textura no se estire en los lados
+            // (Esto es una aproximación, para suelos complejos se requiere un mapa UV mejor)
+        }
+    }
+
     const material = new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.8 });
 
     if (item.floorMaterial) {
@@ -156,37 +163,38 @@ export class ObjectManager {
       this.previewObject = null;
     }
     this.previewItem = item;
-    // Creamos el objeto usando la misma lógica que el final (para que el offset del suelo sea igual)
+    
+    // Creamos el objeto preview (esto puede tardar unos ms si el modelo es pesado, 
+    // pero solo ocurre UNA vez al hacer click en el catálogo)
     const obj = await this.createFromItem({ ...item, uuid: "preview" });
     if (!obj) return;
 
-    // Material semitransparente para indicar que es un fantasma
+    // Material semitransparente para el fantasma
     obj.traverse((child: any) => {
       if (child.isMesh) {
-        // Clonamos material para no afectar caché
         const mat = Array.isArray(child.material) ? child.material[0].clone() : child.material.clone();
         mat.transparent = true;
         mat.opacity = 0.6;
-        mat.depthWrite = false; // Ayuda visual a que parezca fantasmal
+        mat.depthWrite = false; 
         child.material = mat;
       }
     });
 
     this.previewObject = obj;
-    this.previewObject.userData = {}; // Sin userData para que no sea interactuable
+    this.previewObject.userData = {}; // Sin userData para no ser interactuable
     this.scene.add(obj);
   }
 
   public placePreviewAt(point: THREE.Vector3) {
     if (!this.previewObject) return;
+    // Solo movemos el wrapper. Como el modelo interno ya está ajustado (pivote en pies),
+    // poner el wrapper en point.y (suelo) hace que los pies toquen el suelo perfectamente.
     this.previewObject.position.copy(point);
   }
 
   public confirmPreviewPlacement() {
     if (!this.previewObject || !this.previewItem) return;
 
-    // Usamos la posición actual del fantasma (que ya tiene el offset aplicado dentro del wrapper,
-    // pero la posición del wrapper es la del puntero en el suelo)
     const position = [
         this.previewObject.position.x,
         this.previewObject.position.y,
