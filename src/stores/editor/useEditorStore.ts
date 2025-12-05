@@ -80,6 +80,12 @@ interface EditorState {
     points: { x: number; z: number }[]
   ) => void;
 
+  // 🔥 NUEVA ACCIÓN PARA VALLAS
+  updateFencePoints: (
+    uuid: string,
+    points: { x: number; z: number }[]
+  ) => void;
+
   setFenceConfig: (config: Partial<FenceConfig>) => void;
   updateItemFenceConfig: (uuid: string, config: Partial<FenceConfig>) => void;
 
@@ -256,6 +262,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // FLOOR POINTS
   // -----------------------------
   updateFloorPoints: (uuid, points) => {
+    get().saveSnapshot();
+    set((s) => ({
+      items: s.items.map((i) =>
+        i.uuid === uuid ? { ...i, points } : i
+      ),
+    }));
+  },
+
+  // -----------------------------
+  // 🔥 FENCE POINTS (NUEVO)
+  // -----------------------------
+  updateFencePoints: (uuid, points) => {
     get().saveSnapshot();
     set((s) => ({
       items: s.items.map((i) =>

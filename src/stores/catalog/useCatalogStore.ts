@@ -1,29 +1,25 @@
+// --- START OF FILE useCatalogStore.ts ---
 import { create } from "zustand";
-
-export interface CatalogProduct {
-  id: string;
-  name: string;
-  modelUrl: string;
-  price: number;
-  preview?: string;
-}
 
 interface CatalogState {
   isOpen: boolean;
-  selectedProduct: CatalogProduct | null;
-  products: CatalogProduct[];
+  selectedProduct: any;
 
   openCatalog: () => void;
   closeCatalog: () => void;
-  selectProduct: (p: CatalogProduct | null) => void;
+  toggleCatalog: () => void;
+
+  selectProduct: (product: any) => void;
 }
 
 export const useCatalogStore = create<CatalogState>((set) => ({
   isOpen: false,
   selectedProduct: null,
-  products: [],
 
   openCatalog: () => set({ isOpen: true }),
   closeCatalog: () => set({ isOpen: false }),
-  selectProduct: (p) => set({ selectedProduct: p }),
+  toggleCatalog: () => set((s) => ({ isOpen: !s.isOpen })),
+
+  selectProduct: (product) => set({ selectedProduct: product }),
 }));
+// --- END OF FILE ---

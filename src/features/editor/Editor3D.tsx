@@ -1,4 +1,3 @@
-// --- START OF FILE src/features/editor/Editor3D.tsx ---
 import React, { useEffect, useRef } from "react";
 import { A42Engine } from "./engine/A42Engine";
 
@@ -9,7 +8,8 @@ import { FloorProperties } from "./ui/FloorProperties";
 import { FenceProperties } from "./ui/FenceProperties";
 import { InputModal } from "./ui/InputModal";
 import { QRModal } from "./ui/QRModal";
-import { CatalogPanel } from "./ui/CatalogPanel";
+import { Catalog } from "./ui/Catalog";
+
 import { useEditorStore } from "@/stores/editor/useEditorStore";
 import { useSelectionStore } from "@/stores/selection/useSelectionStore";
 import { useProjectStore } from "@/stores/project/useProjectStore";
@@ -53,49 +53,47 @@ export const Editor3D = () => {
 
   const [qrVisible, setQRVisible] = React.useState(false);
 
-  // ------------------------------------------------------
+  // --------------------------
   // INIT ENGINE
-  // ------------------------------------------------------
+  // --------------------------
   useEffect(() => {
     if (!containerRef.current) return;
 
     const engine = new A42Engine(containerRef.current);
     engine.init();
-    engineRef.current = engine;
 
-    // 🔥 ACTUAL FIX: Mouse events DIRECTLY attached to the canvas
     const canvas = engine.renderer.domElement as HTMLCanvasElement;
+    if (canvas) {
+      canvas.style.pointerEvents = "auto";
+      canvas.style.touchAction = "none";
+    }
 
-    canvas.style.pointerEvents = "auto";
-    canvas.style.touchAction = "none"; // evita scroll en móvil
-
-    const handlePointerDown = (e: PointerEvent) => {
-      engine.onMouseDown(e as any);
-    };
-
-    canvas.addEventListener("pointerdown", handlePointerDown);
-
-    // Debug
+    engineRef.current = engine;
     // @ts-ignore
     window.editorEngine = engine;
 
-    // Apply scene settings
     engine.setGridVisible(gridVisible);
     engine.updateSunPosition(sunPosition.azimuth, sunPosition.elevation);
 
     if (backgroundColor === "#111111") engine.setSkyVisible(true);
     else engine.setBackgroundColor(backgroundColor);
 
-    return () => {
-      canvas.removeEventListener("pointerdown", handlePointerDown);
-      engine.dispose();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => engine.dispose();
   }, []);
 
-  // ------------------------------------------------------
+  // --------------------------
+  // 🔥 SYNC SELECTION (REACT -> ENGINE)
+  // Este es el arreglo clave para el Gizmo
+  // --------------------------
+  useEffect(() => {
+    if (engineRef.current) {
+      engineRef.current.interactionManager.selectItemByUUID(selectedItemId);
+    }
+  }, [selectedItemId]);
+
+  // --------------------------
   // REACTIONS
-  // ------------------------------------------------------
+  // --------------------------
   useEffect(() => {
     engineRef.current?.syncSceneFromStore(items);
   }, [items]);
@@ -107,6 +105,7 @@ export const Editor3D = () => {
   useEffect(() => {
     const eng = engineRef.current;
     if (!eng) return;
+
     eng.switchCamera(cameraType);
     eng.interactionManager.updateCamera(eng.activeCamera);
   }, [cameraType]);
@@ -133,33 +132,26 @@ export const Editor3D = () => {
     else engineRef.current?.setBackgroundColor(backgroundColor);
   }, [backgroundColor]);
 
-  // ------------------------------------------------------
-  // GIZMO ACTIONS
-  // ------------------------------------------------------
-  const setGizmoMode = (m: "translate" | "rotate" | "scale") =>
-    engineRef.current?.setGizmoMode(m);
-
-  // ------------------------------------------------------
-  // RENDER
-  // ------------------------------------------------------
   return (
     <div className="w-screen h-screen relative bg-neutral-900 overflow-hidden">
-
-      {/* Canvas container */}
       <div
         ref={containerRef}
         className="absolute inset-0 z-0"
+
+        onPointerDown={(e) =>
+          engineRef.current?.interactionManager.onPointerDown(e.nativeEvent)
+        }
+        // No hace falta pasar move/up, el gizmo lo maneja internamente
         onContextMenu={(e) => e.preventDefault()}
-        style={{ pointerEvents: "auto" }}
       />
 
       <BudgetPanel />
       <EnvironmentPanel />
       <FloorProperties />
       <FenceProperties />
-      <CatalogPanel />
 
-      {/* QR BUTTON */}
+      {mode === 'catalog' && <Catalog />}
+
       <button
         onClick={() => setQRVisible(true)}
         className="absolute top-6 right-6 z-20 bg-neutral-800/90 hover:bg-neutral-700 text-white p-3 rounded-full border border-neutral-600 shadow-lg"
@@ -167,7 +159,6 @@ export const Editor3D = () => {
         <QrCode size={20} />
       </button>
 
-      {/* PRICE (only when logged) */}
       {!isReadOnlyMode && (
         <div className="absolute bottom-6 left-6 z-20">
           <button className="bg-neutral-800/90 px-4 py-3 rounded-full border border-neutral-600 text-white flex gap-3 items-center">
@@ -177,16 +168,15 @@ export const Editor3D = () => {
         </div>
       )}
 
-      {/* GIZMO BUTTONS */}
       {selectedItemId && mode === "editing" && (
         <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex gap-2 glass-panel p-2 rounded-xl">
-          <button onClick={() => setGizmoMode("translate")}>
+          <button onClick={() => engineRef.current?.setGizmoMode("translate")}>
             <Move size={16} />
           </button>
-          <button onClick={() => setGizmoMode("rotate")}>
+          <button onClick={() => engineRef.current?.setGizmoMode("rotate")}>
             <RotateCw size={16} />
           </button>
-          <button onClick={() => setGizmoMode("scale")}>
+          <button onClick={() => engineRef.current?.setGizmoMode("scale")}>
             <Scaling size={16} />
           </button>
 
@@ -200,7 +190,6 @@ export const Editor3D = () => {
         </div>
       )}
 
-      {/* MEASURE TOOL UI */}
       {mode === "measuring" && (
         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-black/80 px-6 py-3 text-white rounded-full border border-white/20 backdrop-blur-md font-mono">
           {measuredDistance !== null
@@ -211,13 +200,12 @@ export const Editor3D = () => {
 
       <Toolbar />
       <QRModal isOpen={qrVisible} onClose={() => setQRVisible(false)} />
+
       <InputModal />
 
-      {/* Watermark */}
       <div className="absolute bottom-6 right-6 text-white/5 font-black text-4xl pointer-events-none select-none">
         A42
       </div>
     </div>
   );
 };
-// --- END OF FILE ---

@@ -79,7 +79,6 @@ export class ObjectManager {
       model.rotation.fromArray(item.rotation);
       model.scale.fromArray(item.scale);
 
-      // 👇 SOLO el grupo raíz es el "item" seleccionable
       model.userData = {
         isItem: true,
         type: "model",
@@ -87,7 +86,6 @@ export class ObjectManager {
         productId: item.productId,
       };
 
-      // Zonas de seguridad
       const editor = useEditorStore.getState();
       const isZonesVisible = editor.safetyZonesVisible;
 
@@ -189,6 +187,11 @@ export class ObjectManager {
     mesh.uuid = item.uuid;
     mesh.receiveShadow = true;
 
+    // 🔥 CORRECCIÓN: Aplicar posición, rotación y escala guardadas
+    mesh.position.fromArray(item.position || [0, 0, 0]);
+    mesh.rotation.fromArray(item.rotation || [0, 0, 0]);
+    mesh.scale.fromArray(item.scale || [1, 1, 1]);
+
     mesh.userData = {
       isItem: true,
       type: "floor",
@@ -217,7 +220,11 @@ export class ObjectManager {
 
     fence.uuid = item.uuid;
 
-    // 👇 SOLO el grupo raíz tiene isItem
+    // 🔥 CORRECCIÓN: Aplicar posición, rotación y escala guardadas
+    fence.position.fromArray(item.position || [0, 0, 0]);
+    fence.rotation.fromArray(item.rotation || [0, 0, 0]);
+    fence.scale.fromArray(item.scale || [1, 1, 1]);
+
     fence.userData = {
       isItem: true,
       type: "fence",
@@ -522,7 +529,6 @@ export class ObjectManager {
         }
       });
 
-      // Animación pop
       const targetScale = model.scale.clone();
       model.scale.set(0, 0, 0);
       let t = 0;
@@ -538,7 +544,6 @@ export class ObjectManager {
       };
       animate();
 
-      // --- GUARDAR EN STORE ---
       const uuid = THREE.MathUtils.generateUUID();
       model.uuid = uuid;
 
@@ -587,4 +592,4 @@ export class ObjectManager {
     object.position.y -= box.min.y;
   }
 }
-// --- END OF FILE ---
+// --- END OF FILE src/features/editor/engine/managers/ObjectManager.ts ---

@@ -1,6 +1,5 @@
-// --- START OF FILE src/features/editor/ui/Catalog.tsx ---
 import { useEffect, useState, useMemo } from 'react';
-import { Search, X } from 'lucide-react'; // Importamos iconos
+import { Search, X } from 'lucide-react'; 
 import { useEditorStore } from '@/stores/editor/useEditorStore';
 import { useCatalogStore } from '@/stores/catalog/useCatalogStore';
 import { 
@@ -14,16 +13,17 @@ import {
 
 export const Catalog = () => {
   const { setMode } = useEditorStore();
-  const { setSelectedProduct } = useCatalogStore();
+  
+  // 🔥 CORRECCIÓN: El nombre correcto en el store es 'selectProduct'
+  const { selectProduct } = useCatalogStore();
+  
   const [catalogDB, setCatalogDB] = useState<CatalogDB | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Navegación
   const [currentLine, setCurrentLine] = useState<string | null>(null);
   const [currentCategory, setCurrentCategory] = useState<string | null>(null);
   
-  // Búsqueda
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
@@ -42,8 +42,6 @@ export const Catalog = () => {
     fetchCatalog();
   }, []);
 
-  // --- LÓGICA DE BÚSQUEDA ---
-  // Aplanamos el catálogo para buscar en todos los productos a la vez
   const allProducts = useMemo(() => {
     if (!catalogDB) return [];
     const products: Product[] = [];
@@ -55,31 +53,26 @@ export const Catalog = () => {
     return products;
   }, [catalogDB]);
 
-  // Filtramos según lo que escriba el usuario
   const filteredProducts = useMemo(() => {
     if (!searchTerm) return [];
     const lowerTerm = searchTerm.toLowerCase();
     return allProducts.filter(p => 
       p.name.toLowerCase().includes(lowerTerm) || 
-      p.id.toLowerCase().includes(lowerTerm) // Buscamos también por REF/ID
+      p.id.toLowerCase().includes(lowerTerm)
     );
   }, [searchTerm, allProducts]);
 
   const handleSelectProduct = (product: Product) => {
-    setSelectedProduct(product);
+    // 🔥 CORRECCIÓN: Usar la función correcta
+    selectProduct(product);
     setMode('placing_item');
   };
 
   const handleBackToLines = () => {
     setCurrentCategory(null);
     setCurrentLine(null);
-    setSearchTerm(''); // Limpiar búsqueda al navegar con breadcrumbs
+    setSearchTerm(''); 
   };
-  // *** se supone que no lo uso ya
-  //const handleBackToCategories = () => {
-    //setCurrentCategory(null);
-    //setSearchTerm('');
-  //};
 
   if (loading) {
     return (
@@ -104,10 +97,8 @@ export const Catalog = () => {
 
   if (!catalogDB) return null;
 
-  // --- RENDERIZADO DEL CONTENIDO ---
-
   const renderContent = () => {
-    // 0. VISTA DE BÚSQUEDA (Si hay texto en el buscador)
+    // 0. BUSQUEDA
     if (searchTerm) {
       if (filteredProducts.length === 0) {
         return (
@@ -135,7 +126,6 @@ export const Catalog = () => {
                   ) : (
                     <span className="text-neutral-500 text-sm">Sin imagen</span>
                   )}
-                  {/* Etiqueta pequeña para saber de qué línea viene al buscar */}
                   <span className="absolute top-2 right-2 bg-black/60 text-xs px-2 py-1 rounded text-white/70 backdrop-blur-sm">
                     {product.category}
                   </span>
@@ -154,7 +144,7 @@ export const Catalog = () => {
       );
     }
 
-    // 1. VISTA DE PRODUCTOS DE CATEGORÍA
+    // 1. PRODUCTOS DE CATEGORÍA
     if (currentLine && currentCategory) {
       const products = catalogDB.lines[currentLine]?.categories[currentCategory];
       
@@ -189,7 +179,7 @@ export const Catalog = () => {
         </>
       );
 
-    // 2. VISTA DE CATEGORÍAS
+    // 2. CATEGORÍAS
     } else if (currentLine) {
       const categories = catalogDB.lines[currentLine]?.categories;
       const categoryNames = Object.keys(categories || {});
@@ -229,7 +219,7 @@ export const Catalog = () => {
         </>
       );
 
-    // 3. VISTA DE LÍNEAS (Home)
+    // 3. LÍNEAS (HOME)
     } else {
       const lineNames = Object.keys(catalogDB.lines);
       if (lineNames.length === 0) return <p className="text-neutral-400 mt-10 text-center">El catálogo está vacío.</p>;
@@ -274,9 +264,7 @@ export const Catalog = () => {
 
   return (
     <div className="absolute inset-0 bg-neutral-950/95 backdrop-blur-md z-40 flex flex-col animate-in fade-in duration-200">
-      {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-center p-6 border-b border-white/10 bg-black/20 gap-4">
-        {/* Breadcrumbs (Navegación) */}
         <div className="flex items-center space-x-3 overflow-hidden flex-grow min-w-0">
           <button 
             onClick={() => { setCurrentLine(null); setCurrentCategory(null); setSearchTerm(''); }}
@@ -307,7 +295,6 @@ export const Catalog = () => {
           )}
         </div>
 
-        {/* BUSCADOR */}
         <div className="relative w-full md:w-80">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <Search size={18} className="text-neutral-400" />
@@ -329,20 +316,17 @@ export const Catalog = () => {
           )}
         </div>
 
-        {/* BOTÓN CERRAR */}
         <button
           onClick={() => setMode('idle')}
           className="p-2 hover:bg-white/10 rounded-full text-white/50 hover:text-white transition-all ml-2"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          <X size={32} />
         </button>
       </div>
 
-      {/* BODY */}
       <div className="flex-grow p-6 overflow-hidden relative">
         {renderContent()}
       </div>
     </div>
   );
 };
-// --- END OF FILE src/features/editor/ui/Catalog.tsx ---
