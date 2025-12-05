@@ -12,8 +12,8 @@ export class InteractionManager {
   private engine: A42Engine;
   public transformControl: TransformControls | null = null;
 
-  private raycaster: THREE.Raycaster;
-  private pointer: THREE.Vector2;
+  private raycaster = new THREE.Raycaster();
+  private pointer = new THREE.Vector2();
   public interactionPlane: THREE.Mesh;
 
   public isDraggingGizmo = false;
@@ -21,10 +21,7 @@ export class InteractionManager {
 
   constructor(engine: A42Engine) {
     this.engine = engine;
-    this.raycaster = new THREE.Raycaster();
-    this.pointer = new THREE.Vector2();
 
-    // Plano para clicks
     this.interactionPlane = new THREE.Mesh(
       new THREE.PlaneGeometry(5000, 5000),
       new THREE.MeshBasicMaterial({ visible: false })
@@ -36,32 +33,34 @@ export class InteractionManager {
     this.initTransformControls();
   }
 
-  // ---------------------------------------------
-  // TRANSFORM CONTROLS (GIZMO)
-  // ---------------------------------------------
+  // -------------------------------------------------------------
+  // INIT TRANSFORM CONTROLS
+  // -------------------------------------------------------------
   private initTransformControls() {
     try {
       this.transformControl = new TransformControls(
-        this.engine.activeCamera as THREE.Camera,
+        this.engine.activeCamera,
         this.engine.renderer.domElement
       );
 
       this.transformControl.rotationSnap = Math.PI / 12;
       this.engine.scene.add(this.transformControl);
 
-      this.transformControl.addEventListener("dragging-changed", (event: any) => {
+      this.transformControl.addEventListener("dragging-changed", (ev: any) => {
         const editor = useEditorStore.getState();
 
-        this.isDraggingGizmo = event.value;
-        this.engine.sceneManager.controls.enabled = !event.value;
+        this.isDraggingGizmo = ev.value;
+        this.engine.sceneManager.controls.enabled = !ev.value;
 
-        const obj = this.transformControl?.object;
+        const obj = this.transformControl!.object;
         if (!obj) return;
 
-        if (event.value) {
+        if (ev.value) {
+          // start drag
           this.dragStartPosition.copy(obj.position);
           editor.saveSnapshot();
         } else {
+          // end drag
           if (this.engine.isObjectColliding(obj)) {
             this.animateRevert(obj, this.dragStartPosition);
           } else {
@@ -76,7 +75,7 @@ export class InteractionManager {
       });
 
       this.transformControl.addEventListener("objectChange", () => {
-        const obj = this.transformControl?.object;
+        const obj = this.transformControl!.object;
         if (obj && obj.userData.isItem && !this.isDraggingGizmo) {
           this.engine.objectManager.adjustObjectToGround(obj);
         }
@@ -85,28 +84,29 @@ export class InteractionManager {
       this.transformControl.detach();
       this.transformControl.visible = false;
     } catch (e) {
-      console.error("ERROR: TransformControls", e);
+      console.error("Error loading TransformControls", e);
       this.transformControl = null;
     }
   }
 
+  // -------------------------------------------------------------
+  // ANIMATED COLLISION REVERT
+  // -------------------------------------------------------------
   private animateRevert(obj: THREE.Object3D, targetPos: THREE.Vector3) {
-    const startPos = obj.position.clone();
+    const start = obj.position.clone();
     let t = 0;
-
-    const animate = () => {
+    const step = () => {
       t += 0.1;
       if (t >= 1) {
         obj.position.copy(targetPos);
         this.engine.checkSafetyCollisions();
         return;
       }
-      obj.position.lerpVectors(startPos, targetPos, t);
+      obj.position.lerpVectors(start, targetPos, t);
       this.engine.checkSafetyCollisions();
-      requestAnimationFrame(animate);
+      requestAnimationFrame(step);
     };
-
-    animate();
+    step();
   }
 
   public updateCamera(camera: THREE.Camera) {
@@ -115,9 +115,9 @@ export class InteractionManager {
     }
   }
 
-  // ---------------------------------------------
-  // CLICK PRINCIPAL
-  // ---------------------------------------------
+  // -------------------------------------------------------------
+  // MAIN MOUSE DOWN
+  // -------------------------------------------------------------
   public onMouseDown = (event: MouseEvent) => {
     if (this.transformControl && this.isDraggingGizmo) return;
 
@@ -129,11 +129,12 @@ export class InteractionManager {
 
     const editor = useEditorStore.getState();
     const catalog = useCatalogStore.getState();
-    const selectionStore = useSelectionStore.getState();
-
+    const selection = useSelectionStore.getState();
     const mode = editor.mode;
 
-    // FLOOR DRAW
+    // -------------------------------------------------------------
+    // DRAW FLOOR
+    // -------------------------------------------------------------
     if (mode === "drawing_floor") {
       const hit = this.raycaster.intersectObject(this.interactionPlane);
       if (hit.length > 0) {
@@ -143,7 +144,9 @@ export class InteractionManager {
       return;
     }
 
-    // FENCE DRAW
+    // -------------------------------------------------------------
+    // DRAW FENCE
+    // -------------------------------------------------------------
     if (mode === "drawing_fence") {
       const hit = this.raycaster.intersectObject(this.interactionPlane);
       if (hit.length > 0) {
@@ -153,16 +156,21 @@ export class InteractionManager {
       return;
     }
 
+    // -------------------------------------------------------------
     // MEASURE TOOL
+    // -------------------------------------------------------------
     if (mode === "measuring") {
       const hit = this.raycaster.intersectObject(this.interactionPlane);
       if (hit.length > 0) this.engine.toolsManager.handleMeasurementClick(hit[0].point);
       return;
     }
 
-    // PLACE OBJECT FROM CATALOG
+    // -------------------------------------------------------------
+    // PLACE ITEM FROM CATALOG
+    // -------------------------------------------------------------
     if (mode === "placing_item" && catalog.selectedProduct) {
       if (event.button !== 0) return;
+
       const hit = this.raycaster.intersectObject(this.interactionPlane);
       if (hit.length > 0) {
         this.engine.objectManager.placeObject(
@@ -170,7 +178,7 @@ export class InteractionManager {
           hit[0].point.z,
           catalog.selectedProduct,
           (uuid) => {
-            selectionStore.selectItem(uuid);
+            selection.selectItem(uuid);
             editor.setMode("editing");
           }
         );
@@ -178,13 +186,13 @@ export class InteractionManager {
       return;
     }
 
-    // ---------------------------------------------
+    // -------------------------------------------------------------
     // IDLE / EDITING — SELECCIÓN
-    // ---------------------------------------------
+    // -------------------------------------------------------------
     if (mode === "idle" || mode === "editing") {
       if (event.button !== 0) return;
 
-      // ¿Click en markers de suelos?
+      // ---------- FLOOR MARKER SELECTION ----------
       const markerHit = this.raycaster.intersectObjects(
         this.engine.toolsManager.floorEditMarkers
       );
@@ -199,55 +207,43 @@ export class InteractionManager {
         }
 
         this.engine.toolsManager.selectVertex(idx, false);
-        if (this.transformControl) {
-          this.transformControl.attach(hit);
-          this.transformControl.setMode("translate");
-          this.transformControl.visible = true;
-        }
+        this.transformControl!.attach(hit);
+        this.transformControl!.setMode("translate");
+        this.transformControl!.visible = true;
         return;
       }
 
-      // Selección normal de objetos
+      // ---------- OBJECT SELECTION ----------
       const interactables = this.engine.scene.children.filter(
-        (obj) => obj.userData?.isItem && obj !== this.transformControl
+        (o) => o.userData?.isItem
       );
-
       const intersects = this.raycaster.intersectObjects(interactables, true);
+
       if (intersects.length > 0) {
-        let target: THREE.Object3D | null = intersects[0].object;
+        let node = intersects[0].object;
 
-        while (
-          target &&
-          !target.userData?.isItem &&
-          target.parent &&
-          target.parent !== this.engine.scene
-        ) {
-          target = target.parent;
+        // SUBIR siempre hasta el root con userData.isItem
+        while (node && !node.userData?.isItem) {
+          node = node.parent!;
         }
+        if (!node || !node.userData?.isItem) return;
 
-        if (target && target.userData?.isItem) {
-          this.selectObject(target);
+        this.selectObject(node);
 
-          // --- FIX: lookup correcto de floor ---
-          const floorItem = useEditorStore
-            .getState()
-            .items.find(
-              (i) =>
-                i.uuid === target!.userData.uuid &&
-                i.type === "floor"
-            );
+        const floorData = useEditorStore
+          .getState()
+          .items.find((i) => i.uuid === node.userData.uuid && i.type === "floor");
 
-          if (floorItem?.points) {
-            this.engine.toolsManager.showFloorEditMarkers(
-              target.userData.uuid,
-              floorItem.points
-            );
-          } else {
-            this.engine.toolsManager.clearFloorEditMarkers();
-          }
+        if (floorData?.points) {
+          this.engine.toolsManager.showFloorEditMarkers(
+            node.userData.uuid,
+            floorData.points
+          );
+        } else {
+          this.engine.toolsManager.clearFloorEditMarkers();
         }
       } else {
-        // Deselección
+        // deselection click
         if (
           this.transformControl?.object &&
           !this.engine.toolsManager.floorEditMarkers.includes(
@@ -261,18 +257,14 @@ export class InteractionManager {
     }
   };
 
-  // ---------------------------------------------
-  // SELECCIÓN
-  // ---------------------------------------------
+  // -------------------------------------------------------------
+  // SELECT OBJECT
+  // -------------------------------------------------------------
   public selectObject(object: THREE.Object3D | null) {
     const selection = useSelectionStore.getState();
     const editor = useEditorStore.getState();
 
-    if (!this.transformControl) {
-      selection.selectItem(null);
-      editor.setMode("idle");
-      return;
-    }
+    if (!this.transformControl) return;
 
     if (this.transformControl.object) {
       this.transformControl.detach();
@@ -287,28 +279,29 @@ export class InteractionManager {
     }
 
     this.transformControl.attach(object);
+    this.transformControl.visible = true;
+
     selection.selectItem(object.userData.uuid);
     editor.setMode("editing");
-    this.transformControl.visible = true;
   }
 
-  // ---------------------------------------------
-  // SYNC TRANSFORM
-  // ---------------------------------------------
+  // -------------------------------------------------------------
+  // SYNC STORE
+  // -------------------------------------------------------------
   private syncTransformToStore(obj: THREE.Object3D) {
     const editor = useEditorStore.getState();
-    if (obj.userData.isItem) {
-      editor.updateItemTransform(
-        obj.userData.uuid,
-        [obj.position.x, obj.position.y, obj.position.z],
-        [obj.rotation.x, obj.rotation.y, obj.rotation.z],
-        [obj.scale.x, obj.scale.y, obj.scale.z]
-      );
-    }
+    if (!obj.userData.isItem) return;
+
+    editor.updateItemTransform(
+      obj.userData.uuid,
+      [obj.position.x, obj.position.y, obj.position.z],
+      [obj.rotation.x, obj.rotation.y, obj.rotation.z],
+      [obj.scale.x, obj.scale.y, obj.scale.z]
+    );
   }
 
   public setGizmoMode(mode: "translate" | "rotate" | "scale") {
-    if (this.transformControl) this.transformControl.setMode(mode);
+    this.transformControl?.setMode(mode);
   }
 }
 // --- END OF FILE ---

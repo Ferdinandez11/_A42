@@ -1,14 +1,29 @@
 import { create } from "zustand";
-import type { Product } from "@/services/catalogService";
+
+export interface CatalogProduct {
+  id: string;
+  name: string;
+  modelUrl: string;
+  price: number;
+  preview?: string;
+}
 
 interface CatalogState {
-  selectedProduct: Product | null;
+  isOpen: boolean;
+  selectedProduct: CatalogProduct | null;
+  products: CatalogProduct[];
 
-  setSelectedProduct: (p: Product | null) => void;
+  openCatalog: () => void;
+  closeCatalog: () => void;
+  selectProduct: (p: CatalogProduct | null) => void;
 }
 
 export const useCatalogStore = create<CatalogState>((set) => ({
+  isOpen: false,
   selectedProduct: null,
+  products: [],
 
-  setSelectedProduct: (p) => set({ selectedProduct: p }),
+  openCatalog: () => set({ isOpen: true }),
+  closeCatalog: () => set({ isOpen: false }),
+  selectProduct: (p) => set({ selectedProduct: p }),
 }));

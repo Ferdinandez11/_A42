@@ -9,7 +9,7 @@ import { FloorProperties } from "./ui/FloorProperties";
 import { FenceProperties } from "./ui/FenceProperties";
 import { InputModal } from "./ui/InputModal";
 import { QRModal } from "./ui/QRModal";
-
+import { CatalogPanel } from "./ui/CatalogPanel";
 import { useEditorStore } from "@/stores/editor/useEditorStore";
 import { useSelectionStore } from "@/stores/selection/useSelectionStore";
 import { useProjectStore } from "@/stores/project/useProjectStore";
@@ -53,55 +53,49 @@ export const Editor3D = () => {
 
   const [qrVisible, setQRVisible] = React.useState(false);
 
-  // --------------------------
+  // ------------------------------------------------------
   // INIT ENGINE
-  // --------------------------
+  // ------------------------------------------------------
   useEffect(() => {
     if (!containerRef.current) return;
 
     const engine = new A42Engine(containerRef.current);
     engine.init();
-
     engineRef.current = engine;
+
+    // 🔥 ACTUAL FIX: Mouse events DIRECTLY attached to the canvas
+    const canvas = engine.renderer.domElement as HTMLCanvasElement;
+
+    canvas.style.pointerEvents = "auto";
+    canvas.style.touchAction = "none"; // evita scroll en móvil
+
+    const handlePointerDown = (e: PointerEvent) => {
+      engine.onMouseDown(e as any);
+    };
+
+    canvas.addEventListener("pointerdown", handlePointerDown);
+
+    // Debug
     // @ts-ignore
     window.editorEngine = engine;
 
+    // Apply scene settings
     engine.setGridVisible(gridVisible);
     engine.updateSunPosition(sunPosition.azimuth, sunPosition.elevation);
 
     if (backgroundColor === "#111111") engine.setSkyVisible(true);
     else engine.setBackgroundColor(backgroundColor);
 
-    return () => engine.dispose();
+    return () => {
+      canvas.removeEventListener("pointerdown", handlePointerDown);
+      engine.dispose();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // --------------------------
-  // SYNC SELECCIÓN ↔ GIZMO
-  // --------------------------
-  useEffect(() => {
-    const eng = engineRef.current;
-    if (!eng) return;
-
-    const im = eng.interactionManager;
-    if (!im) return;
-
-    if (!selectedItemId) {
-      im.selectObject(null);
-      return;
-    }
-
-    const obj = eng.scene.getObjectByProperty("uuid", selectedItemId);
-    if (obj) {
-      im.selectObject(obj);
-    } else {
-      im.selectObject(null);
-    }
-  }, [selectedItemId]);
-
-  // --------------------------
+  // ------------------------------------------------------
   // REACTIONS
-  // --------------------------
+  // ------------------------------------------------------
   useEffect(() => {
     engineRef.current?.syncSceneFromStore(items);
   }, [items]);
@@ -111,7 +105,10 @@ export const Editor3D = () => {
   }, [gridVisible]);
 
   useEffect(() => {
-    engineRef.current?.switchCamera(cameraType);
+    const eng = engineRef.current;
+    if (!eng) return;
+    eng.switchCamera(cameraType);
+    eng.interactionManager.updateCamera(eng.activeCamera);
   }, [cameraType]);
 
   useEffect(() => {
@@ -136,42 +133,31 @@ export const Editor3D = () => {
     else engineRef.current?.setBackgroundColor(backgroundColor);
   }, [backgroundColor]);
 
-  // --------------------------
-  // POINTER HANDLING
-  // --------------------------
-  const handlePointerDown = (e: React.PointerEvent) => {
-    if ((e.target as HTMLElement).closest("button,a,input")) return;
-    engineRef.current?.onMouseDown(e.nativeEvent);
-  };
-
-  // --------------------------
+  // ------------------------------------------------------
   // GIZMO ACTIONS
-  // --------------------------
+  // ------------------------------------------------------
   const setGizmoMode = (m: "translate" | "rotate" | "scale") =>
     engineRef.current?.setGizmoMode(m);
 
-  // Aseguramos que el gizmo use la cámara actual
-  useEffect(() => {
-    const eng = engineRef.current;
-    if (!eng) return;
-
-    eng.switchCamera(cameraType);
-    eng.interactionManager.updateCamera(eng.activeCamera);
-  }, [cameraType]);
-
+  // ------------------------------------------------------
+  // RENDER
+  // ------------------------------------------------------
   return (
     <div className="w-screen h-screen relative bg-neutral-900 overflow-hidden">
+
+      {/* Canvas container */}
       <div
         ref={containerRef}
-        onPointerDown={handlePointerDown}
-        onContextMenu={(e) => e.preventDefault()}
         className="absolute inset-0 z-0"
+        onContextMenu={(e) => e.preventDefault()}
+        style={{ pointerEvents: "auto" }}
       />
 
       <BudgetPanel />
       <EnvironmentPanel />
       <FloorProperties />
       <FenceProperties />
+      <CatalogPanel />
 
       {/* QR BUTTON */}
       <button
@@ -181,7 +167,7 @@ export const Editor3D = () => {
         <QrCode size={20} />
       </button>
 
-      {/* PRICE ONLY IF LOGGED IN */}
+      {/* PRICE (only when logged) */}
       {!isReadOnlyMode && (
         <div className="absolute bottom-6 left-6 z-20">
           <button className="bg-neutral-800/90 px-4 py-3 rounded-full border border-neutral-600 text-white flex gap-3 items-center">
@@ -191,7 +177,7 @@ export const Editor3D = () => {
         </div>
       )}
 
-      {/* SELECTED ITEM TOOLS */}
+      {/* GIZMO BUTTONS */}
       {selectedItemId && mode === "editing" && (
         <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex gap-2 glass-panel p-2 rounded-xl">
           <button onClick={() => setGizmoMode("translate")}>
@@ -225,13 +211,13 @@ export const Editor3D = () => {
 
       <Toolbar />
       <QRModal isOpen={qrVisible} onClose={() => setQRVisible(false)} />
-
       <InputModal />
 
+      {/* Watermark */}
       <div className="absolute bottom-6 right-6 text-white/5 font-black text-4xl pointer-events-none select-none">
         A42
       </div>
     </div>
   );
 };
-// --- END OF FILE src/features/editor/Editor3D.tsx ---
+// --- END OF FILE ---
