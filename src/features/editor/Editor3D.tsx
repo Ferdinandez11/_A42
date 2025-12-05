@@ -15,7 +15,7 @@ import { useEditorStore } from "@/stores/editor/useEditorStore";
 import { useSceneStore } from "@/stores/scene/useSceneStore";
 import { useSelectionStore } from "@/stores/selection/useSelectionStore";
 import { useProjectStore } from "@/stores/project/useProjectStore";
-import { useCatalogStore } from "@/stores/catalog/useCatalogStore"; // IMPORTANTE
+import { useCatalogStore } from "@/stores/catalog/useCatalogStore";
 
 import {
   Euro,
@@ -45,7 +45,7 @@ export const Editor3D = () => {
   // --- Scene & Catalog Stores ---
   const items = useSceneStore((s) => s.items);
   const totalPrice = useSceneStore((s) => s.totalPrice);
-  const selectedProduct = useCatalogStore((s) => s.selectedProduct); // PRODUCTO SELECCIONADO
+  const selectedProduct = useCatalogStore((s) => s.selectedProduct);
 
   // --- Selection store ---
   const selectedUUID = useSelectionStore((s) => s.selectedUUID);
@@ -66,14 +66,22 @@ export const Editor3D = () => {
 
     setEngineInstance(engine);
 
+    // HANDLERS DE INTERACCIÓN
     const handlePointerDown = (e: PointerEvent) => {
+      // Solo interactuar si el click es en el canvas (no en la UI)
       if ((e.target as HTMLElement).tagName === "CANVAS") {
         engine.interactionManager.onPointerDown(e as unknown as MouseEvent);
       }
     };
 
+    const handlePointerMove = (e: PointerEvent) => {
+      // Necesario para el preview fluido sin lag
+      engine.interactionManager.onPointerMove(e as unknown as MouseEvent);
+    };
+
     const container = containerRef.current;
     container.addEventListener("pointerdown", handlePointerDown);
+    container.addEventListener("pointermove", handlePointerMove);
 
     // Config inicial
     engine.setGrid(gridVisible);
@@ -83,6 +91,7 @@ export const Editor3D = () => {
 
     return () => {
       container.removeEventListener("pointerdown", handlePointerDown);
+      container.removeEventListener("pointermove", handlePointerMove);
       engine.dispose();
       setEngineInstance(null);
     };
@@ -99,7 +108,7 @@ export const Editor3D = () => {
   }, [mode, engineInstance]);
 
   // ============================================================
-  // 3. PREVISUALIZACIÓN DE CATÁLOGO (CORREGIDO)
+  // 3. PREVISUALIZACIÓN DE CATÁLOGO
   // ============================================================
   useEffect(() => {
     if (!engineInstance) return;
@@ -118,15 +127,10 @@ export const Editor3D = () => {
         scale: [1, 1, 1],
         data: selectedProduct,
       };
-      
+
       engineInstance.objectManager.setPreviewItem(previewItem);
-    } else {
-      // Limpiar preview si no estamos colocando
-      // Nota: objectManager maneja la limpieza interna cuando confirma, 
-      // pero esto asegura limpieza al cancelar modo.
     }
   }, [selectedProduct, mode, engineInstance]);
-
 
   // ============================================================
   // 4. SINCRONIZACIÓN SELECCIÓN UI → ENGINE
@@ -141,23 +145,26 @@ export const Editor3D = () => {
   // ============================================================
   useEffect(() => {
     if (!engineInstance) return;
-    // syncScene actualiza posición Y propiedades (materiales suelo)
     engineInstance.syncScene(items);
   }, [items, engineInstance]);
 
   // ============================================================
   // 6. REACTIVIDAD SOBRE PROPIEDADES DEL EDITOR
   // ============================================================
+  
+  // Grid
   useEffect(() => {
     engineInstance?.setGrid(gridVisible);
   }, [gridVisible, engineInstance]);
 
+  // Cámara
   useEffect(() => {
     if (!engineInstance) return;
     engineInstance.switchCamera(cameraType);
     engineInstance.interactionManager.updateCamera(engineInstance.activeCamera);
   }, [cameraType, engineInstance]);
 
+  // Zonas de Seguridad
   useEffect(() => {
     if (!engineInstance) return;
     engineInstance.scene.traverse((obj) => {
@@ -167,6 +174,7 @@ export const Editor3D = () => {
     });
   }, [safetyZonesVisible, engineInstance]);
 
+  // Sol
   useEffect(() => {
     if (!engineInstance) return;
     engineInstance.updateSunPosition?.(
@@ -175,12 +183,14 @@ export const Editor3D = () => {
     );
   }, [sunPosition, engineInstance]);
 
+  // Vistas Predefinidas
   useEffect(() => {
     if (!pendingView || !engineInstance) return;
     engineInstance.setView(pendingView);
     clearPendingView();
   }, [pendingView, clearPendingView, engineInstance]);
 
+  // Fondo / Cielo
   useEffect(() => {
     if (!engineInstance) return;
     if (backgroundColor === "#111111") engineInstance.setSky(true);
