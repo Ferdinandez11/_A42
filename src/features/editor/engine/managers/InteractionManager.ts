@@ -29,9 +29,6 @@ export class InteractionManager {
     this.attachListeners();
   }
 
-  // ======================================================
-  // TRANSFORM CONTROL LISTENERS
-  // ======================================================
   private attachListeners() {
     this.transformControl.addEventListener("dragging-changed", (e: any) => {
       this.isDragging = e.value;
@@ -52,16 +49,10 @@ export class InteractionManager {
     });
   }
 
-  // ======================================================
-  // CAMERA UPDATE  ⭐ Necesario para A42Engine
-  // ======================================================
   public updateCamera(camera: THREE.Camera) {
     this.transformControl.camera = camera;
   }
 
-  // ======================================================
-  // SET GIZMO MODE  ⭐ Necesario para A42Engine
-  // ======================================================
   public setGizmoMode(mode: "translate" | "rotate" | "scale") {
     this.transformControl.setMode(mode);
   }
@@ -70,6 +61,7 @@ export class InteractionManager {
   // POINTER DOWN
   // ======================================================
   public onPointerDown = (evt: MouseEvent) => {
+    if (evt.button === 2) return this.handleRightClick();
     if (this.isDragging) return;
 
     const rect = this.engine.renderer.domElement.getBoundingClientRect();
@@ -84,7 +76,9 @@ export class InteractionManager {
   private handleSceneClick() {
     const mode = useEditorStore.getState().mode;
 
-    // 1) SELECT OBJECT
+    // ------------------------------------
+    // TRY SELECT OBJECT
+    // ------------------------------------
     const objects: THREE.Object3D[] = [];
     this.engine.scene.traverse((obj) => {
       if (obj.userData?.isItem) objects.push(obj);
@@ -94,33 +88,52 @@ export class InteractionManager {
     if (hits.length > 0) {
       let obj: THREE.Object3D | null = hits[0].object;
       while (obj && !obj.userData?.isItem && obj.parent) obj = obj.parent;
-      if (obj) {
-        this.selectObject(obj);
-        return;
-      }
+      if (obj) return this.selectObject(obj);
     }
 
-    // 2) CLICK ON GROUND
+    // ------------------------------------
+    // WORLD POINT ON FLOOR
+    // ------------------------------------
     const world = this.engine.sceneManager.raycastWorldPoint(this.raycaster);
     if (world) {
       if (mode === "placing_item") {
-        this.engine.objectManager.placePreviewAt?.(world);
+        this.engine.objectManager.placePreviewAt(world);
         return;
       }
-
       if (mode === "drawing_floor") {
         this.engine.toolsManager.floorTool.addPoint(world);
         return;
       }
-
       if (mode === "drawing_fence") {
         this.engine.toolsManager.fenceTool.addPoint(world);
         return;
       }
     }
 
-    // 3) CLEAR SELECTION
     this.clearSelection();
+  }
+
+  // ======================================================
+  // RIGHT CLICK (CONFIRM ACTION)
+  // ======================================================
+  private handleRightClick() {
+    const mode = useEditorStore.getState().mode;
+
+    if (mode === "placing_item") {
+      this.engine.objectManager.confirmPreviewPlacement();
+      useEditorStore.getState().setMode("idle");
+      return;
+    }
+
+    if (mode === "drawing_floor") {
+      this.engine.toolsManager.floorTool.finalize();
+      return;
+    }
+
+    if (mode === "drawing_fence") {
+      this.engine.toolsManager.fenceTool.finalize();
+      return;
+    }
   }
 
   // ======================================================
@@ -129,16 +142,10 @@ export class InteractionManager {
   public selectObject(obj: THREE.Object3D | null) {
     const store = useSelectionStore.getState();
 
-    if (!obj) {
-      this.clearSelection();
-      return;
-    }
+    if (!obj) return this.clearSelection();
 
     const uuid = obj.userData?.uuid;
-    if (!uuid) {
-      this.clearSelection();
-      return;
-    }
+    if (!uuid) return this.clearSelection();
 
     store.select(uuid);
     this.transformControl.attach(obj);
@@ -156,7 +163,7 @@ export class InteractionManager {
   }
 
   // ======================================================
-  // SYNC TRANSFORM TO STORE
+  // STORE SYNC
   // ======================================================
   private syncTransformToStore(obj: THREE.Object3D) {
     if (!obj.userData?.uuid) return;
@@ -168,9 +175,6 @@ export class InteractionManager {
     });
   }
 
-  // ======================================================
-  // SELECT BY UUID
-  // ======================================================
   public selectItemByUUID(uuid: string | null) {
     if (!uuid) return this.clearSelection();
     const obj = this.engine.scene.getObjectByProperty("uuid", uuid);

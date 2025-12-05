@@ -89,9 +89,16 @@ export class FenceTool {
   }
 
   // ====================================================================
+  // FINALIZE (llamado desde InteractionManager botón derecho)
+  // ====================================================================
+  public finalize() {
+    this.createFence();
+  }
+
+  // ====================================================================
   // CREATE FENCE (SceneItem)
   // ====================================================================
-  public createFence() {
+  private createFence() {
     if (this.points.length < 2) return;
 
     const config = useFenceStore.getState().config as FenceConfig;
@@ -150,12 +157,16 @@ export class FenceTool {
     const topRailY = postHeight - 0.12;
     const bottomRailY = 0.12;
 
+    // --- Recorremos tramos P_i -> P_{i+1} ---
     for (let i = 0; i < pts.length - 1; i++) {
       const A = pts[i];
       const B = pts[i + 1];
       const dist = A.distanceTo(B);
       const dir = new THREE.Vector3().subVectors(B, A).normalize();
       const angle = Math.atan2(dir.x, dir.z);
+
+      // POSTE en el inicio de cada tramo (A)
+      FenceTool.pushMatrix(postMatrices, temp, A, angle, 1);
 
       const segmentCount = Math.max(1, Math.ceil(dist / moduleLength));
       const moduleLen = dist / segmentCount;
@@ -165,10 +176,7 @@ export class FenceTool {
         const t1 = (m + 1) / segmentCount;
         const mid = new THREE.Vector3().lerpVectors(A, B, (t0 + t1) / 2);
 
-        // POST en inicio de módulo
-        FenceTool.pushMatrix(postMatrices, temp, A, angle, 1);
-
-        // RAILS
+        // --- RAILS ---
         if (railGeo) {
           FenceTool.pushMatrix(
             railMatrices,
@@ -186,7 +194,7 @@ export class FenceTool {
           );
         }
 
-        // SLATS
+        // --- SLATS ---
         const slatWidth = config.slatWidth;
         const slatGap = config.slatGap ?? 0.04;
 
@@ -210,7 +218,7 @@ export class FenceTool {
       }
     }
 
-    // Último poste
+    // --- Último poste en el punto final P_{n} ---
     FenceTool.pushMatrix(postMatrices, temp, pts.at(-1)!, 0, 1);
 
     // Instanced meshes
@@ -298,3 +306,4 @@ export class FenceTool {
     group.add(inst);
   }
 }
+// --- END FILE ---

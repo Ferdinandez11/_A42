@@ -13,6 +13,7 @@ export class FloorTool {
     this.scene = scene;
   }
 
+  // RESET ----------------------------------------------------------
   public reset() {
     this.markers.forEach((m) => this.scene.remove(m));
     this.markers = [];
@@ -23,6 +24,7 @@ export class FloorTool {
     this.points = [];
   }
 
+  // ADD POINT ------------------------------------------------------
   public addPoint(world: THREE.Vector3) {
     const p = world.clone();
     p.y = 0;
@@ -35,6 +37,7 @@ export class FloorTool {
       new THREE.SphereGeometry(0.12),
       new THREE.MeshBasicMaterial({ color: 0xe67e22 })
     );
+
     marker.position.copy(p);
     this.scene.add(marker);
     this.markers.push(marker);
@@ -51,14 +54,18 @@ export class FloorTool {
     }
   }
 
+  // CREATE FLOOR ---------------------------------------------------
   public createFloor() {
     if (this.points.length < 3) return;
 
     const uuid = THREE.MathUtils.generateUUID();
-
     const box = new THREE.Box3().setFromPoints(this.points);
     const center = box.getCenter(new THREE.Vector3());
-    const local = this.points.map((p) => ({ x: p.x - center.x, z: p.z - center.z }));
+
+    const local = this.points.map((p) => ({
+      x: p.x - center.x,
+      z: p.z - center.z,
+    }));
 
     const item: FloorItem = {
       uuid,
@@ -75,5 +82,10 @@ export class FloorTool {
 
     useSceneStore.getState().addItem(item);
     this.reset();
+  }
+
+  // FINALIZE --------------------------------------------------------
+  public finalize() {
+    this.createFloor();
   }
 }

@@ -7,25 +7,28 @@ import type {
   ModelItem,
   FloorItem,
   FenceItem,
+  Vector3Array,
 } from "@/types/editor";
+
+import { useSceneStore } from "@/stores/scene/useSceneStore";
 
 export class ObjectManager {
   private scene: THREE.Scene;
   private gltf = new GLTFLoader();
-  private textures = new THREE.TextureLoader();
 
   private cache: Record<string, THREE.Group> = {};
 
-  // PREVIEW SYSTEM
-  private previewMesh: THREE.Object3D | null = null;
+  // === PREVIEW ===
+  private previewObject: THREE.Object3D | null = null;
+  private previewItem: SceneItem | null = null;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
   }
 
-  // ============================================================================
-  // MODEL LOADING
-  // ============================================================================
+  // ============================================================
+  // MODEL LOADING + CACHE
+  // ============================================================
   public async loadModel(url: string): Promise<THREE.Group> {
     if (this.cache[url]) return this.cache[url].clone();
 
@@ -35,9 +38,9 @@ export class ObjectManager {
     return gltf.scene.clone();
   }
 
-  // ============================================================================
-  // CREATE OBJECT FROM SceneItem
-  // ============================================================================
+  // ============================================================
+  // SCENE ITEM → OBJECT
+  // ============================================================
   public async createFromItem(item: SceneItem): Promise<THREE.Object3D | null> {
     switch (item.type) {
       case "model":
@@ -51,39 +54,18 @@ export class ObjectManager {
     }
   }
 
-  // ============================================================================
-  // CREATE FROM PRODUCT (solo para placement preview)
-  // ============================================================================
-  public async createFromProduct(product: any): Promise<THREE.Object3D> {
-    if (!product.modelUrl) {
-      console.warn("Producto sin modelUrl:", product);
-      return new THREE.Group();
-    }
-
-    const model = await this.loadModel(product.modelUrl);
-    model.position.set(0, 0, 0);
-
-    model.userData = {
-      isItem: false, // No es un item real aún
-      productId: product.productId ?? product.id,
-      type: "model",
-    };
-
-    return model;
-  }
-
-  // ============================================================================
+  // ============================================================
   // MODEL
-  // ============================================================================
+  // ============================================================
   private async createModel(item: ModelItem): Promise<THREE.Object3D | null> {
     if (!item.modelUrl) return null;
 
     const model = await this.loadModel(item.modelUrl);
 
     model.uuid = item.uuid;
-    model.position.fromArray(item.position);
-    model.rotation.fromArray(item.rotation);
-    model.scale.fromArray(item.scale);
+    model.position.fromArray(item.position as Vector3Array);
+    model.rotation.fromArray(item.rotation as Vector3Array);
+    model.scale.fromArray(item.scale as Vector3Array);
 
     model.userData = {
       isItem: true,
@@ -98,50 +80,45 @@ export class ObjectManager {
     return model;
   }
 
-  // Detecta zonas de seguridad
   private prepareSafetyZones(root: THREE.Object3D) {
     const safetyMat = new THREE.MeshBasicMaterial({
       color: 0xff0000,
       transparent: true,
-      opacity: 0.3,
+      opacity: 0.25,
       depthWrite: false,
       side: THREE.DoubleSide,
     });
 
-    root.traverse((child) => {
-      if (!(child as THREE.Mesh).isMesh) return;
+    root.traverse((child: any) => {
+      if (!child.isMesh) return;
 
-      const mesh = child as THREE.Mesh;
-      const name = mesh.name.toLowerCase();
-      const matName =
-        (mesh.material as THREE.Material).name?.toLowerCase() ?? "";
+      const name = child.name.toLowerCase();
+      const matName = child.material?.name?.toLowerCase?.() ?? "";
 
       const isSafety =
-        name.includes("safety") ||
         name.includes("seguridad") ||
+        name.includes("safety") ||
+        matName.includes("seguridad") ||
         matName.includes("safety");
 
       if (isSafety) {
-        mesh.material = safetyMat.clone();
-        mesh.userData.isSafetyZone = true;
+        child.material = safetyMat.clone();
+        child.userData.isSafetyZone = true;
       }
     });
   }
 
-  // ============================================================================
+  // ============================================================
   // FLOOR
-  // ============================================================================
+  // ============================================================
   private createFloor(item: FloorItem): THREE.Object3D | null {
-    if (!item.points || item.points.length < 3) return null;
+    const pts = item.points;
+    if (!pts || pts.length < 3) return null;
 
-    // SHAPE
     const shape = new THREE.Shape();
-    shape.moveTo(item.points[0].x, -item.points[0].z);
-
-    for (let i = 1; i < item.points.length; i++) {
-      shape.lineTo(item.points[i].x, -item.points[i].z);
-    }
-    shape.lineTo(item.points[0].x, -item.points[0].z);
+    shape.moveTo(pts[0].x, -pts[0].z);
+    pts.forEach((p, i) => i && shape.lineTo(p.x, -p.z));
+    shape.lineTo(pts[0].x, -pts[0].z);
 
     const geometry = new THREE.ExtrudeGeometry(shape, {
       depth: 0.05,
@@ -150,74 +127,37 @@ export class ObjectManager {
 
     geometry.rotateX(-Math.PI / 2);
 
-    // UV Mapping
-    const scale = item.textureScale ?? 1;
-    const rot = THREE.MathUtils.degToRad(item.textureRotation ?? 0);
-
-    const pos = geometry.attributes.position;
-    const uv = geometry.attributes.uv;
-
-    for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i);
-      const z = pos.getZ(i);
-
-      const u = (x * Math.cos(rot) - z * Math.sin(rot)) / scale;
-      const v = (x * Math.sin(rot) + z * Math.cos(rot)) / scale;
-
-      uv.setXY(i, u, v);
-    }
-
-    let material: THREE.Material;
-
-    if (item.textureUrl) {
-      const tex = this.textures.load(item.textureUrl);
-      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-
-      material = new THREE.MeshStandardMaterial({
-        map: tex,
-        roughness: 0.85,
-        side: THREE.DoubleSide,
-      });
-    } else {
-      material = new THREE.MeshStandardMaterial({
-        color: 0x999999,
-        roughness: 1,
-      });
-    }
+    const material = new THREE.MeshStandardMaterial({
+      color: 0x999999,
+    });
 
     const mesh = new THREE.Mesh(geometry, material);
-
     mesh.uuid = item.uuid;
-    mesh.position.fromArray(item.position);
-    mesh.rotation.fromArray(item.rotation);
-    mesh.scale.fromArray(item.scale);
+
+    mesh.position.fromArray(item.position as Vector3Array);
+    mesh.rotation.fromArray(item.rotation as Vector3Array);
+    mesh.scale.fromArray(item.scale as Vector3Array);
 
     mesh.userData = {
       isItem: true,
       type: "floor",
       uuid: item.uuid,
-      points: item.points,
-      textureUrl: item.textureUrl,
-      textureScale: item.textureScale,
-      textureRotation: item.textureRotation,
     };
 
     this.scene.add(mesh);
     return mesh;
   }
 
-  // ============================================================================
-  // FENCE (placeholder)
-  // ============================================================================
+  // ============================================================
+  // FENCE
+  // ============================================================
   private createFence(item: FenceItem): THREE.Object3D | null {
-    if (!item.points || !item.fenceConfig) return null;
-
     const group = new THREE.Group();
 
     group.uuid = item.uuid;
-    group.position.fromArray(item.position);
-    group.rotation.fromArray(item.rotation);
-    group.scale.fromArray(item.scale);
+    group.position.fromArray(item.position as Vector3Array);
+    group.rotation.fromArray(item.rotation as Vector3Array);
+    group.scale.fromArray(item.scale as Vector3Array);
 
     group.userData = {
       isItem: true,
@@ -225,93 +165,81 @@ export class ObjectManager {
       uuid: item.uuid,
       points: item.points,
       fenceConfig: item.fenceConfig,
+      productId: item.productId,
     };
 
     this.scene.add(group);
     return group;
   }
 
-  // ============================================================================
-  // PREVIEW SYSTEM
-  // ============================================================================
-  public async createPreviewFromProduct(product: any) {
-    this.clearPreview();
-
-    const base = await this.createFromProduct(product);
-
-    base.traverse((c: any) => {
-      if (c.material) {
-        c.material = c.material.clone();
-        c.material.transparent = true;
-        c.material.opacity = 0.55;
-      }
-      c.castShadow = false;
-      c.receiveShadow = false;
-    });
-
-    this.previewMesh = base;
-    this.scene.add(base);
-  }
-
-  public placePreviewAt(worldPos: THREE.Vector3) {
-    if (!this.previewMesh) return;
-
-    this.previewMesh.position.copy(worldPos);
-    this.previewMesh.position.y = 0;
-  }
-
-  public async confirmPreviewPlacement(item: SceneItem) {
-    if (!this.previewMesh) return;
-
-    // Convert preview → real object
-    this.previewMesh.traverse((c: any) => {
-      if (c.material) {
-        c.material.opacity = 1;
-        c.material.transparent = false;
-      }
-    });
-
-    await this.createFromItem(item);
-    this.clearPreview();
-  }
-
-  public clearPreview() {
-    if (this.previewMesh) {
-      this.scene.remove(this.previewMesh);
-      this.previewMesh = null;
+  // ============================================================
+  // PREVIEW HANDLING
+  // ============================================================
+  public async setPreviewItem(item: SceneItem) {
+    if (this.previewObject) {
+      this.scene.remove(this.previewObject);
+      this.previewObject = null;
     }
+
+    this.previewItem = item;
+
+    const obj = await this.createFromItem({ ...item, uuid: "preview" });
+    if (!obj) return;
+
+    obj.traverse((child: any) => {
+      if (child.material) {
+        child.material = child.material.clone();
+        child.material.transparent = true;
+        child.material.opacity = 0.35;
+      }
+    });
+
+    this.previewObject = obj;
+    this.scene.add(obj);
   }
 
-  // ============================================================================
-  // REMOVE OBJECT
-  // ============================================================================
+  public placePreviewAt(point: THREE.Vector3) {
+    if (!this.previewObject) return;
+    this.previewObject.position.copy(point);
+  }
+
+  public confirmPreviewPlacement() {
+    if (!this.previewObject || !this.previewItem) return;
+
+    const uuid = THREE.MathUtils.generateUUID();
+
+    const finalItem: SceneItem = {
+      ...this.previewItem,
+      uuid,
+      position: [
+        this.previewObject.position.x,
+        this.previewObject.position.y,
+        this.previewObject.position.z,
+      ] as Vector3Array,
+    };
+
+    useSceneStore.getState().addItem(finalItem);
+
+    this.scene.remove(this.previewObject);
+    this.previewObject = null;
+    this.previewItem = null;
+  }
+
+  // ============================================================
+  // REMOVE ITEM
+  // ============================================================
   public removeByUUID(uuid: string) {
     const obj = this.scene.getObjectByProperty("uuid", uuid);
     if (!obj) return;
 
     this.scene.remove(obj);
 
-    obj.traverse((child) => {
-      const mesh = child as THREE.Mesh;
-
-      if (mesh.geometry) mesh.geometry.dispose();
-
-      const mat = mesh.material;
-      if (mat) {
-        if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
-        else mat.dispose();
-      }
+    obj.traverse((child: any) => {
+      if (child.geometry) child.geometry.dispose();
+      if (Array.isArray(child.material))
+        child.material.forEach((mat: THREE.Material) => mat.dispose());
+      else child.material?.dispose?.();
     });
   }
-
-  // ============================================================================
-  // UTIL
-  // ============================================================================
-  public adjustObjectToGround(obj: THREE.Object3D) {
-    obj.updateMatrixWorld();
-    const box = new THREE.Box3().setFromObject(obj);
-    obj.position.y -= box.min.y;
-  }
 }
-
 // --- END FILE ---
