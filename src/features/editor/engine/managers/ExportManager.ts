@@ -1,4 +1,4 @@
-// --- START OF FILE src/features/editor/engine/managers/ExportManager.ts ---
+// --- FILE: src/features/editor/engine/managers/ExportManager.ts ---
 import * as THREE from "three";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import type { A42Engine } from "../A42Engine";
@@ -11,30 +11,23 @@ export class ExportManager {
     this.engine = engine;
   }
 
-  // --- 1. EXPORTAR A GLB ---
+  // ======================================================
+  // GLB EXPORT
+  // ======================================================
   public async exportGLB() {
     const name = await useEditorStore
       .getState()
-      .requestInput("Nombre del archivo 3D (.glb):", "proyecto-3d");
+      .requestInput("Nombre del archivo (.glb):", "proyecto-3d");
 
-    if (name === null) return;
+    if (!name) return;
 
     const exporter = new GLTFExporter();
-    const exportableObjects: THREE.Object3D[] = [];
+    const exportGroup = this.buildExportGroup();
 
-    this.engine.scene.traverse((child) => {
-      if (child.userData?.isItem) {
-        exportableObjects.push(child);
-      }
-    });
-
-    if (exportableObjects.length === 0) {
+    if (!exportGroup) {
       alert("No hay objetos para exportar.");
       return;
     }
-
-    const exportGroup = new THREE.Group();
-    exportableObjects.forEach((obj) => exportGroup.add(obj.clone()));
 
     exporter.parse(
       exportGroup,
@@ -42,7 +35,7 @@ export class ExportManager {
         const blob = new Blob([gltf as ArrayBuffer], {
           type: "application/octet-stream",
         });
-        this.downloadFile(blob, `${name}.glb`);
+        this.download(blob, `${name}.glb`);
       },
       (error) => {
         console.error("Error exportando GLB:", error);
@@ -52,116 +45,166 @@ export class ExportManager {
     );
   }
 
-  // --- 2. EXPORTAR A DXF ---
-  public async exportDXF() {
-    const name = await useEditorStore
-      .getState()
-      .requestInput("Nombre del plano (.dxf):", "planta-cad");
-
-    if (name === null) return;
-
-    let dxf = this.getDXFHeader();
-    this.engine.scene.updateMatrixWorld(true);
+  private buildExportGroup(): THREE.Group | null {
+    const group = new THREE.Group();
+    let found = false;
 
     this.engine.scene.traverse((child) => {
-      if (!child.userData.isItem) return;
-
-      if (child.userData.type === "floor" && child.userData.points) {
-        const points = child.userData.points;
-        const worldPoints = points.map((p: any) => {
-          const vec = new THREE.Vector3(p.x, p.y, p.z);
-          vec.applyMatrix4(child.matrixWorld);
-          return vec;
-        });
-
-        for (let i = 0; i < worldPoints.length; i++) {
-          const p1 = worldPoints[i];
-          const p2 = worldPoints[(i + 1) % worldPoints.length];
-          dxf += this.line(p1.x, -p1.z, p2.x, -p2.z, "SUELOS", 4);
-        }
-      } else {
-        const layerName =
-          child.userData.type === "fence" ? "VALLAS" : "MOBILIARIO";
-        const layerColor = child.userData.type === "fence" ? 1 : 3;
-
-        child.traverse((mesh) => {
-          if ((mesh as THREE.Mesh).isMesh) {
-            const geometry = (mesh as THREE.Mesh).geometry;
-            const edges = new THREE.EdgesGeometry(geometry, 15);
-            const positions = edges.attributes.position.array;
-
-            if ((mesh as THREE.InstancedMesh).isInstancedMesh) {
-              const instanced = mesh as THREE.InstancedMesh;
-              const instanceMatrix = new THREE.Matrix4();
-
-              for (let k = 0; k < instanced.count; k++) {
-                instanced.getMatrixAt(k, instanceMatrix);
-                const finalMatrix = new THREE.Matrix4();
-                finalMatrix.multiplyMatrices(
-                  instanced.matrixWorld,
-                  instanceMatrix
-                );
-                dxf += this.drawGeometryPoints(
-                  positions,
-                  finalMatrix,
-                  layerName,
-                  layerColor
-                );
-              }
-            } else {
-              dxf += this.drawGeometryPoints(
-                positions,
-                mesh.matrixWorld,
-                layerName,
-                layerColor
-              );
-            }
-          }
-        });
+      if (child.userData?.isItem) {
+        group.add(child.clone());
+        found = true;
       }
     });
 
-    dxf += this.getDXFFooter();
-
-    const blob = new Blob([dxf], { type: "application/dxf" });
-    this.downloadFile(blob, `${name}.dxf`);
+    return found ? group : null;
   }
 
-  private drawGeometryPoints(
-    positions: ArrayLike<number>,
+  // ======================================================
+  // DXF EXPORT
+  // ======================================================
+  public async exportDXF() {
+    const name = await useEditorStore
+      .getState()
+      .requestInput("Nombre del archivo (.dxf):", "plano-cad");
+
+    if (!name) return;
+
+    let dxf = this.headerDXF();
+    this.engine.scene.updateMatrixWorld(true);
+
+    this.engine.scene.traverse((obj) => {
+      if (!obj.userData?.isItem) return;
+
+      // --- EXPORTAR SUELOS ---
+      if (obj.userData.type === "floor" && obj.userData.points) {
+        dxf += this.exportFloor(obj);
+        return;
+      }
+
+      // --- EXPORTAR MODELOS Y VALLAS ---
+      dxf += this.exportMeshOrInstanced(obj);
+    });
+
+    dxf += this.footerDXF();
+
+    const blob = new Blob([dxf], { type: "application/dxf" });
+    this.download(blob, `${name}.dxf`);
+  }
+
+  // ======================================================
+  // DXF — EXPORT FLOOR
+  // ======================================================
+  private exportFloor(obj: THREE.Object3D): string {
+    let out = "";
+
+    const layer = "SUELOS";
+    const color = 4;
+
+    const pts = obj.userData.points;
+    const world = pts.map((p: any) => {
+      const v = new THREE.Vector3(p.x, 0, p.z);
+      v.applyMatrix4(obj.matrixWorld);
+      return v;
+    });
+
+    for (let i = 0; i < world.length; i++) {
+      const p1 = world[i];
+      const p2 = world[(i + 1) % world.length];
+      out += this.lineDXF(p1.x, -p1.z, p2.x, -p2.z, layer, color);
+    }
+
+    return out;
+  }
+
+  // ======================================================
+  // DXF — MESH / INSTANCED
+  // ======================================================
+  private exportMeshOrInstanced(root: THREE.Object3D): string {
+    let out = "";
+
+    const layer =
+      root.userData.type === "fence" ? "VALLAS" : "MOBILIARIO";
+    const color = root.userData.type === "fence" ? 1 : 3;
+
+    root.traverse((child) => {
+      if (!(child as THREE.Mesh).isMesh) return;
+
+      const mesh = child as THREE.Mesh;
+
+      // Edges
+      const edges = new THREE.EdgesGeometry(mesh.geometry, 10);
+      const pos = edges.attributes.position.array;
+
+      // Instanced meshes
+      if ((mesh as THREE.InstancedMesh).isInstancedMesh) {
+        const inst = mesh as THREE.InstancedMesh;
+        const mat = new THREE.Matrix4();
+
+        for (let i = 0; i < inst.count; i++) {
+          inst.getMatrixAt(i, mat);
+          const worldMat = new THREE.Matrix4().multiplyMatrices(
+            inst.matrixWorld,
+            mat
+          );
+          out += this.exportEdgesDXF(pos, worldMat, layer, color);
+        }
+        return;
+      }
+
+      // Normal meshes
+      out += this.exportEdgesDXF(pos, mesh.matrixWorld, layer, color);
+    });
+
+    return out;
+  }
+
+  private exportEdgesDXF(
+    pos: ArrayLike<number>,
     matrix: THREE.Matrix4,
     layer: string,
     color: number
   ): string {
-    let output = "";
-    for (let i = 0; i < positions.length; i += 6) {
-      const v1 = new THREE.Vector3(
-        positions[i],
-        positions[i + 1],
-        positions[i + 2]
-      );
-      const v2 = new THREE.Vector3(
-        positions[i + 3],
-        positions[i + 4],
-        positions[i + 5]
-      );
+    let out = "";
 
-      v1.applyMatrix4(matrix);
-      v2.applyMatrix4(matrix);
+    for (let i = 0; i < pos.length; i += 6) {
+      const v1 = new THREE.Vector3(pos[i], pos[i + 1], pos[i + 2]).applyMatrix4(matrix);
+      const v2 = new THREE.Vector3(pos[i + 3], pos[i + 4], pos[i + 5]).applyMatrix4(matrix);
 
-      output += this.line(v1.x, -v1.z, v2.x, -v2.z, layer, color);
+      out += this.lineDXF(v1.x, -v1.z, v2.x, -v2.z, layer, color);
     }
-    return output;
+
+    return out;
   }
 
-  private getDXFHeader() {
-    return `0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1009\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n`;
-  }
-  private getDXFFooter() {
-    return `0\nENDSEC\n0\nEOF`;
+  // ======================================================
+  // DXF FORMAT HELPERS
+  // ======================================================
+  private headerDXF() {
+    return `0
+SECTION
+2
+HEADER
+9
+$ACADVER
+1
+AC1009
+0
+ENDSEC
+0
+SECTION
+2
+ENTITIES
+`;
   }
 
-  private line(
+  private footerDXF() {
+    return `0
+ENDSEC
+0
+EOF`;
+  }
+
+  private lineDXF(
     x1: number,
     y1: number,
     x2: number,
@@ -169,14 +212,30 @@ export class ExportManager {
     layer: string,
     color: number
   ) {
-    return `0\nLINE\n8\n${layer}\n62\n${color}\n10\n${x1.toFixed(
-      4
-    )}\n20\n${y1.toFixed(4)}\n11\n${x2.toFixed(4)}\n21\n${y2.toFixed(4)}\n`;
+    return `0
+LINE
+8
+${layer}
+62
+${color}
+10
+${x1.toFixed(4)}
+20
+${y1.toFixed(4)}
+11
+${x2.toFixed(4)}
+21
+${y2.toFixed(4)}
+`;
   }
 
-  private downloadFile(blob: Blob, filename: string) {
+  // ======================================================
+  // FILE DOWNLOAD
+  // ======================================================
+  private download(blob: Blob, filename: string) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
+
     a.href = url;
     a.download = filename;
     document.body.appendChild(a);
@@ -184,8 +243,7 @@ export class ExportManager {
 
     setTimeout(() => {
       document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-    }, 100);
+      URL.revokeObjectURL(url);
+    }, 120);
   }
 }
-// --- END OF FILE ---

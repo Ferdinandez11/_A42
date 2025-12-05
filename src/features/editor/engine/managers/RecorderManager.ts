@@ -1,221 +1,323 @@
-// --- START OF FILE src/features/editor/engine/managers/RecorderManager.ts ---
+// --- FILE: src/features/editor/engine/managers/RecorderManager.ts ---
 import * as THREE from "three";
 import type { A42Engine } from "../A42Engine";
 import { useEditorStore } from "@/stores/editor/useEditorStore";
 
-export class RecorderManager {
-  private engine: A42Engine;
-  private mediaRecorder: MediaRecorder | null = null;
-  private recordedChunks: Blob[] = [];
-  public isRecording: boolean = false;
-  private recIndicator: HTMLElement | null = null;
+//
+// ================================================================
+// 1) HELPER: Recorder UI Indicator
+// ================================================================
+class RecorderIndicator {
+  private el: HTMLElement;
 
-  // Variables para la animación 360
-  private isOrbiting = false;
-  private orbitCenter = new THREE.Vector3();
-  private orbitRadius = 10;
-  private orbitHeight = 10;
-  private orbitDuration = 8.0;
-  private orbitTimeElapsed = 0;
+  constructor() {
+    this.el = document.createElement("div");
+    this.el.innerText = "● REC";
+    Object.assign(this.el.style, {
+      position: "absolute",
+      top: "20px",
+      right: "20px",
+      padding: "6px 14px",
+      fontSize: "18px",
+      fontFamily: "monospace",
+      fontWeight: "bold",
+      color: "white",
+      background: "rgba(200,0,0,0.85)",
+      borderRadius: "6px",
+      zIndex: "99999",
+      pointerEvents: "none",
+      display: "none",
+      boxShadow: "0 0 8px rgba(0,0,0,0.4)",
+      animation: "blinkREC 1s infinite"
+    });
 
-  private pendingFileName: string = "";
-
-  constructor(engine: A42Engine) {
-    this.engine = engine;
-    this.createRecIndicator();
-  }
-
-  private createRecIndicator() {
-    this.recIndicator = document.createElement("div");
-    this.recIndicator.innerText = "🔴 REC";
-    this.recIndicator.style.position = "absolute";
-    this.recIndicator.style.top = "20px";
-    this.recIndicator.style.right = "20px";
-    this.recIndicator.style.color = "red";
-    this.recIndicator.style.fontWeight = "bold";
-    this.recIndicator.style.fontSize = "20px";
-    this.recIndicator.style.fontFamily = "monospace";
-    this.recIndicator.style.background = "rgba(0, 0, 0, 0.5)";
-    this.recIndicator.style.padding = "5px 15px";
-    this.recIndicator.style.borderRadius = "5px";
-    this.recIndicator.style.pointerEvents = "none";
-    this.recIndicator.style.display = "none";
-    this.recIndicator.style.zIndex = "9999";
-
-    this.recIndicator.style.animation = "blink 1s infinite";
     const style = document.createElement("style");
     style.innerHTML = `
-      @keyframes blink { 
-        0% { opacity: 1; } 
-        50% { opacity: 0.3; } 
-        100% { opacity: 1; } 
+      @keyframes blinkREC {
+        0% { opacity: 1; }
+        50% { opacity: 0.35; }
+        100% { opacity: 1; }
       }
     `;
     document.head.appendChild(style);
-    document.body.appendChild(this.recIndicator);
+    document.body.appendChild(this.el);
   }
 
-  // --- 1. FOTO ---
-  public async takeScreenshot() {
-    const name = await useEditorStore.getState().requestInput(
-      "Nombre de la foto:",
-      "captura"
-    );
-    if (name === null) return;
+  show() { this.el.style.display = "block"; }
+  hide() { this.el.style.display = "none"; }
+}
 
-    this.engine.renderer.render(this.engine.scene, this.engine.activeCamera);
-    const dataURL = this.engine.renderer.domElement.toDataURL("image/png");
+//
+// ================================================================
+// 2) HELPER: RecorderState
+// ================================================================
+class RecorderState {
+  private engine: A42Engine;
+  private savedPos = new THREE.Vector3();
+  private savedRot = new THREE.Euler();
+  private savedTarget = new THREE.Vector3();
 
-    const a = document.createElement("a");
-    a.href = dataURL;
-    a.download = `${name}.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  constructor(engine: A42Engine) {
+    this.engine = engine;
   }
 
-  // --- 2. ORBIT 360 ---
-  public async startOrbitAnimation() {
-    if (this.isRecording || this.isOrbiting) return;
+  save() {
+    const cam = this.engine.activeCamera;
+    this.savedPos.copy(cam.position);
+    this.savedRot.copy(cam.rotation);
+    this.savedTarget.copy(this.engine.sceneManager.controls.target);
+  }
 
-    const name = await useEditorStore.getState().requestInput(
-      "Nombre del video 360:",
-      "video-360"
-    );
-    if (name === null) return;
+  restore() {
+    const cam = this.engine.activeCamera;
+    cam.position.copy(this.savedPos);
+    cam.rotation.copy(this.savedRot);
+    this.engine.sceneManager.controls.target.copy(this.savedTarget);
+    this.engine.sceneManager.controls.update();
+    this.engine.sceneManager.controls.enabled = true;
+  }
+}
 
-    this.pendingFileName = name;
+//
+// ================================================================
+// 3) HELPER: VideoRecorder
+// ================================================================
+class VideoRecorder {
+  private recorder: MediaRecorder | null = null;
+  private chunks: Blob[] = [];
+  private onFinish: ((blob: Blob) => void) | null = null;
 
+  start(canvas: HTMLCanvasElement, onFinish: (blob: Blob) => void) {
+    this.onFinish = onFinish;
+
+    const stream = canvas.captureStream(30);
+    let mime = "video/webm;codecs=vp9";
+    if (!MediaRecorder.isTypeSupported(mime)) mime = "video/webm";
+
+    this.recorder = new MediaRecorder(stream, { mimeType: mime });
+    this.chunks = [];
+
+    this.recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) this.chunks.push(e.data);
+    };
+
+    this.recorder.onstop = () => {
+      const blob = new Blob(this.chunks, { type: "video/webm" });
+      if (this.onFinish) this.onFinish(blob);
+    };
+
+    this.recorder.start();
+  }
+
+  stop() {
+    if (this.recorder && this.recorder.state === "recording") {
+      this.recorder.stop();
+    }
+  }
+}
+
+//
+// ================================================================
+// 4) HELPER: CameraAnimator
+// ================================================================
+class CameraAnimator {
+  public active = false;
+
+  private t = 0;
+  private center = new THREE.Vector3();
+  private radius = 10;
+  private height = 5;
+  private duration = 8;
+  private engine: A42Engine;
+
+  constructor(engine: A42Engine) {
+    this.engine = engine;
+  }
+
+  configureFromScene() {
     const box = new THREE.Box3();
     let hasItems = false;
-    this.engine.scene.traverse((obj) => {
-      if (obj.userData?.isItem) {
-        box.expandByObject(obj);
+
+    this.engine.scene.traverse((o) => {
+      if (o.userData?.isItem) {
+        box.expandByObject(o);
         hasItems = true;
       }
     });
-    if (!hasItems) {
-      alert("Añade objetos a la escena.");
-      return;
-    }
 
-    box.getCenter(this.orbitCenter);
+    if (!hasItems) return false;
+
+    box.getCenter(this.center);
+
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.z);
 
-    this.orbitRadius = maxDim * 0.85 + 2;
-    this.orbitHeight = maxDim * 0.4 + 1;
-    this.orbitTimeElapsed = 0;
+    this.radius = maxDim * 0.9 + 2;
+    this.height = maxDim * 0.35 + 1;
+    this.duration = 8;
+    this.t = 0;
 
-    this.engine.switchCamera("perspective");
+    return true;
+  }
+
+  start() {
+    this.active = true;
     this.engine.sceneManager.controls.enabled = false;
+    this.engine.switchCamera("perspective");
+  }
 
-    this.isOrbiting = true;
+  update(delta: number) {
+    if (!this.active) return;
+
+    this.t += delta;
+    const progress = this.t / this.duration;
+    const angle = progress * Math.PI * 2;
+
+    const camX = this.center.x + Math.cos(angle) * this.radius;
+    const camZ = this.center.z + Math.sin(angle) * this.radius;
+
+    this.engine.activeCamera.position.set(
+      camX,
+      this.center.y + this.height,
+      camZ
+    );
+
+    this.engine.activeCamera.lookAt(this.center);
+
+    if (progress >= 1) {
+      this.active = false;
+    }
+  }
+}
+
+//
+// ================================================================
+// 5) MAIN: RecorderManager
+// ================================================================
+export class RecorderManager {
+  private engine: A42Engine;
+
+  private indicator: RecorderIndicator;
+  private state: RecorderState;
+  private video: VideoRecorder;
+  private animator: CameraAnimator;
+
+  public isRecording = false;
+  private pendingName = "";
+
+  constructor(engine: A42Engine) {
+    this.engine = engine;
+
+    // 🔧 YA SE PUEDE USAR engine (ya está asignado)
+    this.indicator = new RecorderIndicator();
+    this.state = new RecorderState(engine);
+    this.video = new VideoRecorder();
+    this.animator = new CameraAnimator(engine);
+  }
+
+  // -------------------------------------------------------------
+  // Screenshot
+  // -------------------------------------------------------------
+  public async takeScreenshot() {
+    const name = await useEditorStore
+      .getState()
+      .requestInput("Nombre de la captura:", "captura");
+
+    if (!name) return;
+
+    this.engine.renderer.render(this.engine.scene, this.engine.activeCamera);
+    const data = this.engine.renderer.domElement.toDataURL("image/png");
+
+    const a = document.createElement("a");
+    a.href = data;
+    a.download = `${name}.png`;
+    a.click();
+  }
+
+  // -------------------------------------------------------------
+  // Orbit 360
+  // -------------------------------------------------------------
+  public async startOrbitAnimation() {
+    if (this.isRecording || this.animator.active) return;
+
+    const name = await useEditorStore
+      .getState()
+      .requestInput("Nombre del video 360:", "video-360");
+
+    if (!name) return;
+
+    this.pendingName = name;
+
+    if (!this.animator.configureFromScene()) {
+      alert("No hay objetos para grabar.");
+      return;
+    }
+
+    this.state.save();
+    this.animator.start();
     this.startRecording();
   }
 
   public update(delta: number) {
-    if (!this.isOrbiting) return;
+    if (!this.animator.active) return;
 
-    this.orbitTimeElapsed += delta;
-    const progress = this.orbitTimeElapsed / this.orbitDuration;
-    const angle = progress * Math.PI * 2;
+    this.animator.update(delta);
 
-    const camX = this.orbitCenter.x + Math.cos(angle) * this.orbitRadius;
-    const camZ = this.orbitCenter.z + Math.sin(angle) * this.orbitRadius;
-
-    this.engine.activeCamera.position.set(
-      camX,
-      this.orbitCenter.y + this.orbitHeight,
-      camZ
-    );
-    this.engine.activeCamera.lookAt(this.orbitCenter);
-
-    if (this.orbitTimeElapsed >= this.orbitDuration) {
-      this.stopOrbitAnimation();
+    if (!this.animator.active) {
+      this.stopRecording(true);
+      this.state.restore();
     }
   }
 
-  private stopOrbitAnimation() {
-    this.isOrbiting = false;
-    this.stopRecording();
-    this.engine.sceneManager.controls.enabled = true;
-  }
-
-  // --- GRABACIÓN ---
+  // -------------------------------------------------------------
+  // Recording
+  // -------------------------------------------------------------
   public startRecording() {
     if (this.isRecording) return;
 
-    if (!this.isOrbiting) this.pendingFileName = "";
+    this.isRecording = true;
+    this.indicator.show();
 
     const canvas = this.engine.renderer.domElement;
-    const stream = canvas.captureStream(30);
 
-    let mimeType = "video/webm;codecs=vp9";
-    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = "video/webm";
-
-    const options: MediaRecorderOptions = { mimeType };
-
-    try {
-      this.mediaRecorder = new MediaRecorder(stream, options);
-    } catch (e) {
-      console.error("Error recorder:", e);
-      return;
-    }
-
-    this.recordedChunks = [];
-    this.isRecording = true;
-
-    if (this.recIndicator) this.recIndicator.style.display = "block";
-
-    this.mediaRecorder.ondataavailable = (event) => {
-      if (event.data.size > 0) this.recordedChunks.push(event.data);
-    };
-
-    this.mediaRecorder.onstop = this.saveVideo;
-    this.mediaRecorder.start();
-    console.log("🎥 Grabación iniciada...");
+    this.video.start(canvas, (blob) => this.saveVideo(blob));
   }
 
-  public stopRecording() {
-    if (!this.mediaRecorder || !this.isRecording) return;
+  public stopRecording(manual = false) {
+    if (!this.isRecording) return;
 
-    this.mediaRecorder.stop();
     this.isRecording = false;
-    if (this.recIndicator) this.recIndicator.style.display = "none";
-    console.log("🛑 Grabación detenida.");
+    this.indicator.hide();
+
+    this.video.stop();
+
+    if (manual) {
+      this.engine.sceneManager.controls.enabled = true;
+    }
   }
 
-  private saveVideo = async () => {
-    let fileName = this.pendingFileName;
+  // -------------------------------------------------------------
+  // Save file
+  // -------------------------------------------------------------
+  private async saveVideo(blob: Blob) {
+    let fileName = this.pendingName;
 
     if (!fileName) {
-      setTimeout(async () => {
-        const result = await useEditorStore.getState().requestInput(
-          "Nombre del recorrido:",
-          "paseo-virtual"
-        );
-        if (result === null) return;
-        this.downloadBlob(result);
-      }, 50);
-    } else {
-      this.downloadBlob(fileName);
-    }
-  };
+      const input = await useEditorStore
+        .getState()
+        .requestInput("Nombre del video:", "grabacion");
 
-  private downloadBlob(filename: string) {
-    const blob = new Blob(this.recordedChunks, { type: "video/webm" });
+      if (!input) return;
+
+      fileName = input; // lo validamos
+    }
+
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.style.display = "none";
     a.href = url;
-    a.download = `${filename}.webm`;
-    document.body.appendChild(a);
+    a.download = `${fileName}.webm`;
     a.click();
-    setTimeout(() => {
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-    }, 100);
+
+    setTimeout(() => URL.revokeObjectURL(url), 300);
   }
 }
-// --- END OF FILE src/features/editor/engine/managers/RecorderManager.ts ---

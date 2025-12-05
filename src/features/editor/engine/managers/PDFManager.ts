@@ -1,97 +1,355 @@
-// --- START OF FILE src/features/editor/engine/managers/PDFManager.ts ---
+// --- FILE: src/features/editor/engine/managers/PDFManager.ts ---
 import * as THREE from "three";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
 import type { A42Engine } from "../A42Engine";
-import type { SceneItem } from "@/types/editor";
+
+// 👇 Usamos el tipo SceneItem del STORE, no el de /types/editor
+type StoreSceneItem = import("@/stores/scene/useSceneStore").SceneItem;
 
 import { useEditorStore } from "@/stores/editor/useEditorStore";
-import { useSceneStore } from "@/stores/scene/useSceneStore"; // 🔥 NUEVO IMPORT
+import { useSceneStore } from "@/stores/scene/useSceneStore";
 import { useUserStore } from "@/stores/user/useUserStore";
 import { PriceCalculator } from "@/utils/PriceCalculator";
 
-export class PDFManager {
+// ======================================================================================
+// 1) HELPER — SceneState (guardar y restaurar estado sin contaminar el motor)
+// ======================================================================================
+class PDFSceneState {
   private engine: A42Engine;
 
-  // Variables de restauración
-  private savedRendererSize = new THREE.Vector2();
-  private savedPixelRatio = 1;
-  private savedCameraPos = new THREE.Vector3();
-  private savedCameraRot = new THREE.Euler();
-  private savedControlsTarget = new THREE.Vector3();
-  private savedBg: THREE.Color | THREE.Texture | null = null;
-  private savedFog: THREE.FogBase | null = null;
-  private wasSkyVisible = false;
+  private rendererSize = new THREE.Vector2();
+  private pixelRatio = 1;
+  private camPos = new THREE.Vector3();
+  private camRot = new THREE.Euler();
+  private controlsTarget = new THREE.Vector3();
+
+  private bg: THREE.Color | THREE.Texture | null = null;
+  private fog: THREE.Fog | THREE.FogExp2 | null = null;
+  private skyVisible = false;
 
   constructor(engine: A42Engine) {
     this.engine = engine;
   }
 
-  public async generatePDF() {
-    const editor = useEditorStore.getState();
-    const scene = useSceneStore.getState(); // 🔥 Accedemos a la escena (Datos)
-    const { user } = useUserStore.getState();
+  save() {
+    const r = this.engine.renderer;
 
-    const items = scene.items; // 🔥 items vienen de SceneStore
+    r.getSize(this.rendererSize);
+    this.pixelRatio = r.getPixelRatio();
 
-    const projectName = await editor.requestInput(
-      "Nombre del Proyecto:",
-      "Levipark21"
-    );
-    if (!projectName) return;
+    this.camPos.copy(this.engine.activeCamera.position);
+    this.camRot.copy(this.engine.activeCamera.rotation);
+    this.controlsTarget.copy(this.engine.sceneManager.controls.target);
 
-    const doc = new jsPDF();
+    this.bg = this.engine.scene.background;
+    this.fog = this.engine.scene.fog as any;
 
-    // 1. PREPARAR ESCENA
-    this.saveSceneState();
+    this.skyVisible = this.engine.sceneManager.sky?.visible ?? false;
+  }
 
-    // Apagar todo para la foto
-    this.engine.sceneManager.controls.enabled = false;
-    this.engine.scene.background = new THREE.Color(0xffffff);
-    this.engine.scene.fog = null;
-    this.engine.setGridVisible(false);
-    this.engine.setSkyVisible(false);
-    this.hideHelpers(true);
+  restore() {
+    const r = this.engine.renderer;
 
-    // 2. FOTOS
+    r.setSize(this.rendererSize.x, this.rendererSize.y);
+    r.setPixelRatio(this.pixelRatio);
 
-    // -- PORTADA --
-    this.resizeRendererInternal(1600, 1200);
     this.engine.switchCamera("perspective");
-    this.setVisibilityForAllItems(true);
-    this.fitCameraToScene(1.3);
+    this.engine.sceneManager.onWindowResize();
+
+    this.engine.activeCamera.position.copy(this.camPos);
+    this.engine.activeCamera.rotation.copy(this.camRot);
+    this.engine.sceneManager.controls.target.copy(this.controlsTarget);
+
+    this.engine.scene.background = this.bg;
+    this.engine.scene.fog = this.fog as any;
+
+    this.engine.sceneManager.controls.enabled = true;
+    this.engine.sceneManager.controls.update();
+
+    // 👇 A42Engine ahora expone setSky y setGrid
+    this.engine.setSky(this.skyVisible);
+
+    const shouldGrid = useEditorStore.getState().gridVisible;
+    this.engine.setGrid(shouldGrid);
+
     this.engine.renderer.render(this.engine.scene, this.engine.activeCamera);
-    const coverImg = this.takeShot("image/jpeg");
+  }
+}
 
-    // -- VISTAS TÉCNICAS --
-    this.engine.switchCamera("orthographic");
-    this.setShadows(false);
-    this.resizeRendererInternal(1200, 1200);
+// ======================================================================================
+// 2) HELPER — PDFRenderer (capturas limpias sin lógica repetida)
+// ======================================================================================
+class PDFRenderer {
+  private engine: A42Engine;
 
-    const sceneBox = this.getSceneBoundingBox();
-    const center = sceneBox.getCenter(new THREE.Vector3());
-    const size = sceneBox.getSize(new THREE.Vector3());
+  constructor(engine: A42Engine) {
+    this.engine = engine;
+  }
+
+  setRendererSize(w: number, h: number) {
+    const cam = this.engine.activeCamera;
+
+    this.engine.renderer.setSize(w, h);
+
+    if (cam instanceof THREE.PerspectiveCamera) {
+      cam.aspect = w / h;
+      cam.updateProjectionMatrix();
+    }
+  }
+
+  capture(format: "image/jpeg" | "image/png" = "image/jpeg"): string {
+    // 0.92 = calidad
+    return this.engine.renderer.domElement.toDataURL(format, 0.92);
+  }
+
+  centerCameraOnBox(box: THREE.Box3, margin = 1.35) {
+    const cam = this.engine.activeCamera as THREE.PerspectiveCamera;
+
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z);
 
-    const orthoSize = maxDim * 0.7;
-    const cam = this.engine.sceneManager.orthoCamera;
-    cam.zoom = 1;
-    cam.left = -orthoSize;
-    cam.right = orthoSize;
-    cam.top = orthoSize;
-    cam.bottom = -orthoSize;
+    const fov = (cam.fov * Math.PI) / 180;
+    let camZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * margin;
+
+    const aspect = cam.aspect;
+    if (aspect < 1) camZ = camZ / aspect;
+
+    const dir = new THREE.Vector3(1, 0.6, 1).normalize();
+    const newPos = dir.multiplyScalar(camZ).add(center);
+
+    cam.position.copy(newPos);
+    cam.lookAt(center);
+  }
+
+  centerCameraOnObject(obj: THREE.Object3D) {
+    const box = new THREE.Box3().setFromObject(obj);
+    if (!box.isEmpty()) this.centerCameraOnBox(box, 1.4);
+  }
+
+  getSceneBox(): THREE.Box3 {
+    const box = new THREE.Box3();
+    this.engine.scene.traverse((o) => {
+      if (o.userData?.isItem && o.visible) box.expandByObject(o);
+    });
+    if (box.isEmpty()) {
+      box.setFromCenterAndSize(
+        new THREE.Vector3(),
+        new THREE.Vector3(2, 2, 2)
+      );
+    }
+    return box;
+  }
+}
+
+// ======================================================================================
+// 3) HELPER — PDFLayout (maquetación con jsPDF)
+// ======================================================================================
+class PDFLayout {
+  private doc: jsPDF;
+
+  constructor(doc: jsPDF) {
+    this.doc = doc;
+  }
+
+  header(title: string, subtitle = "") {
+    const w = this.doc.internal.pageSize.getWidth();
+
+    this.doc.setFont("helvetica", "bold");
+    this.doc.setFontSize(22);
+    this.doc.setTextColor(40);
+    this.doc.text(title, 20, 20);
+
+    if (subtitle) {
+      this.doc.setFontSize(10);
+      this.doc.setTextColor(140);
+      this.doc.text(subtitle, w - 20, 20, { align: "right" });
+    }
+
+    this.doc.setDrawColor(200);
+    this.doc.line(20, 25, w - 20, 25);
+  }
+
+  footer() {
+    const h = this.doc.internal.pageSize.getHeight();
+    this.doc.setFontSize(9);
+    this.doc.setTextColor(120);
+    this.doc.text("Levipark21 · www.levipark21.es", 20, h - 10);
+  }
+
+  imageCentered(img: string, x: number, y: number, w: number, h: number) {
+    const p = this.doc.getImageProperties(img);
+
+    const ratioImg = p.width / p.height;
+    const ratioBox = w / h;
+
+    let drawW = w;
+    let drawH = h;
+
+    if (ratioImg > ratioBox) {
+      drawH = w / ratioImg;
+    } else {
+      drawW = h * ratioImg;
+    }
+
+    const offX = x + (w - drawW) / 2;
+    const offY = y + (h - drawH) / 2;
+
+    this.doc.addImage(img, "JPEG", offX, offY, drawW, drawH);
+  }
+}
+
+// ======================================================================================
+// 4) MAIN — PDFManager (usa las 3 clases anteriores)
+// ======================================================================================
+export class PDFManager {
+  private engine: A42Engine;
+  private sceneState: PDFSceneState;
+  private renderer: PDFRenderer;
+
+  constructor(engine: A42Engine) {
+    this.engine = engine;
+    this.sceneState = new PDFSceneState(engine);
+    this.renderer = new PDFRenderer(engine);
+  }
+
+  // ======================================================
+  // PUBLIC API
+  // ======================================================
+  public async generatePDF() {
+    const project = await useEditorStore
+      .getState()
+      .requestInput("Nombre del Proyecto:", "Proyecto sin título");
+
+    if (!project) return;
+
+    const doc = new jsPDF();
+    const layout = new PDFLayout(doc);
+
+    const items = useSceneStore.getState().items; // StoreSceneItem[]
+    const user = useUserStore.getState().user;
+
+    this.sceneState.save();
+
+    try {
+      // 1) Preparar escena
+      this.prepareScene();
+
+      // 2) Portada
+      const cover = this.captureCover();
+      this.pageCover(doc, layout, project, cover);
+
+      // 3) Vistas técnicas
+      const views = this.captureTechnicalViews();
+      this.pageTechnicalViews(doc, layout, views);
+
+      // 4) Presupuesto
+      if (user) this.pageBudget(doc, layout, items);
+
+      // 5) Fichas de producto
+      const unique = this.getUniqueItems(items);
+      const fichas = this.captureItemImages(unique);
+      this.pageItemSheets(doc, layout, unique, fichas);
+
+      doc.save(`${project}_Levipark.pdf`);
+    } finally {
+      // Restauración garantizada
+      this.sceneState.restore();
+    }
+  }
+
+  // ======================================================
+  // PREPARAR ESCENA
+  // ======================================================
+  private prepareScene() {
+    const eng = this.engine;
+
+    eng.sceneManager.controls.enabled = false;
+
+    eng.scene.background = new THREE.Color(0xffffff);
+    eng.scene.fog = null;
+
+    eng.setGrid(false);
+    eng.setSky(false);
+
+    this.hideHelpers(true);
+  }
+
+  private hideHelpers(hide: boolean) {
+    this.engine.scene.traverse((o) => {
+      const isHelper =
+        o instanceof THREE.GridHelper ||
+        o.type.includes("Helper") ||
+        o.userData?.isSafetyZone ||
+        o.name === "ShadowPlane";
+
+      if (isHelper) o.visible = !hide;
+    });
+  }
+
+  // ======================================================
+  // PORTADA
+  // ======================================================
+  private captureCover() {
+    const eng = this.engine;
+
+    this.renderer.setRendererSize(1600, 1200);
+    eng.switchCamera("perspective");
+
+    this.setAllObjectsVisibility(true);
+    this.renderer.centerCameraOnBox(this.renderer.getSceneBox());
+
+    eng.renderer.render(eng.scene, eng.activeCamera);
+    return this.renderer.capture("image/jpeg");
+  }
+
+  private pageCover(
+    doc: jsPDF,
+    layout: PDFLayout,
+    project: string,
+    img: string
+  ) {
+    layout.header(project, "Dossier del Proyecto");
+    layout.imageCentered(img, 15, 40, 180, 120);
+    layout.footer();
+  }
+
+  // ======================================================
+  // VISTAS TÉCNICAS
+  // ======================================================
+  private captureTechnicalViews() {
+    const eng = this.engine;
+    eng.switchCamera("orthographic");
+
+    const cam = eng.sceneManager.orthoCamera;
+    const box = this.renderer.getSceneBox();
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+
+    cam.left = -maxDim;
+    cam.right = maxDim;
+    cam.top = maxDim;
+    cam.bottom = -maxDim;
     cam.updateProjectionMatrix();
 
     const views: Record<string, string> = {};
-    const viewConfig = [
-      { name: "front", pos: [0, 0, 100], up: [0, 1, 0] },
-      { name: "side", pos: [100, 0, 0], up: [0, 1, 0] },
-      { name: "top", pos: [0, 100, 0], up: [0, 0, -1] },
-      { name: "iso", pos: [100, 60, 100], up: [0, 1, 0] },
-    ] as const;
+    const cfg = [
+      { name: "front", pos: [0, 0, maxDim * 3], up: [0, 1, 0] },
+      { name: "side", pos: [maxDim * 3, 0, 0], up: [0, 1, 0] },
+      { name: "top", pos: [0, maxDim * 3, 0], up: [0, 0, -1] },
+      {
+        name: "iso",
+        pos: [maxDim * 2.5, maxDim * 1.6, maxDim * 2.5],
+        up: [0, 1, 0],
+      },
+    ];
 
-    for (const v of viewConfig) {
+    this.renderer.setRendererSize(1200, 1200);
+
+    for (const v of cfg) {
       cam.position.set(
         center.x + v.pos[0],
         center.y + v.pos[1],
@@ -100,477 +358,215 @@ export class PDFManager {
       cam.up.set(v.up[0], v.up[1], v.up[2]);
       cam.lookAt(center);
       cam.updateProjectionMatrix();
-      this.engine.renderer.render(this.engine.scene, cam);
-      views[v.name] = this.engine.renderer.domElement.toDataURL(
-        "image/jpeg",
-        0.9
-      );
+
+      eng.renderer.render(eng.scene, cam);
+      views[v.name] = this.renderer.capture("image/jpeg");
     }
 
-    // -- ITEMS (únicos) --
-    const uniqueItemsMap = new Map<string, SceneItem>();
-    
-    // 🔥 CORRECCIÓN TS: Tipado explícito
-    items.forEach((item: SceneItem) => {
-      const key = item.productId === "custom_upload" ? item.uuid : item.productId;
-      if (!uniqueItemsMap.has(key)) uniqueItemsMap.set(key, item);
-    });
-
-    this.engine.switchCamera("perspective");
-    this.setShadows(true);
-    this.resizeRendererInternal(1024, 768);
-
-    const itemImages: Record<
-      string,
-      { img: string; width: number; height: number }
-    > = {};
-    for (const [key, item] of uniqueItemsMap) {
-      this.setVisibilityForAllItems(false);
-      this.setVisibilityForItem(item.uuid, true);
-      const obj = this.engine.scene.getObjectByProperty("uuid", item.uuid);
-      if (obj) {
-        this.fitCameraToSingleObject(obj);
-        this.engine.renderer.render(this.engine.scene, this.engine.activeCamera);
-        itemImages[key] = {
-          img: this.engine.renderer.domElement.toDataURL("image/png"),
-          width: 1024,
-          height: 768,
-        };
-      }
-    }
-
-    // 3. RESTAURAR
-    this.restoreSceneState();
-
-    // 4. GENERAR PDF
-    this.generatePDFDocument(
-      doc,
-      projectName,
-      coverImg,
-      views,
-      items,
-      uniqueItemsMap,
-      itemImages,
-      user
-    );
+    return views;
   }
 
-  // --------------------------------------------------------------------------
-  // GESTIÓN DE ESTADO
-  // --------------------------------------------------------------------------
-
-  private saveSceneState() {
-    this.engine.renderer.getSize(this.savedRendererSize);
-    this.savedPixelRatio = this.engine.renderer.getPixelRatio();
-    this.savedCameraPos.copy(this.engine.activeCamera.position);
-    this.savedCameraRot.copy(this.engine.activeCamera.rotation);
-    this.savedControlsTarget.copy(this.engine.sceneManager.controls.target);
-    this.savedBg = this.engine.scene.background;
-    this.savedFog = this.engine.scene.fog;
-    this.wasSkyVisible = this.engine.sceneManager.sky?.visible ?? false;
-  }
-
-  private restoreSceneState() {
-    this.engine.renderer.setSize(
-      this.savedRendererSize.x,
-      this.savedRendererSize.y
-    );
-    this.engine.renderer.setPixelRatio(this.savedPixelRatio);
-    this.engine.switchCamera("perspective");
-    this.engine.sceneManager.onWindowResize();
-
-    this.engine.activeCamera.position.copy(this.savedCameraPos);
-    this.engine.activeCamera.rotation.copy(this.savedCameraRot);
-    this.engine.sceneManager.controls.target.copy(this.savedControlsTarget);
-    this.engine.sceneManager.controls.enabled = true;
-    this.engine.sceneManager.controls.update();
-
-    this.engine.scene.background = this.savedBg;
-    this.engine.scene.fog = this.savedFog;
-    this.engine.setSkyVisible(this.wasSkyVisible);
-    this.setVisibilityForAllItems(true);
-    this.hideHelpers(false);
-    this.setShadows(true);
-
-    const shouldGridBeVisible = useEditorStore.getState().gridVisible;
-    this.engine.setGridVisible(shouldGridBeVisible);
-    this.engine.renderer.render(this.engine.scene, this.engine.activeCamera);
-    setTimeout(() => {
-      this.engine.setGridVisible(shouldGridBeVisible);
-    }, 100);
-  }
-
-  private resizeRendererInternal(w: number, h: number) {
-    this.engine.renderer.setSize(w, h);
-    if (this.engine.activeCamera instanceof THREE.PerspectiveCamera) {
-      this.engine.activeCamera.aspect = w / h;
-      this.engine.activeCamera.updateProjectionMatrix();
-    }
-  }
-
-  private takeShot(format: string): string {
-    return this.engine.renderer.domElement.toDataURL(format, 0.9);
-  }
-
-  // --------------------------------------------------------------------------
-  // UTILS CÁMARA & OBJETOS
-  // --------------------------------------------------------------------------
-  private fitCameraToSingleObject(obj: THREE.Object3D) {
-    const box = this.getObjectBoundingBox(obj);
-    if (box.isEmpty()) return;
-    this.positionCameraFromBox(box, 1.2);
-  }
-
-  private fitCameraToScene(margin = 1.2) {
-    const box = this.getSceneBoundingBox();
-    if (box.isEmpty()) return;
-    this.positionCameraFromBox(box, margin);
-  }
-
-  private positionCameraFromBox(box: THREE.Box3, margin: number) {
-    const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z);
-    if (this.engine.activeCamera instanceof THREE.PerspectiveCamera) {
-      const fov = (this.engine.activeCamera.fov * Math.PI) / 180;
-      let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * margin;
-      const aspect = this.engine.activeCamera.aspect;
-      if (aspect < 1) cameraZ = cameraZ / aspect;
-      const dir = new THREE.Vector3(1, 0.5, 1).normalize();
-      const newPos = dir.multiplyScalar(cameraZ).add(center);
-      this.engine.activeCamera.position.copy(newPos);
-      this.engine.activeCamera.lookAt(center);
-    }
-  }
-
-  private setVisibilityForAllItems(visible: boolean) {
-    this.engine.scene.traverse((obj) => {
-      if (obj.userData?.isItem) {
-        obj.visible = visible;
-        obj.traverse((c) => {
-          if (c !== obj) c.visible = visible;
-        });
-      }
-    });
-  }
-
-  private setVisibilityForItem(uuid: string, visible: boolean) {
-    const obj = this.engine.scene.getObjectByProperty("uuid", uuid);
-    if (obj) {
-      obj.visible = visible;
-      obj.traverse((child) => (child.visible = visible));
-      let parent = obj.parent;
-      while (parent && parent !== this.engine.scene) {
-        parent.visible = true;
-        parent = parent.parent;
-      }
-    }
-  }
-
-  private getObjectBoundingBox(obj: THREE.Object3D): THREE.Box3 {
-    const box = new THREE.Box3();
-    obj.traverse((child) => {
-      if ((child as THREE.Mesh).isMesh) {
-        const mesh = child as THREE.Mesh;
-        if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
-        box.expandByObject(mesh);
-      }
-    });
-    return box;
-  }
-
-  private getSceneBoundingBox(): THREE.Box3 {
-    const box = new THREE.Box3();
-    this.engine.scene.traverse((obj) => {
-      if (obj.visible && obj.userData?.isItem) {
-        box.expandByObject(obj);
-      }
-    });
-    if (box.isEmpty())
-      box.setFromCenterAndSize(
-        new THREE.Vector3(),
-        new THREE.Vector3(5, 5, 5)
-      );
-    return box;
-  }
-
-  private hideHelpers(hide: boolean) {
-    this.engine.scene.traverse((obj) => {
-      const isGrid = obj instanceof THREE.GridHelper;
-      const isHelper = obj.type.includes("Helper") || obj.name.includes("Helper");
-      const isZone = obj.userData?.isSafetyZone;
-      const isShadowPlane = obj.name === "ShadowPlane";
-      if (isGrid || isHelper || isZone || isShadowPlane) {
-        obj.visible = !hide;
-      }
-    });
-  }
-
-  private setShadows(enabled: boolean) {
-    if (this.engine.sceneManager.dirLight) {
-      this.engine.sceneManager.dirLight.castShadow = enabled;
-    }
-  }
-
-  // ========================================================================
-  // MAQUETACIÓN PDF
-  // ========================================================================
-
-  private generatePDFDocument(
+  private pageTechnicalViews(
     doc: jsPDF,
-    projectName: string,
-    coverImg: string,
-    views: Record<string, string>,
-    items: SceneItem[],
-    uniqueItemsMap: Map<string, SceneItem>,
-    itemImages: Record<string, { img: string; width: number; height: number }>,
-    user: any
+    layout: PDFLayout,
+    views: Record<string, string>
   ) {
-    const m = 15;
-    const w = doc.internal.pageSize.getWidth();
-
-    // --- PORTADA ---
-    this.addHeader(doc, projectName, "Dossier del Proyecto");
-    if (coverImg) this.drawImageProp(doc, coverImg, m, 50, w - 2 * m, 120);
-    this.addFooter(doc);
-
-    // --- VISTAS TÉCNICAS ---
     doc.addPage();
-    this.addHeader(doc, "Vistas Técnicas", "");
+    layout.header("Vistas Técnicas");
+
+    const w = doc.internal.pageSize.getWidth();
+    const m = 15;
     const gw = (w - 3 * m) / 2;
     const gh = 80;
-    const yRow1 = 50;
-    const yRow2 = yRow1 + gh + 15;
+    const y1 = 45;
+    const y2 = y1 + gh + 12;
 
     doc.setFontSize(10);
-    doc.text("Alzado (Frontal)", m, yRow1 - 2);
-    if (views.front) this.drawImageProp(doc, views.front, m, yRow1, gw, gh);
-    doc.text("Perfil (Lateral)", m + gw + m, yRow1 - 2);
-    if (views.side)
-      this.drawImageProp(doc, views.side, m + gw + m, yRow1, gw, gh);
-    doc.text("Planta (Superior)", m, yRow2 - 2);
-    if (views.top) this.drawImageProp(doc, views.top, m, yRow2, gw, gh);
-    doc.text("Isométrica", m + gw + m, yRow2 - 2);
-    if (views.iso)
-      this.drawImageProp(doc, views.iso, m + gw + m, yRow2, gw, gh);
-    this.addFooter(doc);
 
-    // --- PRESUPUESTO (SOLO SI HAY USER) ---
-    if (user) {
-      doc.addPage();
-      this.addHeader(doc, "Estimación orientativa", "");
-      let total = 0;
-      const tableData = items.map((item) => {
-        const price = PriceCalculator.getItemPrice(item);
-        total += price;
-        return [
-          item.name || "Elemento",
-          item.productId.substring(0, 15).toUpperCase(),
-          PriceCalculator.getItemDimensions(item),
-          price.toLocaleString("es-ES", {
+    doc.text("Frontal", m, y1 - 3);
+    layout.imageCentered(views.front, m, y1, gw, gh);
+
+    doc.text("Lateral", m + gw + m, y1 - 3);
+    layout.imageCentered(views.side, m + gw + m, y1, gw, gh);
+
+    doc.text("Superior", m, y2 - 3);
+    layout.imageCentered(views.top, m, y2, gw, gh);
+
+    doc.text("Isométrica", m + gw + m, y2 - 3);
+    layout.imageCentered(views.iso, m + gw + m, y2, gw, gh);
+
+    layout.footer();
+  }
+
+  // ======================================================
+  // PRESUPUESTO
+  // ======================================================
+  private pageBudget(
+    doc: jsPDF,
+    layout: PDFLayout,
+    items: StoreSceneItem[]
+  ) {
+    doc.addPage();
+    layout.header("Estimación Presupuestaria");
+
+    let total = 0;
+
+    const rows = items.map((i) => {
+      // 👇 PriceCalculator espera el tipo de /types/editor → casteamos
+      const price = PriceCalculator.getItemPrice(i as any);
+      total += price;
+      return [
+        i.name || "",
+        i.productId,
+        PriceCalculator.getItemDimensions(i as any),
+        price.toLocaleString("es-ES", {
+          style: "currency",
+          currency: "EUR",
+        }),
+      ];
+    });
+
+    const iva = total * 0.21;
+
+    autoTable(doc, {
+      head: [["Elemento", "Ref", "Dim", "Precio"]],
+      body: rows,
+      startY: 40,
+      headStyles: { fillColor: [30, 80, 160] },
+      foot: [
+        [
+          "",
+          "",
+          "Base",
+          total.toLocaleString("es-ES", {
             style: "currency",
             currency: "EUR",
           }),
-        ];
-      });
-      const iva = total * 0.21;
-      autoTable(doc, {
-        head: [["Concepto", "Ref", "Ud/Dim", "Precio"]],
-        body: tableData,
-        startY: 40,
-        theme: "striped",
-        headStyles: { fillColor: [41, 128, 185] },
-        foot: [
-          [
-            "",
-            "",
-            "Base Imponible",
-            total.toLocaleString("es-ES", {
-              style: "currency",
-              currency: "EUR",
-            }),
-          ],
-          [
-            "",
-            "",
-            "IVA 21%",
-            iva.toLocaleString("es-ES", {
-              style: "currency",
-              currency: "EUR",
-            }),
-          ],
-          [
-            "",
-            "",
-            "TOTAL",
-            (total + iva).toLocaleString("es-ES", {
-              style: "currency",
-              currency: "EUR",
-            }),
-          ],
         ],
-        footStyles: {
-          fillColor: [240, 240, 240],
-          textColor: 0,
-          fontStyle: "bold",
-          halign: "right",
-        },
-        columnStyles: { 3: { halign: "right" } },
-      });
-      this.addFooter(doc);
+        [
+          "",
+          "",
+          "IVA 21%",
+          iva.toLocaleString("es-ES", {
+            style: "currency",
+            currency: "EUR",
+          }),
+        ],
+        [
+          "",
+          "",
+          "TOTAL",
+          (total + iva).toLocaleString("es-ES", {
+            style: "currency",
+            currency: "EUR",
+          }),
+        ],
+      ],
+      footStyles: {
+        fillColor: [240, 240, 240],
+        fontStyle: "bold",
+        textColor: 10,
+      },
+      columnStyles: { 3: { halign: "right" } },
+    });
+
+    layout.footer();
+  }
+
+  // ======================================================
+  // FICHAS DE PRODUCTO
+  // ======================================================
+  private getUniqueItems(items: StoreSceneItem[]) {
+    const map = new Map<string, StoreSceneItem>();
+
+    items.forEach((item) => {
+      const key =
+        item.productId === "custom_upload" ? item.uuid : item.productId;
+      if (!map.has(key)) map.set(key, item);
+    });
+
+    return map;
+  }
+
+  private captureItemImages(unique: Map<string, StoreSceneItem>) {
+    const out: Record<string, string> = {};
+
+    this.engine.switchCamera("perspective");
+    this.renderer.setRendererSize(1024, 768);
+
+    for (const [key, item] of unique) {
+      this.setAllObjectsVisibility(false);
+      this.setObjectVisibility(item.uuid, true);
+
+      const obj = this.engine.scene.getObjectByProperty("uuid", item.uuid);
+      if (obj) {
+        this.renderer.centerCameraOnObject(obj);
+        this.engine.renderer.render(
+          this.engine.scene,
+          this.engine.activeCamera
+        );
+        out[key] = this.renderer.capture("image/png");
+      }
     }
 
-    // --- FICHAS ---
-    for (const [key, item] of uniqueItemsMap) {
-      doc.addPage();
-      const anyItem = item as any;
+    return out;
+  }
 
-      this.addHeader(
-        doc,
+  private pageItemSheets(
+    doc: jsPDF,
+    layout: PDFLayout,
+    unique: Map<string, StoreSceneItem>,
+    images: Record<string, string>
+  ) {
+    for (const [key, item] of unique) {
+      doc.addPage();
+
+      layout.header(
         item.name || "Ficha Técnica",
         item.productId.toUpperCase()
       );
 
-      if (itemImages[key]) {
-        this.drawImageProp(doc, itemImages[key].img, m, 40, w - 2 * m, 100);
+      if (images[key]) {
+        layout.imageCentered(images[key], 15, 40, 180, 110);
       }
 
-      const yStart = 150;
-      doc.setFontSize(12);
-      doc.setTextColor(0);
-      doc.text("Descripción:", m, yStart);
-      doc.setFontSize(10);
-      doc.setTextColor(80);
-
-      const descRaw = this.findValueInItem(anyItem, [
-        "DESCRIPCION",
-        "Descripcion",
-        "Description",
-        "description",
-      ]);
-      const finalDesc = descRaw
-        ? descRaw
-        : "Elemento certificado para uso público conforme a normativa vigente.";
-      const splitDesc = doc.splitTextToSize(finalDesc, w - 2 * m);
-      doc.text(splitDesc, m, yStart + 7);
-
-      // --- LINKS DINÁMICOS ---
-      let linkY = yStart + 20 + splitDesc.length * 5;
+      const y = 160;
       doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.text("Descripción:", 15, y);
 
-      const urlTech = this.findValueInItem(anyItem, [
-        "URL_TECH",
-        "url_tech",
-        "Url_Tech",
-      ]);
-      linkY += this.renderLinkLine(
-        doc,
-        "Ficha Técnica (PDF)",
-        urlTech,
-        m,
-        linkY
-      );
-
-      const urlCert = this.findValueInItem(anyItem, [
-        "URL_CERT",
-        "url_cert",
-        "Url_Cert",
-      ]);
-      linkY += this.renderLinkLine(
-        doc,
-        "Certificado de Conformidad",
-        urlCert,
-        m,
-        linkY
-      );
-
-      const urlInst = this.findValueInItem(anyItem, [
-        "URL_INST",
-        "url_inst",
-        "Url_Inst",
-      ]);
-      linkY += this.renderLinkLine(
-        doc,
-        "Instrucciones de Montaje",
-        urlInst,
-        m,
-        linkY
-      );
-
-      this.addFooter(doc);
-    }
-
-    doc.save(`${projectName}_Levipark.pdf`);
-  }
-
-  private renderLinkLine(
-    doc: jsPDF,
-    label: string,
-    url: string | undefined,
-    x: number,
-    y: number
-  ): number {
-    if (!url || url.length < 5 || url.toLowerCase() === "undefined") {
-      return 0;
-    }
-    doc.setTextColor(0, 102, 204);
-    doc.text(`>> ${label}`, x, y);
-    doc.link(x, y - 5, 100, 8, { url: url.trim() });
-    return 8;
-  }
-
-  private findValueInItem(item: any, keys: string[]): string | undefined {
-    const data = item.data || {};
-    for (const k of keys) {
-      if (data[k]) return data[k];
-      if (item[k]) return item[k];
-    }
-    return undefined;
-  }
-
-  private drawImageProp(
-    doc: jsPDF,
-    imgData: string,
-    x: number,
-    y: number,
-    w: number,
-    h: number
-  ) {
-    const props = doc.getImageProperties(imgData);
-    const ratioBox = w / h;
-    const ratioImg = props.width / props.height;
-    let newW = w;
-    let newH = h;
-    if (ratioImg > ratioBox) newH = w / ratioImg;
-    else newW = h * ratioImg;
-    const offsetX = x + (w - newW) / 2;
-    const offsetY = y + (h - newH) / 2;
-    doc.addImage(imgData, "JPEG", offsetX, offsetY, newW, newH);
-  }
-
-  private addHeader(doc: jsPDF, title: string, subtitle: string) {
-    doc.setFontSize(22);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(40);
-    doc.text(title, 20, 20);
-    if (subtitle) {
-      doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
-      doc.setTextColor(150);
-      doc.text(subtitle, 190, 20, { align: "right" });
+      doc.setFontSize(10);
+      doc.setTextColor(60);
+
+      const anyItem = item as any;
+      const desc =
+        anyItem.data?.descripcion ||
+        anyItem.data?.DESCRIPCION ||
+        anyItem.description ||
+        "Elemento certificado según normativa vigente.";
+
+      const lines = doc.splitTextToSize(desc, 180);
+      doc.text(lines, 15, y + 7);
+
+      layout.footer();
     }
-    doc.setDrawColor(200);
-    doc.line(20, 25, 190, 25);
   }
 
-  private addFooter(doc: jsPDF) {
-    const h = doc.internal.pageSize.getHeight();
-    doc.setFontSize(9);
-    doc.setTextColor(150);
-    doc.text(`Generado: ${new Date().toLocaleDateString()}`, 20, h - 10);
-    doc.text("Levipark 21 - www.levipark21.es", 190, h - 10, {
-      align: "right",
+  // ======================================================
+  // VISIBILIDAD OBJETOS
+  // ======================================================
+  private setAllObjectsVisibility(v: boolean) {
+    this.engine.scene.traverse((o) => {
+      if (o.userData?.isItem) o.visible = v;
     });
   }
+
+  private setObjectVisibility(uuid: string, v: boolean) {
+    const obj = this.engine.scene.getObjectByProperty("uuid", uuid);
+    if (!obj) return;
+    obj.visible = v;
+    obj.traverse((c) => (c.visible = v));
+  }
 }
-// --- END OF FILE src/features/editor/engine/managers/PDFManager.ts ---
+// --- END FILE ---
