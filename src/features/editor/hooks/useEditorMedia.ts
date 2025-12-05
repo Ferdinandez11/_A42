@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { useEngine } from '../context/EngineContext';
-import { useEditorStore } from '@/stores/editor/useEditorStore';
+
 
 export const useEditorMedia = () => {
   const engine = useEngine();
-  const { requestInput } = useEditorStore();
   const [isRecording, setIsRecording] = useState(false);
 
   // --- FOTO Y VIDEO ---
