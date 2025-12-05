@@ -1,48 +1,40 @@
 import { useEffect, useState } from "react";
-import { useSelectionStore } from "@/stores/selection/useSelectionStore";
-import { useEngine } from "../context/EngineContext"; // 👈 Importamos hook
+import { useCADStore } from "@/stores/cad/useCADStore"; 
+import { useSceneTools } from "../hooks/useSceneTools"; // 👈 Hook nuevo
 import { ArrowLeftRight } from "lucide-react";
 
 export const CadControl = () => {
-  const engine = useEngine(); // 👈 Obtenemos motor
-  const selectedVertexIndices = useSelectionStore((s) => s.selectedVertices);
-  const measuredDistance = useSelectionStore((s) => s.measuredDistance);
-  const measuredAngle = useSelectionStore((s) => s.measuredAngle);
+  const { setCadSegment, setCadAngle, swapCadSelection } = useSceneTools();
+  
+  const selectedVertexIndices = useCADStore((s) => s.selectedVertices);
+  const dist = useCADStore((s) => s.distance);
+  const angle = useCADStore((s) => s.angle);
 
   const [inputValue, setInputValue] = useState<string>("");
 
   const mode = selectedVertexIndices.length === 3 ? "ANGLE" : "DISTANCE";
 
   useEffect(() => {
-    if (mode === "ANGLE" && measuredAngle !== null) {
-      setInputValue(measuredAngle.toFixed(1));
-    } else if (mode === "DISTANCE" && measuredDistance !== null) {
-      setInputValue(measuredDistance.toFixed(3));
-    }
-  }, [measuredDistance, measuredAngle, mode]);
+      if (mode === "ANGLE" && angle !== null) {
+        setInputValue(angle.toFixed(1));
+      } else if (mode === "DISTANCE" && dist !== null) {
+        setInputValue(dist.toFixed(3));
+      }
+    }, [dist, angle, mode]);
 
   const handleApply = () => {
     const val = parseFloat(inputValue);
-    if (isNaN(val) || val <= 0 || !engine) return;
+    if (isNaN(val) || val <= 0) return;
 
     if (mode === "DISTANCE") {
-      engine.toolsManager.setSegmentLength(
-        val,
-        selectedVertexIndices[1],
-        selectedVertexIndices[0]
-      );
+      setCadSegment(val, selectedVertexIndices[1], selectedVertexIndices[0]);
     } else {
-      engine.toolsManager.setVertexAngle(val);
+      setCadAngle(val);
     }
-  };
-
-  const handleSwap = () => {
-    if (engine) engine.toolsManager.swapSelectionOrder();
   };
 
   if (selectedVertexIndices.length < 2) return null;
 
-  // ... (Resto del renderizado igual)
   return (
     <div
       className={`p-3 rounded-lg mb-3 border-l-4 shadow-lg ${
@@ -57,7 +49,7 @@ export const CadControl = () => {
         </span>
         {mode === "DISTANCE" && (
           <button
-            onClick={handleSwap}
+            onClick={swapCadSelection}
             className="p-1 hover:bg-white/10 rounded text-blue-400"
             title="Cambiar dirección"
           >

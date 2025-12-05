@@ -2,19 +2,29 @@ import React, { useState, useRef } from 'react';
 import { 
   MousePointer2, Grid3X3, Component, Trees, Grid, Undo2, Redo2, Eye, Box, ArrowUp, ArrowRight, GalleryVerticalEnd, Square, Sun, Upload, Ruler, Footprints, Video, Camera, Film, Download, FileText, ShieldAlert, FileDown, Save, LayoutDashboard
 } from 'lucide-react';
+
+// STORES
 import { useEditorStore } from "@/stores/editor/useEditorStore";
-import { useSceneStore } from "@/stores/scene/useSceneStore"; 
+import { useSceneStore } from "@/stores/scene/useSceneStore";
 import { useProjectStore } from "@/stores/project/useProjectStore";
-import { useEngine } from "../context/EngineContext"; // 👈 Importamos hook
+
+// HOOKS NUEVOS (Abstracción limpia) 👈
+import { useEditorMedia } from '../hooks/useEditorMedia';
+import { useSceneTools } from '../hooks/useSceneTools';
+
+// UTILIDADES
 import { supabase } from '../../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import './Editor.css';
 
 export const Toolbar = () => {
   const navigate = useNavigate();
-  const engine = useEngine(); // 👈 Obtenemos la instancia
   
-  // UI Actions
+  // Custom Hooks para lógica compleja 👈
+  const { isRecording, takePhoto, start360Video, toggleRecording, exportGLB, exportDXF, generatePDF } = useEditorMedia();
+  const { activateWalkMode } = useSceneTools();
+
+  // Stores
   const {
     mode, setMode, gridVisible, toggleGrid,
     cameraType, setCameraType, triggerView,
@@ -24,10 +34,9 @@ export const Toolbar = () => {
     requestInput,
   } = useEditorStore();
 
-  // Data Actions
   const {
     items, addItem, fenceConfig, totalPrice,
-    undo, redo, past, future 
+    undo, redo, past, future
   } = useSceneStore();
 
   const {
@@ -36,7 +45,6 @@ export const Toolbar = () => {
   } = useProjectStore();
 
   const [showViews, setShowViews] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -47,26 +55,23 @@ export const Toolbar = () => {
     { id: 'catalog', icon: <Trees size={20} />, label: 'Catálogo' },
   ];
 
+  // --- LÓGICA DE GUARDADO (Se mantiene aquí porque interactúa mucho con Stores y UI) ---
   const handleSaveProject = async () => {
-    if (isReadOnlyMode) return alert("Modo de Solo Lectura...");
-    if (!user) return alert("Debes iniciar sesión...");
-    if (!engine) return; // 👈 Check de seguridad
+    if (isReadOnlyMode) return alert("Modo de Solo Lectura.");
+    if (!user) return alert("Inicia sesión para guardar.");
 
-    // Render para thumbnail
-    engine.renderer.render(engine.scene, engine.activeCamera); 
-    const thumbnailBase64 = engine.renderer.domElement.toDataURL('image/jpeg', 0.5);
+    // Usamos el hook de medios o stores, pero para el thumbnail seguimos necesitando acceso al canvas.
+    // Como excepción, podemos acceder al canvas globalmente o pasarlo, 
+    // pero idealmente useEditorMedia podría devolver una función getThumbnail().
+    // Por simplicidad ahora, dejaremos el acceso al engine SOLO para el thumbnail aquí o lo movemos al hook.
+    // Vamos a moverlo al hook en un futuro, de momento:
+    const canvas = document.querySelector('canvas');
+    const thumbnailBase64 = canvas?.toDataURL('image/jpeg', 0.5) || '';
 
-    const projectData = {
-      items,
-      fenceConfig,
-      camera: cameraType
-    };
-
-    // ... (El resto de la lógica de guardado es idéntica, no cambia)
-    // Solo asegúrate de copiar el resto de la función handleSaveProject original
-    // ...
+    const projectData = { items, fenceConfig, camera: cameraType };
     
-    // (Resumen para no copiar todo el bloque de lógica de supabase que ya tenías):
+    // ... (RESTO DE LÓGICA DE GUARDADO DE SUPABASE IDÉNTICA AL PASO ANTERIOR) ...
+    // Copia tu lógica de handleSaveProject aquí
     let nameToSave = currentProjectName;
     let isOverwrite = false;
 
@@ -108,6 +113,7 @@ export const Toolbar = () => {
       setIsSaving(false);
     }
   };
+  // --------------------------------------------------------------------------------
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]; if (!file) return;
@@ -125,33 +131,15 @@ export const Toolbar = () => {
     else { setMode('measuring'); setShowViews(false); } 
   };
 
-  // Reemplazamos los getEngine() por el objeto engine directo
-  const generatePDF = () => { engine?.pdfManager.generatePDF(); };
-  const activateWalkMode = () => { engine?.walkManager.enable(); };
-  const takePhoto = () => { engine?.recorderManager.takeScreenshot(); };
-  const start360Video = () => { engine?.recorderManager.startOrbitAnimation(); };
-  const exportGLB = () => { engine?.exportManager.exportGLB(); };
-  const exportDXF = () => { engine?.exportManager.exportDXF(); };
-  
-  const toggleRecording = () => {
-    if (!engine) return;
-    const manager = engine.recorderManager;
-    if (isRecording) { manager.stopRecording(); setIsRecording(false); } 
-    else { manager.startRecording(); setIsRecording(true); }
-  };
-
-  // ... El JSX de renderizado es idéntico, solo asegúrate de envolver
-  // los botones que usan engine con un check `disabled={!engine}` si quieres ser muy estricto,
-  // aunque `engine` debería existir siempre que el Editor esté montado.
-  
   return (
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center">
-      {/* ... (Todo el JSX igual que antes) ... */}
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center">
+      
+      {/* PANEL DE VISTAS */}
       {showViews && (
         <div className="absolute bottom-full mb-4 glass-panel flex-row animate-in slide-in-from-bottom-2 fade-in duration-200">
            <button className={`tool-btn ${cameraType === 'perspective' ? 'active' : ''}`} onClick={() => setCameraType('perspective')} title="3D"><Eye size={18} /></button>
            <button className={`tool-btn ${cameraType === 'orthographic' ? 'active' : ''}`} onClick={() => setCameraType('orthographic')} title="2D"><Square size={18} /></button>
-           <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
+           <div className="w-px bg-white/10 mx-1" />
            <button className="tool-btn" onClick={() => triggerView('top')} title="Planta"><ArrowUp size={18} /></button>
            <button className="tool-btn" onClick={() => triggerView('front')} title="Alzado"><GalleryVerticalEnd size={18} /></button>
            <button className="tool-btn" onClick={() => triggerView('side')} title="Perfil"><ArrowRight size={18} /></button>
@@ -159,13 +147,14 @@ export const Toolbar = () => {
         </div>
       )}
 
+      {/* BARRA PRINCIPAL */}
       <div className="glass-panel">
         {user && (
            <button className="tool-btn text-blue-400 hover:text-blue-300" onClick={() => navigate(user.email?.includes('admin') || user.email?.includes('levipark') ? '/admin/crm' : '/portal?tab=projects')} title="Ir a Mis Proyectos">
              <LayoutDashboard size={20} /> <span className="tool-label">Portal</span>
            </button>
         )}
-        {user && <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />}
+        {user && <div className="w-px bg-white/10 mx-1" />}
 
         {tools.map((tool) => (
           <button key={tool.id} className={`tool-btn ${mode === tool.id ? 'active' : ''}`} onClick={() => { setMode(tool.id as any); setShowViews(false); }}>
@@ -173,31 +162,25 @@ export const Toolbar = () => {
           </button>
         ))}
 
-        <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
+        <div className="w-px bg-white/10 mx-1" />
 
-        {user ? (
-            <button 
-                className={`tool-btn ${isSaving ? 'text-yellow-400' : ''}`} 
-                onClick={handleSaveProject} 
-                disabled={isSaving || isReadOnlyMode}
-                title={isReadOnlyMode ? "Modo Lectura (No se puede guardar)" : "Guardar Proyecto en Nube"}
-                style={{ opacity: isReadOnlyMode ? 0.5 : 1, cursor: isReadOnlyMode ? 'not-allowed' : 'pointer' }}
-            >
-                <Save size={20} className={isSaving ? 'animate-pulse' : ''} /> 
-                <span className="tool-label">{isSaving ? '...' : 'Guardar'}</span>
-            </button>
-        ) : (
-            <button className="tool-btn opacity-50 hover:opacity-100" onClick={() => navigate('/login')} title="Inicia sesión para guardar">
-                <Save size={20} /> <span className="tool-label">Login</span>
-            </button>
-        )}
+        <button 
+            className={`tool-btn ${isSaving ? 'text-yellow-400' : ''}`} 
+            onClick={handleSaveProject} 
+            disabled={isSaving || isReadOnlyMode}
+            title={isReadOnlyMode ? "Solo Lectura" : "Guardar"}
+            style={{ opacity: isReadOnlyMode ? 0.5 : 1, cursor: isReadOnlyMode ? 'not-allowed' : 'pointer' }}
+        >
+            <Save size={20} className={isSaving ? 'animate-pulse' : ''} /> 
+            <span className="tool-label">{isSaving ? '...' : 'Guardar'}</span>
+        </button>
         
         <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".glb,.gltf" className="hidden" />
-        <button className="tool-btn" onClick={() => fileInputRef.current?.click()} title="Importar GLB">
+        <button className="tool-btn" onClick={() => fileInputRef.current?.click()} title="Importar">
             <Upload size={20} /> <span className="tool-label">Importar</span>
         </button>
 
-        <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
+        <div className="w-px bg-white/10 mx-1" />
 
         <button className={`tool-btn ${showViews ? 'active' : ''}`} onClick={() => setShowViews(!showViews)}>
           <Eye size={20} /> <span className="tool-label">Vistas</span>
@@ -205,51 +188,51 @@ export const Toolbar = () => {
         <button className={`tool-btn ${envPanelVisible ? 'active' : ''}`} onClick={toggleEnvPanel}>
           <Sun size={20} /> <span className="tool-label">Entorno</span>
         </button>
-        <button className={`tool-btn ${mode === 'measuring' ? 'active' : ''}`} onClick={toggleMeasureMode} title="Medir">
+        <button className={`tool-btn ${mode === 'measuring' ? 'active' : ''}`} onClick={toggleMeasureMode}>
             <Ruler size={20} /> <span className="tool-label">Medir</span>
         </button>
-        <button className={`tool-btn ${safetyZonesVisible ? 'active text-red-400' : ''}`} onClick={toggleSafetyZones} title="Zonas de Seguridad">
+        <button className={`tool-btn ${safetyZonesVisible ? 'active text-red-400' : ''}`} onClick={toggleSafetyZones}>
             <ShieldAlert size={20} /> <span className="tool-label">Zonas</span>
         </button>
 
-        <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
+        <div className="w-px bg-white/10 mx-1" />
         
-        <button className="tool-btn" onClick={takePhoto} title="Hacer Foto">
+        <button className="tool-btn" onClick={takePhoto}>
             <Camera size={20} /> <span className="tool-label">Foto</span>
         </button>
-        <button className="tool-btn" onClick={start360Video} title="Video 360 Auto">
+        <button className="tool-btn" onClick={start360Video}>
             <Film size={20} /> <span className="tool-label">360º</span>
         </button>
 
         {user && (
           <>
-            <button className="tool-btn" onClick={exportGLB} title="Exportar 3D (.glb)">
+            <button className="tool-btn" onClick={exportGLB}>
                 <Download size={20} /> <span className="tool-label">3D</span>
             </button>
-            <button className="tool-btn" onClick={exportDXF} title="Exportar Plano (.dxf)">
+            <button className="tool-btn" onClick={exportDXF}>
                 <FileText size={20} /> <span className="tool-label">CAD</span>
             </button>
           </>
         )}
 
-        <button className="tool-btn" onClick={generatePDF} title="Generar Dossier PDF">
+        <button className="tool-btn" onClick={generatePDF}>
             <FileDown size={20} /> <span className="tool-label">PDF</span>
         </button>
 
-        <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
+        <div className="w-px bg-white/10 mx-1" />
 
-        <button className="tool-btn" onClick={activateWalkMode} title="Paseo (WASD)">
+        <button className="tool-btn" onClick={activateWalkMode}>
             <Footprints size={20} /> <span className="tool-label">Paseo</span>
         </button>
         <button className={`tool-btn ${isRecording ? 'text-red-500 hover:text-red-400' : ''}`} onClick={toggleRecording}>
             <Video size={20} /> <span className="tool-label">{isRecording ? "Stop" : "Rec"}</span>
         </button>
         
-        <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
+        <div className="w-px bg-white/10 mx-1" />
         <button className={`tool-btn ${gridVisible ? 'active' : ''}`} onClick={toggleGrid}>
           <Grid size={20} /> <span className="tool-label">Grid</span>
         </button>
-        <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
+        <div className="w-px bg-white/10 mx-1" />
         <button className="tool-btn" onClick={undo} disabled={past.length === 0} style={{ opacity: past.length === 0 ? 0.3 : 1 }}>
           <Undo2 size={20} /> <span className="tool-label">Undo</span>
         </button>

@@ -39,10 +39,11 @@ export const Editor3D = () => {
     sunPosition,
     backgroundColor,
     safetyZonesVisible,
+    measurementResult, // 👈 1. AÑADE ESTO AQUÍ
   } = useEditorStore();
 
   const { items, totalPrice } = useSceneStore();
-  const { selectedItemId, duplicateSelection, removeSelection, measuredDistance } = useSelectionStore();
+  const { selectedItemId, duplicateSelection, removeSelection } = useSelectionStore();
   const { isReadOnlyMode } = useProjectStore();
 
   const [qrVisible, setQRVisible] = React.useState(false);
@@ -191,9 +192,9 @@ export const Editor3D = () => {
         )}
 
         {mode === "measuring" && (
-          <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-black/80 px-6 py-3 text-white rounded-full border border-white/20 backdrop-blur-md font-mono">
-            {measuredDistance !== null
-              ? `Distancia: ${measuredDistance.toFixed(2)} m`
+          <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-black/80 px-6 py-3 text-white rounded-full border border-white/20 backdrop-blur-md font-mono pointer-events-none">
+            {measurementResult !== null
+              ? `Distancia: ${measurementResult.toFixed(2)} m`
               : "Selecciona punto A y B"}
           </div>
         )}
