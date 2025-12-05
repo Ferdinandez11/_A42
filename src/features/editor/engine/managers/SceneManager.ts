@@ -2,6 +2,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { Sky } from "three/examples/jsm/objects/Sky.js";
+import { useEditorStore } from "@/stores/editor/useEditorStore";
 
 export type CameraView = "top" | "front" | "side" | "iso";
 
@@ -17,6 +18,8 @@ export class SceneManager {
   public dirLight: THREE.DirectionalLight | null = null;
   public sky: Sky | null = null;
   public sun: THREE.DirectionalLight;
+
+  public interactionPlane: THREE.Mesh;   // ⭐️ ← NECESARIO PARA RAYCAST AL SUELO
 
   private container: HTMLElement;
   private frameOverlay: HTMLElement | null = null;
@@ -41,13 +44,44 @@ export class SceneManager {
 
     // === ENVIRONMENT ===
     this.sun = this.createSun();
-    this.dirLight = this.sun; // <--- AHORA updateSunPosition funciona
+    this.dirLight = this.sun;
     this.sky = this.createSky();
     this.grid = this.createGrid();
     this.createShadowReceiver();
 
-    // === FRAME OVERLAY ===
+    // === INTERACTION PLANE ===
+    this.interactionPlane = this.createInteractionPlane();
+
+    // === UI FRAME (PDF) ===
     this.initFrameOverlay();
+
+    // === SYNC WITH EDITOR STORE ===
+    this.setupEditorStoreSync();
+  }
+
+  // ------------------------------------------------------
+  // BACKGROUND / SKY SYNC WITH UI
+  // ------------------------------------------------------
+  private setupEditorStoreSync() {
+    useEditorStore.subscribe(
+      (s) => s.backgroundColor,
+      (color) => this.setBackgroundColor(color)
+    );
+
+    useEditorStore.subscribe(
+      (s) => s.skyVisible,
+      (visible) => this.setSkyVisible(visible)
+    );
+
+    useEditorStore.subscribe(
+      (s) => s.sunPosition,
+      (sun) => this.updateSunPosition(sun.azimuth, sun.elevation)
+    );
+
+    useEditorStore.subscribe(
+      (s) => s.gridVisible,
+      (visible) => this.setGridVisible(visible)
+    );
   }
 
   // ------------------------------------------------------
@@ -199,7 +233,7 @@ export class SceneManager {
   }
 
   // ------------------------------------------------------
-  // SUN POSITION (FIXED)
+  // SUN POSITION
   // ------------------------------------------------------
   public updateSunPosition(azimuth: number, elevation: number) {
     if (!this.dirLight) return;
@@ -216,6 +250,9 @@ export class SceneManager {
     this.dirLight.target.updateMatrixWorld();
   }
 
+  // ------------------------------------------------------
+  // GRID & BACKGROUND
+  // ------------------------------------------------------
   private createGrid() {
     const grid = new THREE.GridHelper(200, 200, 0x888888, 0x444444);
     grid.position.y = 0.005;
@@ -238,6 +275,30 @@ export class SceneManager {
     if (this.sky) this.sky.visible = false;
   }
 
+  // ------------------------------------------------------
+  // INTERACTION PLANE (para clicks sobre el suelo)
+  // ------------------------------------------------------
+  private createInteractionPlane() {
+    const plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(5000, 5000),
+      new THREE.MeshBasicMaterial({ visible: false })
+    );
+    plane.rotation.x = -Math.PI / 2;
+    plane.position.y = 0;
+    plane.userData.isInteractionPlane = true;
+    this.scene.add(plane);
+    return plane;
+  }
+
+  public raycastWorldPoint(raycaster: THREE.Raycaster): THREE.Vector3 | null {
+    const hit = raycaster.intersectObject(this.interactionPlane, false);
+    if (!hit.length) return null;
+    return hit[0].point;
+  }
+
+  // ------------------------------------------------------
+  // SHADOW RECEIVER
+  // ------------------------------------------------------
   private createShadowReceiver() {
     const plane = new THREE.Mesh(
       new THREE.PlaneGeometry(2000, 2000),
@@ -250,7 +311,7 @@ export class SceneManager {
   }
 
   // ------------------------------------------------------
-  // PDF FRAME OVERLAY
+  // FRAME OVERLAY (PDF)
   // ------------------------------------------------------
   private initFrameOverlay() {
     const el = document.createElement("div");

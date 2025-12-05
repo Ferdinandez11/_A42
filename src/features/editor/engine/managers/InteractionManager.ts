@@ -5,6 +5,7 @@ import { TransformControls } from "three/examples/jsm/controls/TransformControls
 import type { A42Engine } from "../A42Engine";
 import { useSceneStore } from "@/stores/scene/useSceneStore";
 import { useSelectionStore } from "@/stores/selection/useSelectionStore";
+import { useEditorStore } from "@/stores/editor/useEditorStore";
 
 export class InteractionManager {
   private engine: A42Engine;
@@ -41,10 +42,8 @@ export class InteractionManager {
       if (!obj) return;
 
       if (e.value) {
-        // drag start
         this.dragStart.copy(obj.position);
       } else {
-        // drag end → sincronizar con store
         if (obj.userData?.uuid) {
           this.syncTransformToStore(obj);
         }
@@ -59,7 +58,7 @@ export class InteractionManager {
   }
 
   // ======================================================
-  // PUBLIC API
+  // POINTER EVENTS
   // ======================================================
   public onPointerDown = (evt: MouseEvent) => {
     if (this.isDragging) return;
@@ -70,35 +69,65 @@ export class InteractionManager {
 
     this.raycaster.setFromCamera(this.pointer, this.engine.activeCamera);
 
-    this.handleSelection();
+    this.handleSceneClick();
   };
 
-  private handleSelection() {
-    const intersectables: THREE.Object3D[] = [];
+  private handleSceneClick() {
+    const clickMode = useEditorStore.getState().mode;
 
+    // -------------------------------------------------
+    // 1) Check if hit object (SELECTION)
+    // -------------------------------------------------
+    const items: THREE.Object3D[] = [];
     this.engine.scene.traverse((obj) => {
-      if (obj.userData?.isItem) intersectables.push(obj);
+      if (obj.userData?.isItem) items.push(obj);
     });
 
-    const hits = this.raycaster.intersectObjects(intersectables, true);
-    if (hits.length === 0) {
-      this.clearSelection();
-      return;
+    const hits = this.raycaster.intersectObjects(items, true);
+
+    if (hits.length > 0) {
+      let target: THREE.Object3D | null = hits[0].object;
+      while (target && !target.userData?.isItem && target.parent) {
+        target = target.parent;
+      }
+
+      if (target?.userData?.uuid) {
+        this.selectObject(target);
+        return;
+      }
     }
 
-    let target: THREE.Object3D | null = hits[0].object;
-    while (target && !target.userData?.isItem && target.parent) {
-      target = target.parent;
+    // -------------------------------------------------
+    // 2) If not clicked object → try FLOOR POINT
+    // -------------------------------------------------
+    const world = this.engine.sceneManager.raycastWorldPoint(this.raycaster);
+
+    if (world) {
+      if (clickMode === "placing_item") {
+        this.engine.objectManager.placePreviewAt(world);
+        return;
+      }
+
+      if (clickMode === "drawing_floor") {
+        this.engine.toolsManager.floorTool.onClick(world);
+        return;
+      }
+
+      if (clickMode === "drawing_fence") {
+        this.engine.toolsManager.fenceTool.onClick(world);
+        return;
+      }
     }
 
-    if (!target?.userData?.uuid) {
-      this.clearSelection();
-      return;
-    }
-
-    this.selectObject(target);
+    // -------------------------------------------------
+    // 3) Clear selection
+    // -------------------------------------------------
+    this.clearSelection();
   }
 
+  // ======================================================
+  // CAMERA & GIZMO
+  // ======================================================
   public updateCamera(camera: THREE.Camera) {
     this.transformControl.camera = camera;
   }
@@ -156,6 +185,9 @@ export class InteractionManager {
     });
   }
 
+  // ======================================================
+  // SELECT ITEM BY UUID
+  // ======================================================
   public selectItemByUUID(uuid: string | null) {
     if (!uuid) {
       this.clearSelection();
@@ -170,6 +202,5 @@ export class InteractionManager {
 
     this.selectObject(obj);
   }
-
 }
 // --- END FILE ---
