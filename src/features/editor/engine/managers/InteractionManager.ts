@@ -1,3 +1,4 @@
+// --- START OF FILE src/features/editor/engine/managers/InteractionManager.ts ---
 import * as THREE from "three";
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
 
@@ -48,7 +49,7 @@ export class InteractionManager {
       this.transformControl.rotationSnap = Math.PI / 12;
       this.engine.scene.add(this.transformControl);
 
-      // Evento arrastrar (Inicio/Fin)
+      // --- 1. Evento Inicio/Fin de Arrastre ---
       this.transformControl.addEventListener("dragging-changed", (event: any) => {
         const editor = useEditorStore.getState();
 
@@ -59,10 +60,11 @@ export class InteractionManager {
         if (!obj) return;
 
         if (event.value) {
+          // Inicio del drag
           this.dragStartPosition.copy(obj.position);
           editor.saveSnapshot();
         } else {
-          // Al soltar
+          // Fin del drag
           if (this.engine.isObjectColliding(obj)) {
             this.animateRevert(obj, this.dragStartPosition);
           } else {
@@ -76,20 +78,19 @@ export class InteractionManager {
         }
       });
 
-      // 🔥 NUEVO EVENTO: Se dispara mientras mueves el objeto con el Gizmo
+      // --- 2. Evento DURANTE el Arrastre (Sincronización Visual) ---
       this.transformControl.addEventListener("change", () => {
-        // Si estamos arrastrando (moviendo algo)
         if (this.isDraggingGizmo && this.transformControl?.object) {
            const obj = this.transformControl.object;
            
-           // Si el objeto movido es un suelo o valla, actualizamos sus puntos verdes
+           // Si movemos un suelo o valla, actualizamos la posición visual de sus marcadores
            if (obj.userData.isItem && (obj.userData.type === 'floor' || obj.userData.type === 'fence')) {
              this.engine.toolsManager.syncMarkersWithObject(obj);
            }
         }
       });
 
-      // Ajuste al suelo durante movimiento
+      // --- 3. Evento cambio de objeto (Ajuste altura) ---
       this.transformControl.addEventListener("objectChange", () => {
         const obj = this.transformControl?.object;
         if (obj && obj.userData.isItem && !this.isDraggingGizmo) {
@@ -229,7 +230,7 @@ export class InteractionManager {
     if (mode === "idle" || mode === "editing") {
       if (event.button !== 0) return;
 
-      // Click en markers de edición (Suelos o Vallas)
+      // 1. Click en markers de edición (Suelos o Vallas)
       const markerHit = this.raycaster.intersectObjects(
         this.engine.toolsManager.floorEditMarkers
       );
@@ -252,7 +253,7 @@ export class InteractionManager {
         return;
       }
 
-      // Selección normal
+      // 2. Selección normal de objetos
       const interactables = this.engine.scene.children.filter(
         (obj) => obj.userData?.isItem && obj !== this.transformControl
       );
@@ -274,6 +275,7 @@ export class InteractionManager {
           this.selectObject(target);
         }
       } else {
+        // 3. Clic en vacío -> Deseleccionar
         if (
           this.transformControl?.object &&
           !this.engine.toolsManager.floorEditMarkers.includes(
@@ -286,18 +288,19 @@ export class InteractionManager {
     }
   }
 
-  // 🔥 Helper interno modificado para soportar VALLAS y SUELOS
+  // 🔥 CORRECCIÓN: Tipado seguro para .points
   private attachGizmo(object: THREE.Object3D) {
     if (!this.transformControl) return;
     this.transformControl.attach(object);
     this.transformControl.visible = true;
     
-    // Verificar si tiene puntos (sea suelo o valla) y mostrar marcadores
+    // 1. Buscar el item en el store
     const item = useEditorStore.getState().items.find(
-      (i) => i.uuid === object.userData.uuid && (i.type === "floor" || i.type === "fence")
+      (i) => i.uuid === object.userData.uuid
     );
 
-    if (item?.points) {
+    // 2. Comprobar explícitamente el tipo para que TS sepa que tiene 'points'
+    if (item && (item.type === "floor" || item.type === "fence")) {
       this.engine.toolsManager.showFloorEditMarkers(object.userData.uuid, item.points);
     } else {
       this.engine.toolsManager.clearFloorEditMarkers();
@@ -343,3 +346,4 @@ export class InteractionManager {
     if (this.transformControl) this.transformControl.setMode(mode);
   }
 }
+// --- END OF FILE src/features/editor/engine/managers/InteractionManager.ts ---

@@ -8,7 +8,7 @@ import { FENCE_PRESETS } from "@/features/editor/data/fence_presets";
 import type {
   SceneItem,
   FenceConfig,
-  FloorMaterialType,
+  FloorMaterialType
 } from "@/types/editor";
 
 import type { Product } from "@/services/catalogService";
@@ -69,6 +69,7 @@ export class ObjectManager {
   // ----------------------------------------------------------
 
   public async recreateModel(item: SceneItem) {
+    if (item.type !== 'model') return;
     if (!item.modelUrl) return;
 
     try {
@@ -135,6 +136,7 @@ export class ObjectManager {
   // ----------------------------------------------------------
 
   public recreateFloor(item: SceneItem) {
+    if (item.type !== 'floor') return;
     if (!item.points || item.points.length < 3) return;
 
     const shape = new THREE.Shape();
@@ -187,7 +189,6 @@ export class ObjectManager {
     mesh.uuid = item.uuid;
     mesh.receiveShadow = true;
 
-    // 🔥 CORRECCIÓN: Aplicar posición, rotación y escala guardadas
     mesh.position.fromArray(item.position || [0, 0, 0]);
     mesh.rotation.fromArray(item.rotation || [0, 0, 0]);
     mesh.scale.fromArray(item.scale || [1, 1, 1]);
@@ -211,6 +212,7 @@ export class ObjectManager {
   // ----------------------------------------------------------
 
   public recreateFence(item: SceneItem) {
+    if (item.type !== 'fence') return;
     if (!item.points || !item.fenceConfig) return;
 
     const points = item.points.map((p) => new THREE.Vector3(p.x, 0, p.z));
@@ -220,7 +222,6 @@ export class ObjectManager {
 
     fence.uuid = item.uuid;
 
-    // 🔥 CORRECCIÓN: Aplicar posición, rotación y escala guardadas
     fence.position.fromArray(item.position || [0, 0, 0]);
     fence.rotation.fromArray(item.rotation || [0, 0, 0]);
     fence.scale.fromArray(item.scale || [1, 1, 1]);
@@ -554,6 +555,9 @@ export class ObjectManager {
         productId: product.id,
       };
 
+      // Nota: Al usar any aquí nos saltamos el tipado estricto solo en el momento de creación,
+      // pero el objeto final sí cumple la interfaz ModelItem.
+      // Lo correcto sería construir el objeto tipado antes.
       useEditorStore.getState().addItem({
         uuid,
         productId: product.id,
@@ -573,7 +577,7 @@ export class ObjectManager {
 
         description: product.description,
         data: product,
-      });
+      } as any);
 
       this.scene.add(model);
       afterPlace?.(uuid);

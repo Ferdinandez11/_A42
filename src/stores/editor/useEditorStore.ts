@@ -2,14 +2,13 @@
 import { create } from "zustand";
 import * as THREE from "three";
 
-// Importamos tipos
 import type {
   SceneItem,
   FloorMaterialType,
   FenceConfig,
   EditorMode,
   CameraType,
-  CameraView,
+  CameraView
 } from "@/types/editor";
 
 declare global {
@@ -80,7 +79,6 @@ interface EditorState {
     points: { x: number; z: number }[]
   ) => void;
 
-  // 🔥 NUEVA ACCIÓN PARA VALLAS
   updateFencePoints: (
     uuid: string,
     points: { x: number; z: number }[]
@@ -149,7 +147,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   // -----------------------------
-  // SNAPSHOTS PARA UNDO/REDO
+  // ACTIONS
   // -----------------------------
   saveSnapshot: () => {
     const snapshot = structuredClone(get().items);
@@ -159,9 +157,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }));
   },
 
-  // -----------------------------
-  // ADD ITEM
-  // -----------------------------
   addItem: (item) => {
     const price = item.price ?? 0;
     get().saveSnapshot();
@@ -171,9 +166,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }));
   },
 
-  // -----------------------------
-  // REMOVE ITEM
-  // -----------------------------
   removeItem: (uuid) => {
     get().saveSnapshot();
     set((s) => {
@@ -186,9 +178,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 
-  // -----------------------------
-  // DUPLICATE ITEM
-  // -----------------------------
   duplicateItem: (uuid) => {
     const s = get();
     const original = s.items.find((i) => i.uuid === uuid);
@@ -211,9 +200,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 
-  // -----------------------------
-  // UPDATE TRANSFORM
-  // -----------------------------
   updateItemTransform: (uuid, pos, rot, scale) =>
     set((s) => ({
       items: s.items.map((i) =>
@@ -228,25 +214,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ),
     })),
 
-  // -----------------------------
-  // FLOOR MATERIAL
-  // -----------------------------
   updateFloorMaterial: (uuid, material) =>
     set((s) => ({
       items: s.items.map((i) =>
-        i.uuid === uuid
+        i.uuid === uuid && i.type === "floor"
           ? { ...i, floorMaterial: material, textureUrl: undefined }
           : i
       ),
     })),
 
-  // -----------------------------
-  // FLOOR TEXTURE
-  // -----------------------------
   updateFloorTexture: (uuid, url, scale, rotation) =>
     set((s) => ({
       items: s.items.map((i) =>
-        i.uuid === uuid
+        i.uuid === uuid && i.type === "floor"
           ? {
               ...i,
               textureUrl: url,
@@ -258,55 +238,44 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ),
     })),
 
-  // -----------------------------
-  // FLOOR POINTS
-  // -----------------------------
   updateFloorPoints: (uuid, points) => {
     get().saveSnapshot();
     set((s) => ({
       items: s.items.map((i) =>
-        i.uuid === uuid ? { ...i, points } : i
+        i.uuid === uuid && i.type === "floor" ? { ...i, points } : i
       ),
     }));
   },
 
-  // -----------------------------
-  // 🔥 FENCE POINTS (NUEVO)
-  // -----------------------------
   updateFencePoints: (uuid, points) => {
     get().saveSnapshot();
     set((s) => ({
       items: s.items.map((i) =>
-        i.uuid === uuid ? { ...i, points } : i
+        i.uuid === uuid && i.type === "fence" ? { ...i, points } : i
       ),
     }));
   },
 
-  // -----------------------------
-  // GLOBAL FENCE CONFIG
-  // -----------------------------
   setFenceConfig: (config) =>
     set((s) => ({
       fenceConfig: { ...s.fenceConfig, ...config },
     })),
 
-  // -----------------------------
-  // ITEM FENCE CONFIG
-  // -----------------------------
   updateItemFenceConfig: (uuid, config) => {
     get().saveSnapshot();
     set((s) => ({
-      items: s.items.map((i) =>
-        i.uuid === uuid && i.fenceConfig
-          ? { ...i, fenceConfig: { ...i.fenceConfig, ...config } }
-          : i
-      ),
+      items: s.items.map((i) => {
+        if (i.uuid === uuid && i.type === "fence") {
+          return {
+            ...i,
+            fenceConfig: { ...i.fenceConfig, ...config },
+          };
+        }
+        return i;
+      }),
     }));
   },
 
-  // -----------------------------
-  // UNDO
-  // -----------------------------
   undo: () => {
     const { past, items, future } = get();
     if (past.length === 0) return;
@@ -321,9 +290,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 
-  // -----------------------------
-  // REDO
-  // -----------------------------
   redo: () => {
     const { past, items, future } = get();
     if (future.length === 0) return;
@@ -338,9 +304,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 
-  // -----------------------------
-  // RESET SCENE
-  // -----------------------------
   resetScene: () =>
     set({
       items: [],
@@ -351,26 +314,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       pendingView: null,
     }),
 
-  // -----------------------------
-  // MODE
-  // -----------------------------
   setMode: (mode) => {
     window.editorEngine?.clearTools?.();
     set({ mode });
   },
 
-  // -----------------------------
-  // UI TOGGLES
-  // -----------------------------
   toggleGrid: () => set((s) => ({ gridVisible: !s.gridVisible })),
   toggleBudget: () => set((s) => ({ budgetVisible: !s.budgetVisible })),
   toggleEnvPanel: () => set((s) => ({ envPanelVisible: !s.envPanelVisible })),
   toggleSafetyZones: () =>
     set((s) => ({ safetyZonesVisible: !s.safetyZonesVisible })),
 
-  // -----------------------------
-  // ENVIRONMENT
-  // -----------------------------
   setSunPosition: (azimuth, elevation) =>
     set({ sunPosition: { azimuth, elevation } }),
 
@@ -378,16 +332,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setMeasurementResult: (dist) => set({ measurementResult: dist }),
 
-  // -----------------------------
-  // CAMERA
-  // -----------------------------
   setCameraType: (type) => set({ cameraType: type }),
   triggerView: (view) => set({ pendingView: view }),
   clearPendingView: () => set({ pendingView: null }),
 
-  // -----------------------------
-  // INPUT MODAL
-  // -----------------------------
   requestInput: (title, defaultValue = "") =>
     new Promise((resolve) => {
       set({

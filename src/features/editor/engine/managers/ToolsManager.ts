@@ -4,6 +4,7 @@ import * as THREE from "three";
 import { useEditorStore } from "@/stores/editor/useEditorStore";
 import { useCADStore } from "@/stores/cad/useCADStore";
 import { useFenceStore } from "@/stores/fence/useFenceStore";
+import type { FloorItem, FenceItem } from "@/types/editor"; // Importamos los tipos
 
 export class ToolsManager {
   private scene: THREE.Scene;
@@ -68,7 +69,7 @@ export class ToolsManager {
   }
 
   // ---------------------------------------------------------------------------
-  // DRAWING FLOOR (GIZMO CENTRADO)
+  // DRAWING FLOOR
   // ---------------------------------------------------------------------------
   public addDraftPoint(point: THREE.Vector3) {
     const p = point.clone();
@@ -97,34 +98,38 @@ export class ToolsManager {
     const box = new THREE.Box3().setFromPoints(this.floorPoints);
     const center = new THREE.Vector3();
     box.getCenter(center);
-    center.y = 0; // Suelo
+    center.y = 0;
 
-    // 2. Puntos Relativos al centro
+    // 2. Puntos Relativos
     const localPoints = this.floorPoints.map((p) => ({ 
       x: p.x - center.x, 
       z: p.z - center.z 
     }));
 
-    // 3. Guardar en Store (Posición = Centro)
-    editor.addItem({
+    // 🔥 CREACIÓN ESTRICTA DEL OBJETO (FloorItem)
+    const newFloor: FloorItem = {
       uuid,
       productId: "custom_floor",
       name: "Suelo a medida",
       price: 100,
+      
+      type: "floor", // Type Guard
+      points: localPoints,
+      floorMaterial: "rubber_red",
+
       position: [center.x, 0, center.z], 
       rotation: [0, 0, 0],
       scale: [1, 1, 1],
-      type: "floor",
-      points: localPoints,
-      floorMaterial: "rubber_red",
-    });
+    };
+
+    editor.addItem(newFloor);
 
     this.clearTools();
     editor.setMode("idle");
   }
 
   // ---------------------------------------------------------------------------
-  // DRAWING FENCE (GIZMO CENTRADO)
+  // DRAWING FENCE
   // ---------------------------------------------------------------------------
   public addFenceDraftPoint(point: THREE.Vector3) {
     const p = point.clone();
@@ -156,7 +161,7 @@ export class ToolsManager {
     box.getCenter(center);
     center.y = 0;
 
-    // 2. Puntos Relativos al centro
+    // 2. Puntos Relativos
     const points2D = this.fencePoints.map((p) => ({ 
       x: p.x - center.x, 
       z: p.z - center.z 
@@ -164,19 +169,23 @@ export class ToolsManager {
 
     const uuid = THREE.MathUtils.generateUUID();
 
-    // 3. Guardar en Store (Posición = Centro)
-    editor.addItem({
+    // 🔥 CREACIÓN ESTRICTA DEL OBJETO (FenceItem)
+    const newFence: FenceItem = {
       uuid,
       productId: "fence_" + currentConfig.presetId,
       name: "Valla",
       price: 100,
-      position: [center.x, 0, center.z], 
-      rotation: [0, 0, 0],
-      scale: [1, 1, 1],
+      
       type: "fence",
       points: points2D,
       fenceConfig: JSON.parse(JSON.stringify(currentConfig)),
-    });
+
+      position: [center.x, 0, center.z], 
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+    };
+
+    editor.addItem(newFence);
 
     this.clearTools();
     editor.setMode("idle");
@@ -229,11 +238,12 @@ export class ToolsManager {
     const editor = useEditorStore.getState();
     const item = editor.items.find(i => i.uuid === parentObj.userData.uuid);
     
-    if (!item || !item.points) return;
+    // Type Guard para asegurar que tiene puntos
+    if (!item || (item.type !== 'floor' && item.type !== 'fence')) return;
 
     this.floorEditMarkers.forEach(marker => {
       const idx = marker.userData.pointIndex;
-      const pointData = item.points![idx]; 
+      const pointData = item.points[idx]; 
 
       const worldPos = new THREE.Vector3(pointData.x, 0, pointData.z);
       worldPos.applyMatrix4(parentObj.matrixWorld);
@@ -253,8 +263,8 @@ export class ToolsManager {
     const items = editor.items;
     const item = items.find((i) => i.uuid === uuid);
 
-    if (item && item.points) {
-      // World -> Local
+    // Type Guard
+    if (item && (item.type === 'floor' || item.type === 'fence')) {
       const localPos = marker.position.clone();
       const inverseMatrix = parentObj.matrixWorld.clone().invert();
       localPos.applyMatrix4(inverseMatrix);
