@@ -31,6 +31,12 @@ export interface SceneItem {
 interface SceneState {
   items: SceneItem[];
 
+  // Historial (por ahora solo para que compile la UI)
+  past: SceneItem[][];
+  future: SceneItem[][];
+  undo: () => void;
+  redo: () => void;
+
   // === ACTIONS ===
   addItem: (item: SceneItem) => void;
   updateItem: (uuid: string, partial: Partial<SceneItem>) => void;
@@ -52,6 +58,16 @@ interface SceneState {
 
 export const useSceneStore = create<SceneState>((set) => ({
   items: [],
+
+  past: [],
+  future: [],
+
+  undo: () => {
+    // TODO: implementar histórico real si lo necesitas
+  },
+  redo: () => {
+    // TODO: implementar histórico real si lo necesitas
+  },
 
   // =====================================================
   // ADD ITEM

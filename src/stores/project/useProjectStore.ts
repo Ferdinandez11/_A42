@@ -11,6 +11,8 @@ interface ProjectState {
 
   // Modo de acceso
   isReadOnly: boolean;
+  // Alias para código antiguo / UI
+  isReadOnlyMode: boolean;
 
   // === ACTIONS ===
   setProjectInfo: (id: string | null, name: string) => void;
@@ -30,6 +32,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
   thumbnailUrl: null,
   totalPrice: null,
   isReadOnly: false,
+  isReadOnlyMode: false,
 
   // === ACTIONS ===
   setProjectInfo: (id, name) =>
@@ -44,7 +47,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
   setTotalPrice: (price) => set({ totalPrice: price }),
 
-  setReadOnly: (state) => set({ isReadOnly: state }),
+  setReadOnly: (state) => set({ isReadOnly: state, isReadOnlyMode: state }),
 
   clearProject: () =>
     set({
@@ -53,5 +56,6 @@ export const useProjectStore = create<ProjectState>((set) => ({
       thumbnailUrl: null,
       totalPrice: null,
       isReadOnly: false,
+      isReadOnlyMode: false,
     }),
 }));

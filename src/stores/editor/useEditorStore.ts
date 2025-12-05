@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { CameraView, CameraType } from "@/types/editor";
 
 export type ToolMode =
   | "select"
@@ -10,6 +11,13 @@ export type ToolMode =
   | "catalog"
   | "none";
 
+export type EditorMode =
+  | "idle"
+  | "drawing_floor"
+  | "drawing_fence"
+  | "catalog"
+  | "measuring";
+
 interface EditorState {
   // UI
   gridVisible: boolean;
@@ -19,14 +27,30 @@ interface EditorState {
   budgetVisible: boolean;
   qrModalOpen: boolean;
 
-  // Tool mode
+  // Tool mode “antiguo”
   activeTool: ToolMode;
+
+  // Nuevo: modo de editor de alto nivel (para Toolbar / Editor3D)
+  mode: EditorMode;
+  setMode: (mode: EditorMode) => void;
+
+  // Cámara y vistas
+  cameraType: CameraType;
+  setCameraType: (type: CameraType) => void;
+
+  pendingView: CameraView | null;
+  triggerView: (view: CameraView) => void;
+  clearPendingView: () => void;
 
   // Background
   backgroundColor: string;
 
-  // Sun position (for Sky)
+  // Sol / Sky (de momento solo un número, p.ej. elevación)
   sunPosition: number;
+
+  // Medición
+  measurementResult: number | null;
+  setMeasurementResult: (value: number | null) => void;
 
   // Modals
   inputModal: {
@@ -36,7 +60,7 @@ interface EditorState {
     resolve: ((value: string | null) => void) | null;
   };
 
-  // ==== ACTIONS ====
+  // ==== ACTIONS EXISTENTES ====
   setActiveTool: (tool: ToolMode) => void;
 
   toggleGrid: () => void;
@@ -66,8 +90,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   activeTool: "select",
 
+  // Nuevo estado de modo
+  mode: "idle",
+
+  // Cámara por defecto
+  cameraType: "perspective",
+  pendingView: null,
+
   backgroundColor: "#222222",
   sunPosition: 45,
+
+  measurementResult: null,
 
   inputModal: {
     isOpen: false,
@@ -79,6 +112,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // === ACTIONS ===
   setActiveTool: (tool) => set({ activeTool: tool }),
 
+  setMode: (mode) => set({ mode }),
+
+  setCameraType: (type) => set({ cameraType: type }),
+
+  triggerView: (view) => set({ pendingView: view }),
+  clearPendingView: () => set({ pendingView: null }),
+
   toggleGrid: () => set((s) => ({ gridVisible: !s.gridVisible })),
   toggleSky: () => set((s) => ({ skyVisible: !s.skyVisible })),
   toggleEnvPanel: () => set((s) => ({ envPanelVisible: !s.envPanelVisible })),
@@ -88,6 +128,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setBackgroundColor: (color) => set({ backgroundColor: color }),
   setSunPosition: (pos) => set({ sunPosition: pos }),
+
+  setMeasurementResult: (value) => set({ measurementResult: value }),
 
   openQRModal: () => set({ qrModalOpen: true }),
   closeQRModal: () => set({ qrModalOpen: false }),
