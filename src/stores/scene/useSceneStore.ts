@@ -1,45 +1,9 @@
-// --- FILE: src/stores/scene/useSceneStore.ts ---
 import { create } from "zustand";
-import type { Vector3Array } from "@/types/editor";
+// Importamos los tipos estrictos en lugar de definirlos aquí
+import type { SceneItem, Vector3Array } from "@/types/editor";
 
-export interface SceneItem {
-  uuid: string;
-  productId: string;
-  name: string;
-
-  price: number;
-
-  position: Vector3Array;
-  rotation: Vector3Array;
-  scale: Vector3Array;
-
-  description?: string;
-  url_tech?: string;
-  url_cert?: string;
-  url_inst?: string;
-
-  data?: any;
-
-  type?: "model" | "floor" | "fence";
-  info?: string;
-
-  // ⭐ FENCE SUPPORT
-  fenceConfig?: {
-    presetId: string;
-    colors: {
-      post: number;
-      slatA: number;
-      slatB?: number;
-      slatC?: number;
-    };
-  };
-
-  // ⭐ FLOOR SUPPORT
-  floorMaterial?: string;
-  textureUrl?: string;
-  textureScale?: number;
-  textureRotation?: number;
-}
+// Re-exportamos para compatibilidad
+export type { SceneItem };
 
 interface SceneState {
   items: SceneItem[];
@@ -104,8 +68,9 @@ export const useSceneStore = create<SceneState>((set) => ({
   // =====================================================
   updateItem: (uuid, partial) =>
     set((s) => {
+      // Forzamos el tipado aquí porque Partial<SceneItem> es seguro
       const items = s.items.map((it) =>
-        it.uuid === uuid ? { ...it, ...partial } : it
+        it.uuid === uuid ? ({ ...it, ...partial } as SceneItem) : it
       );
       return {
         items,
@@ -118,9 +83,13 @@ export const useSceneStore = create<SceneState>((set) => ({
   // =====================================================
   updateItemFenceConfig: (uuid, newConfig) =>
     set((s) => {
-      const items = s.items.map((it) =>
-        it.uuid === uuid ? { ...it, fenceConfig: newConfig } : it
-      );
+      const items = s.items.map((it) => {
+        // Solo actualizamos si es una valla para mantener la consistencia de tipos
+        if (it.uuid === uuid && it.type === "fence") {
+          return { ...it, fenceConfig: newConfig };
+        }
+        return it;
+      });
       return {
         items,
         totalPrice: items.reduce((sum, it) => sum + (it.price ?? 0), 0),
@@ -132,9 +101,13 @@ export const useSceneStore = create<SceneState>((set) => ({
   // =====================================================
   updateFloorMaterial: (uuid, material) =>
     set((s) => {
-      const items = s.items.map((it) =>
-        it.uuid === uuid ? { ...it, floorMaterial: material } : it
-      );
+      const items = s.items.map((it) => {
+        // Solo actualizamos si es suelo
+        if (it.uuid === uuid && it.type === "floor") {
+          return { ...it, floorMaterial: material as any }; // Cast a any para flexibilizar FloorMaterialType
+        }
+        return it;
+      });
       return { items, totalPrice: s.totalPrice };
     }),
 
@@ -143,16 +116,17 @@ export const useSceneStore = create<SceneState>((set) => ({
   // =====================================================
   updateFloorTexture: (uuid, url, scale, rotation) =>
     set((s) => {
-      const items = s.items.map((it) =>
-        it.uuid === uuid
-          ? {
-              ...it,
-              textureUrl: url ?? it.textureUrl,
-              textureScale: scale ?? it.textureScale ?? 1,
-              textureRotation: rotation ?? it.textureRotation ?? 0,
-            }
-          : it
-      );
+      const items = s.items.map((it) => {
+        if (it.uuid === uuid && it.type === "floor") {
+          return {
+            ...it,
+            textureUrl: url ?? it.textureUrl,
+            textureScale: scale ?? it.textureScale ?? 1,
+            textureRotation: rotation ?? it.textureRotation ?? 0,
+          };
+        }
+        return it;
+      });
       return { items, totalPrice: s.totalPrice };
     }),
 

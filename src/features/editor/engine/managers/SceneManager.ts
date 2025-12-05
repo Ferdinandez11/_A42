@@ -19,7 +19,7 @@ export class SceneManager {
   public sky: Sky | null = null;
   public sun: THREE.DirectionalLight;
 
-  public interactionPlane: THREE.Mesh; // ⭐️ Plano invisible para raycast al suelo
+  public interactionPlane: THREE.Mesh;
 
   private container: HTMLElement;
   private frameOverlay: HTMLElement | null = null;
@@ -29,7 +29,7 @@ export class SceneManager {
 
     // === SCENE ===
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color("#222222");
+    this.scene.background = null; 
 
     // === RENDERER ===
     this.renderer = this.createRenderer(container);
@@ -45,77 +45,72 @@ export class SceneManager {
     // === ENVIRONMENT ===
     this.sun = this.createSun();
     this.dirLight = this.sun;
-    this.sky = this.createSky();
+    this.sky = this.createSky(); // Crear cielo
     this.grid = this.createGrid();
     this.createShadowReceiver();
 
     // === INTERACTION PLANE ===
     this.interactionPlane = this.createInteractionPlane();
 
-    // === FRAME OVERLAY (PDF) ===
+    // === FRAME OVERLAY ===
     this.initFrameOverlay();
 
-    // === SYNC CON ZUSTAND EDITOR STORE ===
+    // === SYNC ===
     this.setupEditorStoreSync();
+    
+    // Forzar actualización inicial del sol para que el cielo se pinte AZUL y no negro
+    const initialSun = useEditorStore.getState().sunPosition;
+    this.updateSunPosition(initialSun.azimuth, initialSun.elevation);
   }
 
   // ------------------------------------------------------
   // SYNC CON useEditorStore
   // ------------------------------------------------------
   private setupEditorStoreSync() {
-    // Fondo
-    useEditorStore.subscribe((state) => {
-      const color: string = state.backgroundColor;
-      this.setBackgroundColor(color);
-    });
+    let currentBg = useEditorStore.getState().backgroundColor;
+    let currentSun = useEditorStore.getState().sunPosition;
 
-    // Cielo
-    useEditorStore.subscribe((state) => {
-      const visible: boolean = state.skyVisible;
-      this.setSkyVisible(visible);
-    });
+    // Aplicamos estado inicial
+    this.setBackgroundColor(currentBg);
+    this.setGridVisible(useEditorStore.getState().gridVisible);
 
-    // Sol
     useEditorStore.subscribe((state) => {
-      const sun = state.sunPosition as { azimuth: number; elevation: number };
-      this.updateSunPosition(sun.azimuth, sun.elevation);
-    });
+      // 1. FONDO
+      if (state.backgroundColor !== currentBg) {
+        currentBg = state.backgroundColor;
+        this.setBackgroundColor(currentBg);
+      }
 
-    // Grid
-    useEditorStore.subscribe((state) => {
-      const visible: boolean = state.gridVisible;
-      this.setGridVisible(visible);
+      // 2. GRID
+      this.setGridVisible(state.gridVisible);
+
+      // 3. SOL
+      if (
+        state.sunPosition.azimuth !== currentSun.azimuth ||
+        state.sunPosition.elevation !== currentSun.elevation
+      ) {
+        currentSun = state.sunPosition;
+        this.updateSunPosition(currentSun.azimuth, currentSun.elevation);
+      }
     });
   }
 
   // ------------------------------------------------------
-  // RENDERER
+  // RENDERER & CAMERAS
   // ------------------------------------------------------
   private createRenderer(container: HTMLElement) {
-    const renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      alpha: false,
-      preserveDrawingBuffer: true,
-      powerPreference: "high-performance",
-    });
-
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true, powerPreference: "high-performance" });
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
-
+    renderer.toneMappingExposure = 0.8; // Un poco menos expuesto para que el cielo se vea mejor
     container.appendChild(renderer.domElement);
     return renderer;
   }
 
-  // ------------------------------------------------------
-  // CAMERAS
-  // ------------------------------------------------------
   private createPerspectiveCamera() {
     const aspect = this.container.clientWidth / this.container.clientHeight;
     const cam = new THREE.PerspectiveCamera(45, aspect, 0.1, 5000);
@@ -126,32 +121,18 @@ export class SceneManager {
   private createOrthoCamera() {
     const aspect = this.container.clientWidth / this.container.clientHeight;
     const s = 20;
-
-    const cam = new THREE.OrthographicCamera(
-      -(s * aspect) / 2,
-      (s * aspect) / 2,
-      s / 2,
-      -s / 2,
-      -500,
-      500
-    );
-
+    const cam = new THREE.OrthographicCamera(-(s * aspect) / 2, (s * aspect) / 2, s / 2, -s / 2, -500, 500);
     cam.position.set(20, 20, 20);
     cam.lookAt(0, 0, 0);
-
     return cam;
   }
 
   public switchCamera(type: "perspective" | "orthographic") {
     const oldPos = this.activeCamera.position.clone();
     const target = this.controls.target.clone();
-
-    this.activeCamera =
-      type === "perspective" ? this.perspectiveCamera : this.orthoCamera;
-
+    this.activeCamera = type === "perspective" ? this.perspectiveCamera : this.orthoCamera;
     this.activeCamera.position.copy(oldPos);
     this.activeCamera.lookAt(target);
-
     this.controls.object = this.activeCamera;
     this.controls.update();
   }
@@ -159,63 +140,38 @@ export class SceneManager {
   public setView(view: CameraView) {
     const d = 22;
     const target = new THREE.Vector3(0, 0, 0);
-
-    const pos =
-      view === "top"
-        ? new THREE.Vector3(0, d, 0)
-        : view === "front"
-        ? new THREE.Vector3(0, 0, d)
-        : view === "side"
-        ? new THREE.Vector3(d, 0, 0)
-        : new THREE.Vector3(d, d, d);
-
+    const pos = view === "top" ? new THREE.Vector3(0, d, 0) : view === "front" ? new THREE.Vector3(0, 0, d) : view === "side" ? new THREE.Vector3(d, 0, 0) : new THREE.Vector3(d, d, d);
     this.activeCamera.position.copy(pos);
     this.activeCamera.lookAt(target);
-
     this.controls.target.copy(target);
     this.controls.update();
   }
 
-  // ------------------------------------------------------
-  // CONTROLS
-  // ------------------------------------------------------
   private createControls() {
     const c = new OrbitControls(this.activeCamera, this.renderer.domElement);
-
     c.enableDamping = true;
     c.dampingFactor = 0.04;
-
     c.minDistance = 1;
     c.maxDistance = 500;
-
     c.screenSpacePanning = true;
-
-    c.mouseButtons = {
-      LEFT: THREE.MOUSE.ROTATE,
-      MIDDLE: THREE.MOUSE.DOLLY,
-      RIGHT: THREE.MOUSE.PAN,
-    };
-
+    c.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
     return c;
   }
 
   // ------------------------------------------------------
-  // ENVIRONMENT
+  // ENVIRONMENT (SOL Y CIELO)
   // ------------------------------------------------------
   private createSun() {
-    const sun = new THREE.DirectionalLight(0xffffff, 2.5);
+    const sun = new THREE.DirectionalLight(0xffffff, 2.0);
     sun.position.set(60, 80, 60);
     sun.castShadow = true;
-
     sun.shadow.mapSize.set(2048, 2048);
-
     const d = 60;
     sun.shadow.camera.left = -d;
     sun.shadow.camera.right = d;
     sun.shadow.camera.top = d;
     sun.shadow.camera.bottom = -d;
     sun.shadow.bias = -0.0001;
-
     this.scene.add(sun);
     return sun;
   }
@@ -223,25 +179,20 @@ export class SceneManager {
   private createSky() {
     const sky = new Sky();
     sky.scale.setScalar(450000);
-
+    
+    // Parámetros ajustados para un día azul claro
     const u = sky.material.uniforms;
-    u["turbidity"].value = 10;
-    u["rayleigh"].value = 3;
-    u["mieCoefficient"].value = 0.004;
-    u["mieDirectionalG"].value = 0.7;
-
-    this.updateSunPosition(180, 45);
+    u["turbidity"].value = 0.6;  // Menos turbidez = más claro
+    u["rayleigh"].value = 0.5;   // Dispersión baja = azul más puro
+    u["mieCoefficient"].value = 0.005;
+    u["mieDirectionalG"].value = 0.8;
 
     this.scene.add(sky);
     return sky;
   }
 
-  // ------------------------------------------------------
-  // SUN POSITION
-  // ------------------------------------------------------
   public updateSunPosition(azimuth: number, elevation: number) {
-    if (!this.dirLight) return;
-
+    // Calculamos posición esférica
     const phi = THREE.MathUtils.degToRad(90 - elevation);
     const theta = THREE.MathUtils.degToRad(azimuth);
 
@@ -249,13 +200,22 @@ export class SceneManager {
     const y = Math.cos(phi);
     const z = Math.sin(phi) * Math.sin(theta);
 
-    this.dirLight.position.set(x * 50, y * 50, z * 50);
-    this.dirLight.target.position.set(0, 0, 0);
-    this.dirLight.target.updateMatrixWorld();
+    // 1. Mover la LUZ (para las sombras)
+    if (this.dirLight) {
+        this.dirLight.position.set(x * 100, y * 100, z * 100);
+        this.dirLight.target.position.set(0, 0, 0);
+        this.dirLight.target.updateMatrixWorld();
+    }
+
+    // 2. Mover el SOL DEL CIELO (Esto es lo que faltaba para que no fuera negro)
+    if (this.sky) {
+        // El shader del cielo necesita el vector del sol en sus uniforms
+        this.sky.material.uniforms['sunPosition'].value.set(x, y, z);
+    }
   }
 
   // ------------------------------------------------------
-  // GRID & BACKGROUND
+  // HELPERS
   // ------------------------------------------------------
   private createGrid() {
     const grid = new THREE.GridHelper(200, 200, 0x888888, 0x444444);
@@ -265,30 +225,27 @@ export class SceneManager {
   }
 
   public setGridVisible(v: boolean) {
-    this.grid.visible = v;
+    if(this.grid) this.grid.visible = v;
   }
 
   public setSkyVisible(v: boolean) {
     if (!this.sky) return;
     this.sky.visible = v;
-    this.scene.background = v ? null : new THREE.Color("#222222");
   }
 
   public setBackgroundColor(color: string) {
-    this.scene.background = new THREE.Color(color);
-    if (this.sky) this.sky.visible = false;
+    if (color === '#111111') {
+        this.setSkyVisible(true);
+        this.scene.background = null; 
+    } else {
+        this.setSkyVisible(false);
+        this.scene.background = new THREE.Color(color);
+    }
   }
 
-  // ------------------------------------------------------
-  // INTERACTION PLANE (para clicks sobre el suelo)
-  // ------------------------------------------------------
   private createInteractionPlane() {
-    const plane = new THREE.Mesh(
-      new THREE.PlaneGeometry(5000, 5000),
-      new THREE.MeshBasicMaterial({ visible: false })
-    );
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(5000, 5000), new THREE.MeshBasicMaterial({ visible: false }));
     plane.rotation.x = -Math.PI / 2;
-    plane.position.y = 0;
     plane.userData.isInteractionPlane = true;
     this.scene.add(plane);
     return plane;
@@ -296,54 +253,21 @@ export class SceneManager {
 
   public raycastWorldPoint(raycaster: THREE.Raycaster): THREE.Vector3 | null {
     const hit = raycaster.intersectObject(this.interactionPlane, false);
-    if (!hit.length) return null;
-    return hit[0].point;
+    return hit.length ? hit[0].point : null;
   }
 
-  // ------------------------------------------------------
-  // SHADOW RECEIVER
-  // ------------------------------------------------------
   private createShadowReceiver() {
-    const plane = new THREE.Mesh(
-      new THREE.PlaneGeometry(2000, 2000),
-      new THREE.ShadowMaterial({ opacity: 0.3 })
-    );
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), new THREE.ShadowMaterial({ opacity: 0.3 }));
     plane.rotation.x = -Math.PI / 2;
     plane.receiveShadow = true;
     plane.position.y = 0.001;
     this.scene.add(plane);
   }
 
-  // ------------------------------------------------------
-  // FRAME OVERLAY (PDF)
-  // ------------------------------------------------------
   private initFrameOverlay() {
     const el = document.createElement("div");
-    el.style.position = "absolute";
-    el.style.display = "none";
-    el.style.border = "2px dashed rgba(255,255,255,0.9)";
-    el.style.pointerEvents = "none";
-    el.style.zIndex = "200";
-    el.style.left = "50%";
-    el.style.top = "50%";
-    el.style.transform = "translate(-50%, -50%)";
-
-    const label = document.createElement("div");
-    label.innerText = "ÁREA PDF PORTADA";
-    label.style.position = "absolute";
-    label.style.bottom = "-22px";
-    label.style.left = "50%";
-    label.style.transform = "translateX(-50%)";
-    label.style.fontSize = "11px";
-    label.style.fontWeight = "bold";
-    label.style.color = "#fff";
-
-    el.appendChild(label);
-
-    if (getComputedStyle(this.container).position === "static") {
-      this.container.style.position = "relative";
-    }
-
+    Object.assign(el.style, { position: "absolute", display: "none", border: "2px dashed rgba(255,255,255,0.9)", pointerEvents: "none", zIndex: "200", left: "50%", top: "50%", transform: "translate(-50%, -50%)" });
+    if (getComputedStyle(this.container).position === "static") this.container.style.position = "relative";
     this.container.appendChild(el);
     this.frameOverlay = el;
   }
@@ -355,65 +279,37 @@ export class SceneManager {
   }
 
   public updateFrameDimensions() {
-    if (!this.frameOverlay) return;
-    if (this.frameOverlay.style.display === "none") return;
-
+    if (!this.frameOverlay || this.frameOverlay.style.display === "none") return;
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
-
     const aspectTarget = 170 / 120;
     const aspectScreen = w / h;
-
-    let fw: number;
-    let fh: number;
-
-    if (aspectScreen > aspectTarget) {
-      fh = h * 0.85;
-      fw = fh * aspectTarget;
-    } else {
-      fw = w * 0.85;
-      fh = fw / aspectTarget;
-    }
-
+    let fw, fh;
+    if (aspectScreen > aspectTarget) { fh = h * 0.85; fw = fh * aspectTarget; } 
+    else { fw = w * 0.85; fh = fw / aspectTarget; }
     this.frameOverlay.style.width = `${fw}px`;
     this.frameOverlay.style.height = `${fh}px`;
   }
 
-  // ------------------------------------------------------
-  // RESIZE & DISPOSE
-  // ------------------------------------------------------
   public onWindowResize = () => {
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
-
     this.perspectiveCamera.aspect = w / h;
     this.perspectiveCamera.updateProjectionMatrix();
-
-    const s = 20;
-    const a = w / h;
-    this.orthoCamera.left = -(s * a) / 2;
-    this.orthoCamera.right = (s * a) / 2;
-    this.orthoCamera.top = s / 2;
-    this.orthoCamera.bottom = -s / 2;
+    const s = 20; const a = w / h;
+    this.orthoCamera.left = -(s * a) / 2; this.orthoCamera.right = (s * a) / 2;
+    this.orthoCamera.top = s / 2; this.orthoCamera.bottom = -s / 2;
     this.orthoCamera.updateProjectionMatrix();
-
     this.renderer.setSize(w, h);
     this.updateFrameDimensions();
   };
 
   public dispose() {
     try {
-      if (this.renderer.domElement.parentElement) {
-        this.container.removeChild(this.renderer.domElement);
-      }
-
-      if (this.frameOverlay) {
-        this.container.removeChild(this.frameOverlay);
-      }
+      if (this.renderer.domElement.parentElement) this.container.removeChild(this.renderer.domElement);
+      if (this.frameOverlay) this.container.removeChild(this.frameOverlay);
     } catch {}
-
     this.controls.dispose();
     this.renderer.dispose();
   }
 }
-// --- END FILE ---

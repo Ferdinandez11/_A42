@@ -3,8 +3,10 @@ import * as THREE from "three";
 import { useSceneStore } from "@/stores/scene/useSceneStore";
 import { useFenceStore } from "@/stores/fence/useFenceStore";
 import type { FenceItem, FenceConfig as BaseFenceConfig } from "@/types/editor";
+// IMPORTANTE: Importamos los presets para rellenar los datos que faltan
+import { FENCE_PRESETS } from "../../../data/fence_presets";
 
-// Tipo interno extendido con todos los campos que este tool necesita
+// Tipo interno extendido con todos los campos necesarios
 type FenceConfig = BaseFenceConfig & {
   moduleLength?: number;
 
@@ -24,9 +26,6 @@ type FenceConfig = BaseFenceConfig & {
   railThickness?: number;
 };
 
-/**
- * FenceTool PRO — versión profesional
- */
 export class FenceTool {
   private scene: THREE.Scene;
 
@@ -58,6 +57,7 @@ export class FenceTool {
     const p = world.clone();
     p.y = 0;
 
+    // Evitar puntos duplicados muy cerca
     if (this.points.length > 0 && p.distanceTo(this.points.at(-1)!) < 0.1) {
       return;
     }
@@ -89,7 +89,7 @@ export class FenceTool {
   }
 
   // ====================================================================
-  // FINALIZE (llamado desde InteractionManager botón derecho)
+  // FINALIZE
   // ====================================================================
   public finalize() {
     this.createFence();
@@ -101,7 +101,8 @@ export class FenceTool {
   private createFence() {
     if (this.points.length < 2) return;
 
-    const config = useFenceStore.getState().config as FenceConfig;
+    // Obtenemos config del store (parcial, solo tiene ID y colores)
+    const storeConfig = useFenceStore.getState().config;
 
     const uuid = THREE.MathUtils.generateUUID();
     const box = new THREE.Box3().setFromPoints(this.points);
@@ -115,12 +116,12 @@ export class FenceTool {
     const item: FenceItem = {
       uuid,
       type: "fence",
-      productId: "fence_" + (config as any).presetId,
+      productId: "fence_" + storeConfig.presetId,
       name: "Valla",
-      price: 100,
+      price: 100, // Precio base dummy, luego se recalcula con PriceCalculator
       points: localPoints,
-      // clonamos para no mutar el store
-      fenceConfig: structuredClone(config),
+      // Guardamos la config del usuario
+      fenceConfig: structuredClone(storeConfig),
       position: [center.x, 0, center.z],
       rotation: [0, 0, 0],
       scale: [1, 1, 1],
@@ -132,11 +133,27 @@ export class FenceTool {
   }
 
   // ====================================================================
-  // RUNTIME GEOMETRY BUILDER
+  // RUNTIME GEOMETRY BUILDER (CORREGIDO)
   // ====================================================================
   public static buildFenceMesh(item: FenceItem): THREE.Group {
     const group = new THREE.Group();
-    const config = item.fenceConfig as FenceConfig;
+    
+    // 1. RECUPERAMOS LOS VALORES DEL PRESET
+    // item.fenceConfig tiene lo que el usuario personalizó (colores, id)
+    // FENCE_PRESETS tiene las dimensiones geométricas
+    const userConfig = item.fenceConfig;
+    const presetData = FENCE_PRESETS[userConfig.presetId] || FENCE_PRESETS["wood"];
+
+    // 2. FUSIONAMOS (Merge) para tener un objeto config completo
+    const config: FenceConfig = {
+        ...presetData,        // Valores geométricos por defecto (postHeight, slatWidth, etc)
+        ...userConfig,        // Sobreescribe colores y presetId
+        // Aseguramos merging de colores
+        colors: {
+            ...presetData.defaultColors,
+            ...userConfig.colors
+        }
+    } as FenceConfig;
 
     const pts = item.points.map((p) => new THREE.Vector3(p.x, 0, p.z));
     if (pts.length < 2) return group;
@@ -147,12 +164,13 @@ export class FenceTool {
 
     const temp = new THREE.Object3D();
 
+    // 3. GENERAMOS GEOMETRÍAS CON LA CONFIG COMPLETA
     const postGeo = FenceTool.getPostGeometry(config);
     const railGeo = FenceTool.getRailGeometry(config);
     const slatGeo = FenceTool.getSlatGeometry(config);
 
     const moduleLength = config.moduleLength ?? 2.0;
-    const postHeight = config.postHeight;
+    const postHeight = config.postHeight || 1.0; // Fallback por seguridad
 
     const topRailY = postHeight - 0.12;
     const bottomRailY = 0.12;
@@ -162,6 +180,10 @@ export class FenceTool {
       const A = pts[i];
       const B = pts[i + 1];
       const dist = A.distanceTo(B);
+      
+      // Evitar NaN si los puntos son idénticos
+      if (dist < 0.001) continue;
+
       const dir = new THREE.Vector3().subVectors(B, A).normalize();
       const angle = Math.atan2(dir.x, dir.z);
 
@@ -195,7 +217,7 @@ export class FenceTool {
         }
 
         // --- SLATS ---
-        const slatWidth = config.slatWidth;
+        const slatWidth = config.slatWidth || 0.1;
         const slatGap = config.slatGap ?? 0.04;
 
         const maxSlats = Math.max(
@@ -206,11 +228,17 @@ export class FenceTool {
 
         for (let s = 0; s < slatCount; s++) {
           const tSlat = (s + 0.5) / slatCount;
-          const pSlat = new THREE.Vector3().lerpVectors(A, B, tSlat);
+          const pSlat = new THREE.Vector3().lerpVectors(A, B, tSlat); // Esto es incorrecto para la posición exacta en el módulo, pero válido visualmente para MVP
+          
+          // Corrección: Interpolar entre el inicio y fin del SUB-SEGMENTO actual, no de todo el tramo A-B
+          const subStart = new THREE.Vector3().lerpVectors(A, B, t0);
+          const subEnd = new THREE.Vector3().lerpVectors(A, B, t1);
+          const pSlatExact = new THREE.Vector3().lerpVectors(subStart, subEnd, (s + 0.5) / slatCount);
+
           FenceTool.pushMatrix(
             slatMatrices,
             temp,
-            new THREE.Vector3(pSlat.x, postHeight * 0.5, pSlat.z),
+            new THREE.Vector3(pSlatExact.x, postHeight * 0.5, pSlatExact.z),
             angle,
             1
           );
@@ -234,7 +262,7 @@ export class FenceTool {
   // HELPERS GEOMETRÍA
   // ====================================================================
   private static getPostGeometry(config: FenceConfig) {
-    const h = config.postHeight;
+    const h = config.postHeight || 1.0;
 
     if (config.postType === "round") {
       const r = config.postRadius ?? 0.06;
@@ -264,9 +292,9 @@ export class FenceTool {
   }
 
   private static getSlatGeometry(config: FenceConfig) {
-    const thickness = config.slatThickness;
-    const height = config.postHeight * 0.7;
-    const width = config.slatWidth;
+    const thickness = config.slatThickness || 0.02;
+    const height = (config.postHeight || 1.0) * 0.7;
+    const width = config.slatWidth || 0.1;
 
     return new THREE.BoxGeometry(thickness, height, width);
   }
@@ -278,6 +306,9 @@ export class FenceTool {
     angle: number,
     length: number
   ) {
+    // Protección contra NaNs
+    if (isNaN(pos.x) || isNaN(pos.y) || isNaN(pos.z) || isNaN(length)) return;
+
     temp.position.copy(pos);
     temp.rotation.set(0, angle, 0);
     temp.scale.set(1, 1, length);
@@ -306,4 +337,3 @@ export class FenceTool {
     group.add(inst);
   }
 }
-// --- END FILE ---

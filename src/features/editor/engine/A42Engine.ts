@@ -85,7 +85,6 @@ export class A42Engine {
     this.sceneManager.setSkyVisible(visible);
   }
 
-  /** ✔️ NECESARIO PARA EDITOR3D */
   public updateSunPosition(azimuth: number, elevation: number) {
     this.sceneManager.updateSunPosition(azimuth, elevation);
   }
@@ -167,7 +166,7 @@ export class A42Engine {
     button.style.cursor = "pointer";
   }
 
-  // === SCENE SYNC -----------------------------------------------------
+  // === SCENE SYNC (Con corrección de TransformControls) -------------------
 
   public async syncScene(items: SceneItem[]) {
     await this.syncSceneFromStore(items);
@@ -177,6 +176,7 @@ export class A42Engine {
     const scene = this.scene;
     const existing = new Map<string, THREE.Object3D>();
 
+    // Indexar objetos existentes
     scene.traverse((child) => {
       if (child.userData?.isItem && child.uuid) {
         existing.set(child.uuid, child);
@@ -186,11 +186,62 @@ export class A42Engine {
     for (const item of items) {
       const obj = existing.get(item.uuid);
 
+      // --- CREACIÓN ---
       if (!obj) {
         await this.objectManager.createFromItem(item);
         continue;
       }
 
+      // --- DETECCIÓN DE CAMBIOS ESTRUCTURALES ---
+      // Si necesitamos recrear el objeto, debemos tener cuidado con el Gizmo
+      let needsRecreation = false;
+
+      // 1. Suelos
+      if (item.type === 'floor') {
+         const oldMat = obj.userData?.floorMaterial;
+         const oldTex = obj.userData?.textureUrl;
+         const oldTexScale = obj.userData?.textureScale;
+         const oldTexRot = obj.userData?.textureRotation;
+
+         if (oldMat !== item.floorMaterial || oldTex !== item.textureUrl || oldTexScale !== item.textureScale || oldTexRot !== item.textureRotation) {
+             needsRecreation = true;
+         }
+      }
+
+      // 2. Vallas
+      if (item.type === 'fence') {
+        const oldConfig = JSON.stringify(obj.userData?.fenceConfig);
+        const newConfig = JSON.stringify(item.fenceConfig);
+        if (oldConfig !== newConfig) needsRecreation = true;
+      }
+
+      // --- APLICAR RECREACIÓN SEGURA ---
+      if (needsRecreation) {
+          // ⚠️ PASO CRÍTICO: Comprobar si el objeto está seleccionado
+          const currentSelected = this.interactionManager.transformControl.object;
+          const isSelected = currentSelected && currentSelected.uuid === item.uuid;
+
+          // 1. Si está seleccionado, SOLTAMOS el gizmo para que no crashee
+          if (isSelected) {
+              this.interactionManager.selectObject(null);
+          }
+
+          // 2. Borramos y creamos
+          this.objectManager.removeByUUID(item.uuid);
+          const newObj = await this.objectManager.createFromItem(item);
+
+          // 3. Si estaba seleccionado, VOLVEMOS A AGARRAR el nuevo objeto
+          if (isSelected && newObj) {
+              this.interactionManager.selectObject(newObj);
+          }
+
+          // Marcamos como procesado
+          existing.delete(item.uuid);
+          continue; 
+      }
+
+      // --- ACTUALIZACIÓN ESTÁNDAR (Posición/Rotación) ---
+      // Solo llegamos aquí si no se ha recreado el objeto
       obj.position.fromArray(item.position);
       obj.rotation.fromArray(item.rotation);
       obj.scale.fromArray(item.scale);
@@ -198,7 +249,16 @@ export class A42Engine {
       existing.delete(item.uuid);
     }
 
+    // --- LIMPIEZA DE HUÉRFANOS ---
     for (const [uuid] of existing) {
+      // También protegemos el borrado final por si acaso
+      const objToDelete = existing.get(uuid);
+      const currentSelected = this.interactionManager.transformControl.object;
+      
+      if (currentSelected && objToDelete && currentSelected.uuid === objToDelete.uuid) {
+          this.interactionManager.selectObject(null);
+      }
+
       this.objectManager.removeByUUID(uuid);
     }
   }
@@ -235,4 +295,3 @@ export class A42Engine {
     this.sceneManager.dispose();
   }
 }
-// --- END FILE ---

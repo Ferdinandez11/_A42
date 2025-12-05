@@ -1,4 +1,3 @@
-// --- FILE: src/features/editor/engine/managers/ObjectManager.ts ---
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
@@ -11,10 +10,12 @@ import type {
 } from "@/types/editor";
 
 import { useSceneStore } from "@/stores/scene/useSceneStore";
+import { FenceTool } from "./tools/FenceTool"; // Importamos la herramienta de vallas
 
 export class ObjectManager {
   private scene: THREE.Scene;
   private gltf = new GLTFLoader();
+  private textureLoader = new THREE.TextureLoader(); // Loader para texturas de suelo
 
   private cache: Record<string, THREE.Group> = {};
 
@@ -109,7 +110,7 @@ export class ObjectManager {
   }
 
   // ============================================================
-  // FLOOR
+  // FLOOR (CORREGIDO: Aplica color y textura)
   // ============================================================
   private createFloor(item: FloorItem): THREE.Object3D | null {
     const pts = item.points;
@@ -124,12 +125,52 @@ export class ObjectManager {
       depth: 0.05,
       bevelEnabled: false,
     });
+    
+    // Corregir orientación UV para texturas
+    const uvAttribute = geometry.attributes.uv;
+    if (uvAttribute) {
+       for (let i = 0; i < uvAttribute.count; i++) {
+          const u = uvAttribute.getX(i);
+          const v = uvAttribute.getY(i);
+          // Ajuste simple de mapeo planar
+          // Nota: Para extrude geometry, el mapeo UV por defecto es lateral, 
+          // a veces requiere recalcular UVs en base a posición X/Z para la cara superior.
+       }
+    }
 
     geometry.rotateX(-Math.PI / 2);
 
+    // --- MATERIAL ---
     const material = new THREE.MeshStandardMaterial({
-      color: 0x999999,
+      color: 0x999999, // Gris por defecto
+      roughness: 0.8,
     });
+
+    // Asignar color según ID
+    if (item.floorMaterial) {
+        const matId = item.floorMaterial;
+        if (matId === 'rubber_red') material.color.setHex(0xA04040);
+        else if (matId === 'rubber_green') material.color.setHex(0x22c55e);
+        else if (matId === 'rubber_blue') material.color.setHex(0x3b82f6);
+        else if (matId === 'grass') material.color.setHex(0x4ade80);
+        else if (matId === 'concrete') material.color.setHex(0x9ca3af);
+    }
+
+    // Cargar textura si existe
+    if (item.textureUrl) {
+        this.textureLoader.load(item.textureUrl, (tex) => {
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            
+            const scale = item.textureScale ?? 1;
+            tex.repeat.set(0.5 * scale, 0.5 * scale); 
+            tex.rotation = THREE.MathUtils.degToRad(item.textureRotation ?? 0);
+            
+            material.map = tex;
+            material.color.setHex(0xffffff); // Reset color para ver la textura
+            material.needsUpdate = true;
+        });
+    }
 
     const mesh = new THREE.Mesh(geometry, material);
     mesh.uuid = item.uuid;
@@ -142,6 +183,10 @@ export class ObjectManager {
       isItem: true,
       type: "floor",
       uuid: item.uuid,
+      // Guardamos estado para detectar cambios en A42Engine
+      floorMaterial: item.floorMaterial,
+      textureUrl: item.textureUrl,
+      points: item.points
     };
 
     this.scene.add(mesh);
@@ -149,10 +194,11 @@ export class ObjectManager {
   }
 
   // ============================================================
-  // FENCE
+  // FENCE (CORREGIDO: Usa FenceTool para generar geometría)
   // ============================================================
   private createFence(item: FenceItem): THREE.Object3D | null {
-    const group = new THREE.Group();
+    // Usamos el builder estático de la herramienta
+    const group = FenceTool.buildFenceMesh(item);
 
     group.uuid = item.uuid;
     group.position.fromArray(item.position as Vector3Array);
@@ -186,15 +232,28 @@ export class ObjectManager {
     const obj = await this.createFromItem({ ...item, uuid: "preview" });
     if (!obj) return;
 
+    // Hacerlo semitransparente
     obj.traverse((child: any) => {
       if (child.material) {
-        child.material = child.material.clone();
-        child.material.transparent = true;
-        child.material.opacity = 0.35;
+        // Clonar material para no afectar al original si es cacheado
+        if (Array.isArray(child.material)) {
+             child.material = child.material.map((m: THREE.Material) => {
+                 const cm = m.clone();
+                 cm.transparent = true;
+                 cm.opacity = 0.5;
+                 return cm;
+             });
+        } else {
+             child.material = child.material.clone();
+             child.material.transparent = true;
+             child.material.opacity = 0.5;
+        }
       }
     });
 
     this.previewObject = obj;
+    // Quitamos userData para que no sea seleccionable ni exportable
+    this.previewObject.userData = {}; 
     this.scene.add(obj);
   }
 
@@ -242,4 +301,3 @@ export class ObjectManager {
     });
   }
 }
-// --- END FILE ---

@@ -15,6 +15,7 @@ import { useEditorStore } from "@/stores/editor/useEditorStore";
 import { useSceneStore } from "@/stores/scene/useSceneStore";
 import { useSelectionStore } from "@/stores/selection/useSelectionStore";
 import { useProjectStore } from "@/stores/project/useProjectStore";
+import { useCatalogStore } from "@/stores/catalog/useCatalogStore"; // IMPORTANTE
 
 import {
   Euro,
@@ -30,46 +31,27 @@ export const Editor3D = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [engineInstance, setEngineInstance] = useState<A42Engine | null>(null);
 
-  // --- Editor store (usamos 'any' para evitar choques de tipos) ---
-  const mode = useEditorStore((s: any) => s.mode as string);
+  // --- Editor store ---
+  const mode = useEditorStore((s) => s.mode);
   const gridVisible = useEditorStore((s) => s.gridVisible);
-  const cameraType = useEditorStore((s: any) => s.cameraType as string);
-  const pendingView = useEditorStore(
-    (s: any) => s.pendingView as any | null
-  );
-  const clearPendingView = useEditorStore(
-    (s: any) => s.clearPendingView as () => void
-  );
-  const sunPosition = useEditorStore(
-    (s: any) =>
-      (s.sunPosition as { azimuth: number; elevation: number }) ?? {
-        azimuth: 0,
-        elevation: 45,
-      }
-  );
+  const cameraType = useEditorStore((s) => s.cameraType);
+  const pendingView = useEditorStore((s) => s.pendingView);
+  const clearPendingView = useEditorStore((s) => s.clearPendingView);
+  const sunPosition = useEditorStore((s) => s.sunPosition);
   const backgroundColor = useEditorStore((s) => s.backgroundColor);
-  const safetyZonesVisible = useEditorStore(
-    (s: any) => (s.safetyZonesVisible as boolean) ?? true
-  );
-  const measurementResult = useEditorStore(
-    (s: any) => (s.measurementResult as number | null) ?? null
-  );
+  const safetyZonesVisible = useEditorStore((s) => s.safetyZonesVisible);
+  const measurementResult = useEditorStore((s) => s.measurementResult);
 
-  // --- Scene store ---
+  // --- Scene & Catalog Stores ---
   const items = useSceneStore((s) => s.items);
-  const totalPrice = useSceneStore(
-    (s: any) => (s.totalPrice as number) ?? 0
-  );
+  const totalPrice = useSceneStore((s) => s.totalPrice);
+  const selectedProduct = useCatalogStore((s) => s.selectedProduct); // PRODUCTO SELECCIONADO
 
-  // --- Selection store: usamos selectedUUID, que sabemos que existe ---
-  const selectedUUID = useSelectionStore(
-    (s: any) => s.selectedUUID as string | null
-  );
+  // --- Selection store ---
+  const selectedUUID = useSelectionStore((s) => s.selectedUUID);
 
   // --- Project store ---
-  const isReadOnlyMode = useProjectStore(
-    (s: any) => (s.isReadOnlyMode as boolean) ?? false
-  );
+  const isReadOnlyMode = useProjectStore((s) => s.isReadOnlyMode);
 
   const [qrVisible, setQRVisible] = React.useState(false);
 
@@ -85,9 +67,7 @@ export const Editor3D = () => {
     setEngineInstance(engine);
 
     const handlePointerDown = (e: PointerEvent) => {
-      // solo clicks sobre el canvas, no sobre la UI
       if ((e.target as HTMLElement).tagName === "CANVAS") {
-        // Transformamos a MouseEvent para que encaje con la firma
         engine.interactionManager.onPointerDown(e as unknown as MouseEvent);
       }
     };
@@ -119,7 +99,37 @@ export const Editor3D = () => {
   }, [mode, engineInstance]);
 
   // ============================================================
-  // 3. SINCRONIZACIÓN SELECCIÓN UI → ENGINE
+  // 3. PREVISUALIZACIÓN DE CATÁLOGO (CORREGIDO)
+  // ============================================================
+  useEffect(() => {
+    if (!engineInstance) return;
+
+    if (mode === "placing_item" && selectedProduct) {
+      // Crear objeto fantasma
+      const previewItem: any = {
+        uuid: "preview-temp",
+        type: "model",
+        productId: selectedProduct.id,
+        name: selectedProduct.name,
+        modelUrl: selectedProduct.modelUrl,
+        price: selectedProduct.price,
+        position: [0, 0, 0],
+        rotation: [0, 0, 0],
+        scale: [1, 1, 1],
+        data: selectedProduct,
+      };
+      
+      engineInstance.objectManager.setPreviewItem(previewItem);
+    } else {
+      // Limpiar preview si no estamos colocando
+      // Nota: objectManager maneja la limpieza interna cuando confirma, 
+      // pero esto asegura limpieza al cancelar modo.
+    }
+  }, [selectedProduct, mode, engineInstance]);
+
+
+  // ============================================================
+  // 4. SINCRONIZACIÓN SELECCIÓN UI → ENGINE
   // ============================================================
   useEffect(() => {
     if (!engineInstance) return;
@@ -127,16 +137,16 @@ export const Editor3D = () => {
   }, [selectedUUID, engineInstance]);
 
   // ============================================================
-  // 4. SINCRONIZACIÓN ESCENA STORE → ENGINE
+  // 5. SINCRONIZACIÓN ESCENA STORE → ENGINE
   // ============================================================
   useEffect(() => {
     if (!engineInstance) return;
-    // syncScene es el método público del motor; si el tipo no encaja, usamos any
-    (engineInstance as any).syncScene(items as any);
+    // syncScene actualiza posición Y propiedades (materiales suelo)
+    engineInstance.syncScene(items);
   }, [items, engineInstance]);
 
   // ============================================================
-  // 5. REACTIVIDAD SOBRE PROPIEDADES DEL EDITOR
+  // 6. REACTIVIDAD SOBRE PROPIEDADES DEL EDITOR
   // ============================================================
   useEffect(() => {
     engineInstance?.setGrid(gridVisible);
@@ -144,14 +154,12 @@ export const Editor3D = () => {
 
   useEffect(() => {
     if (!engineInstance) return;
-    engineInstance.switchCamera(cameraType as any);
+    engineInstance.switchCamera(cameraType);
     engineInstance.interactionManager.updateCamera(engineInstance.activeCamera);
   }, [cameraType, engineInstance]);
 
   useEffect(() => {
     if (!engineInstance) return;
-
-    // Mostrado/ocultado de zonas de seguridad directamente sobre la escena
     engineInstance.scene.traverse((obj) => {
       if (obj.userData?.isSafetyZone) {
         obj.visible = safetyZonesVisible;
@@ -169,7 +177,7 @@ export const Editor3D = () => {
 
   useEffect(() => {
     if (!pendingView || !engineInstance) return;
-    engineInstance.setView(pendingView as any);
+    engineInstance.setView(pendingView);
     clearPendingView();
   }, [pendingView, clearPendingView, engineInstance]);
 
@@ -180,13 +188,13 @@ export const Editor3D = () => {
   }, [backgroundColor, engineInstance]);
 
   // ============================================================
-  // 6. ACCIONES SOBRE LA SELECCIÓN (duplicar / eliminar)
+  // 7. ACCIONES SOBRE LA SELECCIÓN
   // ============================================================
   const handleDuplicateSelection = useCallback(() => {
     if (!selectedUUID) return;
 
-    const sceneState = useSceneStore.getState() as any;
-    const currentItems = sceneState.items as any[];
+    const sceneState = useSceneStore.getState();
+    const currentItems = sceneState.items;
     const original = currentItems.find((i) => i.uuid === selectedUUID);
     if (!original) return;
 
@@ -201,18 +209,18 @@ export const Editor3D = () => {
       ] as [number, number, number],
     };
 
-    sceneState.addItem(newItem);
+    sceneState.addItem(newItem as any);
   }, [selectedUUID]);
 
   const handleRemoveSelection = useCallback(() => {
     if (!selectedUUID || !engineInstance) return;
 
-    const sceneState = useSceneStore.getState() as any;
+    const sceneState = useSceneStore.getState();
     sceneState.removeItem(selectedUUID);
 
     engineInstance.objectManager.removeByUUID(selectedUUID);
 
-    const selState = useSelectionStore.getState() as any;
+    const selState = useSelectionStore.getState();
     selState.select(null);
   }, [selectedUUID, engineInstance]);
 
