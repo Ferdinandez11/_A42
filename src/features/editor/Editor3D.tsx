@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { A42Engine } from "./engine/A42Engine";
+import { EngineContext } from "./context/EngineContext";
 
 import { Toolbar } from "./ui/Toolbar";
 import { BudgetPanel } from "./ui/BudgetPanel";
@@ -11,7 +12,7 @@ import { QRModal } from "./ui/QRModal";
 import { Catalog } from "./ui/Catalog";
 
 import { useEditorStore } from "@/stores/editor/useEditorStore";
-import { useSceneStore } from "@/stores/scene/useSceneStore"; // 🔥
+import { useSceneStore } from "@/stores/scene/useSceneStore";
 import { useSelectionStore } from "@/stores/selection/useSelectionStore";
 import { useProjectStore } from "@/stores/project/useProjectStore";
 
@@ -27,11 +28,8 @@ import {
 
 export const Editor3D = () => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const engineRef = useRef<A42Engine | null>(null);
+  const [engineInstance, setEngineInstance] = useState<A42Engine | null>(null);
 
-  // --- STORES ---
-  
-  // UI State
   const {
     mode,
     gridVisible,
@@ -43,171 +41,171 @@ export const Editor3D = () => {
     safetyZonesVisible,
   } = useEditorStore();
 
-  // Data State
-  const { items, totalPrice } = useSceneStore(); // 🔥
-
-  const {
-    selectedItemId,
-    duplicateSelection,
-    removeSelection,
-    measuredDistance,
-  } = useSelectionStore();
-
+  const { items, totalPrice } = useSceneStore();
+  const { selectedItemId, duplicateSelection, removeSelection, measuredDistance } = useSelectionStore();
   const { isReadOnlyMode } = useProjectStore();
 
   const [qrVisible, setQRVisible] = React.useState(false);
 
-  // --------------------------
-  // INIT ENGINE
-  // --------------------------
+  // 1. INICIALIZACIÓN Y EVENTOS DOM
   useEffect(() => {
     if (!containerRef.current) return;
 
+    // Instanciar motor
     const engine = new A42Engine(containerRef.current);
     engine.init();
 
-    const canvas = engine.renderer.domElement as HTMLCanvasElement;
-    if (canvas) {
-      canvas.style.pointerEvents = "auto";
-      canvas.style.touchAction = "none";
-    }
+    // Guardar en estado
+    setEngineInstance(engine);
 
-    engineRef.current = engine;
-    // @ts-ignore
-    window.editorEngine = engine;
+    // 🔥 FIX: Añadir listener directo al DOM para evitar problemas de bubbling en React
+    const handlePointerDown = (e: PointerEvent) => {
+      // Solo procesar si el click es en el canvas (evitar UI)
+      if ((e.target as HTMLElement).tagName === "CANVAS") {
+        engine.interactionManager.onPointerDown(e);
+      }
+    };
 
+    const container = containerRef.current;
+    container.addEventListener("pointerdown", handlePointerDown);
+
+    // Configuración inicial
     engine.setGridVisible(gridVisible);
     engine.updateSunPosition(sunPosition.azimuth, sunPosition.elevation);
-
     if (backgroundColor === "#111111") engine.setSkyVisible(true);
     else engine.setBackgroundColor(backgroundColor);
 
-    return () => engine.dispose();
+    return () => {
+      container.removeEventListener("pointerdown", handlePointerDown);
+      engine.dispose();
+      setEngineInstance(null);
+    };
   }, []);
 
-  // --------------------------
-  // 🔥 SYNC SELECTION (REACT -> ENGINE)
-  // --------------------------
+  // 2. LIMPIEZA DE HERRAMIENTAS AL CAMBIAR MODO
   useEffect(() => {
-    if (engineRef.current) {
-      engineRef.current.interactionManager.selectItemByUUID(selectedItemId);
+    if (engineInstance) {
+      engineInstance.clearTools();
     }
-  }, [selectedItemId]);
+  }, [mode, engineInstance]);
 
-  // --------------------------
-  // REACTIONS
-  // --------------------------
+  // 3. SINCRONIZACIÓN DE ESTADO
   useEffect(() => {
-    engineRef.current?.syncSceneFromStore(items);
-  }, [items]);
-
-  useEffect(() => {
-    engineRef.current?.setGridVisible(gridVisible);
-  }, [gridVisible]);
+    if (engineInstance) {
+      engineInstance.interactionManager.selectItemByUUID(selectedItemId);
+    }
+  }, [selectedItemId, engineInstance]);
 
   useEffect(() => {
-    const eng = engineRef.current;
-    if (!eng) return;
-
-    eng.switchCamera(cameraType);
-    eng.interactionManager.updateCamera(eng.activeCamera);
-  }, [cameraType]);
+    engineInstance?.syncSceneFromStore(items);
+  }, [items, engineInstance]);
 
   useEffect(() => {
-    engineRef.current?.updateSafetyZones(safetyZonesVisible);
-  }, [safetyZonesVisible]);
+    engineInstance?.setGridVisible(gridVisible);
+  }, [gridVisible, engineInstance]);
 
   useEffect(() => {
-    engineRef.current?.updateSunPosition(
-      sunPosition.azimuth,
-      sunPosition.elevation
-    );
-  }, [sunPosition]);
+    if (!engineInstance) return;
+    engineInstance.switchCamera(cameraType);
+    engineInstance.interactionManager.updateCamera(engineInstance.activeCamera);
+  }, [cameraType, engineInstance]);
 
   useEffect(() => {
-    if (!pendingView) return;
-    engineRef.current?.setView(pendingView);
+    engineInstance?.updateSafetyZones(safetyZonesVisible);
+  }, [safetyZonesVisible, engineInstance]);
+
+  useEffect(() => {
+    engineInstance?.updateSunPosition(sunPosition.azimuth, sunPosition.elevation);
+  }, [sunPosition, engineInstance]);
+
+  useEffect(() => {
+    if (!pendingView || !engineInstance) return;
+    engineInstance.setView(pendingView);
     clearPendingView();
-  }, [pendingView, clearPendingView]);
+  }, [pendingView, clearPendingView, engineInstance]);
 
   useEffect(() => {
-    if (backgroundColor === "#111111") engineRef.current?.setSkyVisible(true);
-    else engineRef.current?.setBackgroundColor(backgroundColor);
-  }, [backgroundColor]);
+    if (!engineInstance) return;
+    if (backgroundColor === "#111111") engineInstance.setSkyVisible(true);
+    else engineInstance.setBackgroundColor(backgroundColor);
+  }, [backgroundColor, engineInstance]);
 
   return (
-    <div className="w-screen h-screen relative bg-neutral-900 overflow-hidden">
-      <div
-        ref={containerRef}
-        className="absolute inset-0 z-0"
+    <EngineContext.Provider value={{ engine: engineInstance }}>
+      <div className="w-screen h-screen relative bg-neutral-900 overflow-hidden">
+        
+        {/* Contenedor del Motor 3D */}
+        <div
+          ref={containerRef}
+          className="absolute inset-0 z-0"
+          onContextMenu={(e) => e.preventDefault()}
+        />
 
-        onPointerDown={(e) =>
-          engineRef.current?.interactionManager.onPointerDown(e.nativeEvent)
-        }
-        onContextMenu={(e) => e.preventDefault()}
-      />
+        {/* UI LAYERS */}
+        <BudgetPanel />
+        <EnvironmentPanel />
+        <FloorProperties />
+        <FenceProperties />
 
-      <BudgetPanel />
-      <EnvironmentPanel />
-      <FloorProperties />
-      <FenceProperties />
+        {/* 🔥 FIX: Asegurar que el Catálogo esté por encima de todo */}
+        {mode === 'catalog' && (
+          <div className="absolute inset-0 z-40">
+            <Catalog />
+          </div>
+        )}
 
-      {mode === 'catalog' && <Catalog />}
+        <button
+          onClick={() => setQRVisible(true)}
+          className="absolute top-6 right-6 z-20 bg-neutral-800/90 hover:bg-neutral-700 text-white p-3 rounded-full border border-neutral-600 shadow-lg"
+        >
+          <QrCode size={20} />
+        </button>
 
-      <button
-        onClick={() => setQRVisible(true)}
-        className="absolute top-6 right-6 z-20 bg-neutral-800/90 hover:bg-neutral-700 text-white p-3 rounded-full border border-neutral-600 shadow-lg"
-      >
-        <QrCode size={20} />
-      </button>
+        {!isReadOnlyMode && (
+          <div className="absolute bottom-6 left-6 z-20">
+            <button className="bg-neutral-800/90 px-4 py-3 rounded-full border border-neutral-600 text-white flex gap-3 items-center">
+              <Euro size={18} />
+              <span className="text-lg">{totalPrice.toLocaleString()} €</span>
+            </button>
+          </div>
+        )}
 
-      {!isReadOnlyMode && (
-        <div className="absolute bottom-6 left-6 z-20">
-          <button className="bg-neutral-800/90 px-4 py-3 rounded-full border border-neutral-600 text-white flex gap-3 items-center">
-            <Euro size={18} />
-            <span className="text-lg">{totalPrice.toLocaleString()} €</span>
-          </button>
+        {selectedItemId && mode === "editing" && (
+          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex gap-2 glass-panel p-2 rounded-xl z-30">
+            <button onClick={() => engineInstance?.setGizmoMode("translate")}>
+              <Move size={16} />
+            </button>
+            <button onClick={() => engineInstance?.setGizmoMode("rotate")}>
+              <RotateCw size={16} />
+            </button>
+            <button onClick={() => engineInstance?.setGizmoMode("scale")}>
+              <Scaling size={16} />
+            </button>
+            <button onClick={duplicateSelection}>
+              <Copy size={16} />
+            </button>
+            <button onClick={removeSelection}>
+              <Trash2 size={16} />
+            </button>
+          </div>
+        )}
+
+        {mode === "measuring" && (
+          <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-black/80 px-6 py-3 text-white rounded-full border border-white/20 backdrop-blur-md font-mono">
+            {measuredDistance !== null
+              ? `Distancia: ${measuredDistance.toFixed(2)} m`
+              : "Selecciona punto A y B"}
+          </div>
+        )}
+
+        <Toolbar />
+        <QRModal isOpen={qrVisible} onClose={() => setQRVisible(false)} />
+        <InputModal />
+
+        <div className="absolute bottom-6 right-6 text-white/5 font-black text-4xl pointer-events-none select-none">
+          A42
         </div>
-      )}
-
-      {selectedItemId && mode === "editing" && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex gap-2 glass-panel p-2 rounded-xl">
-          <button onClick={() => engineRef.current?.setGizmoMode("translate")}>
-            <Move size={16} />
-          </button>
-          <button onClick={() => engineRef.current?.setGizmoMode("rotate")}>
-            <RotateCw size={16} />
-          </button>
-          <button onClick={() => engineRef.current?.setGizmoMode("scale")}>
-            <Scaling size={16} />
-          </button>
-
-          <button onClick={duplicateSelection}>
-            <Copy size={16} />
-          </button>
-
-          <button onClick={removeSelection}>
-            <Trash2 size={16} />
-          </button>
-        </div>
-      )}
-
-      {mode === "measuring" && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-black/80 px-6 py-3 text-white rounded-full border border-white/20 backdrop-blur-md font-mono">
-          {measuredDistance !== null
-            ? `Distancia: ${measuredDistance.toFixed(2)} m`
-            : "Selecciona punto A y B"}
-        </div>
-      )}
-
-      <Toolbar />
-      <QRModal isOpen={qrVisible} onClose={() => setQRVisible(false)} />
-
-      <InputModal />
-
-      <div className="absolute bottom-6 right-6 text-white/5 font-black text-4xl pointer-events-none select-none">
-        A42
       </div>
-    </div>
+    </EngineContext.Provider>
   );
 };

@@ -68,12 +68,8 @@ src/features/crm/pages/CrmDashboard.tsx
 src/features/crm/pages/ProfilePage.tsx
 src/features/editor/data/fence_presets.ts
 src/features/editor/Editor3D.tsx
-src/features/editor/engine/A42Engine_old_gpt_01.txt
-src/features/editor/engine/A42Engine_old_gpt.txt
 src/features/editor/engine/A42Engine.ts
 src/features/editor/engine/managers/ExportManager.ts
-src/features/editor/engine/managers/InteractionManager_old_gpt_01.txt
-src/features/editor/engine/managers/InteractionManager_old_gpt.txt
 src/features/editor/engine/managers/InteractionManager.ts
 src/features/editor/engine/managers/ObjectManager.ts
 src/features/editor/engine/managers/PDFManager.ts
@@ -3300,7 +3296,6 @@ export const FENCE_PRESETS: Record<string, FencePreset> = {
 </file>
 
 <file path="src/features/editor/Editor3D.tsx">
-// --- START OF FILE src/features/editor/Editor3D.tsx ---
 import React, { useEffect, useRef } from "react";
 import { A42Engine } from "./engine/A42Engine";
 
@@ -3311,8 +3306,10 @@ import { FloorProperties } from "./ui/FloorProperties";
 import { FenceProperties } from "./ui/FenceProperties";
 import { InputModal } from "./ui/InputModal";
 import { QRModal } from "./ui/QRModal";
+import { Catalog } from "./ui/Catalog";
 
 import { useEditorStore } from "@/stores/editor/useEditorStore";
+import { useSceneStore } from "@/stores/scene/useSceneStore"; // 🔥
 import { useSelectionStore } from "@/stores/selection/useSelectionStore";
 import { useProjectStore } from "@/stores/project/useProjectStore";
 
@@ -3331,18 +3328,21 @@ export const Editor3D = () => {
   const engineRef = useRef<A42Engine | null>(null);
 
   // --- STORES ---
+  
+  // UI State
   const {
     mode,
     gridVisible,
-    items,
     cameraType,
     pendingView,
     clearPendingView,
     sunPosition,
     backgroundColor,
     safetyZonesVisible,
-    totalPrice,
   } = useEditorStore();
+
+  // Data State
+  const { items, totalPrice } = useSceneStore(); // 🔥
 
   const {
     selectedItemId,
@@ -3382,6 +3382,15 @@ export const Editor3D = () => {
 
     return () => engine.dispose();
   }, []);
+
+  // --------------------------
+  // 🔥 SYNC SELECTION (REACT -> ENGINE)
+  // --------------------------
+  useEffect(() => {
+    if (engineRef.current) {
+      engineRef.current.interactionManager.selectItemByUUID(selectedItemId);
+    }
+  }, [selectedItemId]);
 
   // --------------------------
   // REACTIONS
@@ -3433,13 +3442,6 @@ export const Editor3D = () => {
         onPointerDown={(e) =>
           engineRef.current?.interactionManager.onPointerDown(e.nativeEvent)
         }
-        onPointerMove={(e) =>
-          engineRef.current?.interactionManager.onPointerMove(e.nativeEvent)
-        }
-        onPointerUp={(e) =>
-          engineRef.current?.interactionManager.onPointerUp(e.nativeEvent)
-        }
-
         onContextMenu={(e) => e.preventDefault()}
       />
 
@@ -3447,6 +3449,8 @@ export const Editor3D = () => {
       <EnvironmentPanel />
       <FloorProperties />
       <FenceProperties />
+
+      {mode === 'catalog' && <Catalog />}
 
       <button
         onClick={() => setQRVisible(true)}
@@ -3505,10 +3509,9 @@ export const Editor3D = () => {
     </div>
   );
 };
-// --- END OF FILE ---
 </file>
 
-<file path="src/features/editor/engine/A42Engine_old_gpt_01.txt">
+<file path="src/features/editor/engine/A42Engine.ts">
 // --- START OF FILE src/features/editor/engine/A42Engine.ts ---
 import * as THREE from "three";
 import { ARButton } from "three/examples/jsm/webxr/ARButton.js";
@@ -3525,6 +3528,7 @@ import { ExportManager } from "./managers/ExportManager";
 import { PDFManager } from "./managers/PDFManager";
 
 import { useEditorStore } from "@/stores/editor/useEditorStore";
+import { useSceneStore } from "@/stores/scene/useSceneStore"; // 🔥 NUEVO IMPORT
 import { useSelectionStore } from "@/stores/selection/useSelectionStore";
 
 export class A42Engine {
@@ -3566,9 +3570,6 @@ export class A42Engine {
     window.editorEngine = this;
   }
 
-  // -------------------------------------------------------
-  // GETTERS CÓMODOS
-  // -------------------------------------------------------
   public get scene() {
     return this.sceneManager.scene;
   }
@@ -3579,16 +3580,11 @@ export class A42Engine {
     return this.sceneManager.renderer;
   }
 
-  // -------------------------------------------------------
-  // INPUT RATÓN DESDE REACT
-  // -------------------------------------------------------
+  // 🔥 CORRECCIÓN 1: Usar onPointerDown (el nombre nuevo)
   public onMouseDown = (event: MouseEvent) => {
-    this.interactionManager.onMouseDown(event);
+    this.interactionManager.onPointerDown(event);
   };
 
-  // -------------------------------------------------------
-  // AJUSTES DE ESCENA
-  // -------------------------------------------------------
   public setBackgroundColor(color: string) {
     this.sceneManager.setBackgroundColor(color);
   }
@@ -3602,18 +3598,12 @@ export class A42Engine {
     this.sceneManager.updateSunPosition(azimuth, elevation);
   }
 
-  // Marco portada PDF
   public togglePDFFraming(visible: boolean) {
     this.sceneManager.setFrameVisible(visible);
   }
 
-  // -------------------------------------------------------
-  // CÁMARAS / VISTAS
-  // -------------------------------------------------------
   public switchCamera(type: CameraType) {
     this.sceneManager.switchCamera(type);
-
-    // actualizar cámara en control orbital y gizmo
     this.sceneManager.controls.object = this.sceneManager.activeCamera;
     this.interactionManager.updateCamera(this.sceneManager.activeCamera);
   }
@@ -3622,9 +3612,6 @@ export class A42Engine {
     this.sceneManager.setView(view);
   }
 
-  // -------------------------------------------------------
-  // TOOLS / GIZMO
-  // -------------------------------------------------------
   public clearTools() {
     this.toolsManager.clearTools();
     if (this.interactionManager.transformControl) {
@@ -3637,9 +3624,6 @@ export class A42Engine {
     this.interactionManager.setGizmoMode(mode);
   }
 
-  // -------------------------------------------------------
-  // SAFETY ZONES
-  // -------------------------------------------------------
   public updateSafetyZones(visible: boolean) {
     this.scene.traverse((obj) => {
       if (obj.userData?.isSafetyZone) {
@@ -3729,9 +3713,6 @@ export class A42Engine {
     return false;
   }
 
-  // -------------------------------------------------------
-  // AR INIT
-  // -------------------------------------------------------
   private async initAR() {
     if (!("xr" in navigator)) return;
     try {
@@ -3819,454 +3800,6 @@ export class A42Engine {
     document.body.appendChild(arContainer);
   }
 
-  // -------------------------------------------------------
-  // SYNC ESCENA <-> STORE
-  //  (MODELO 1: NO RECREAR SI NO HACE FALTA)
-  // -------------------------------------------------------
-  public async syncSceneFromStore(storeItems: SceneItem[]) {
-    // mapa de objetos de escena actuales
-    const sceneItemsMap = new Map<string, THREE.Object3D>();
-    this.scene.children.forEach((child) => {
-      if (child.userData?.isItem && child.uuid) {
-        sceneItemsMap.set(child.uuid, child);
-      }
-    });
-
-    for (const item of storeItems) {
-      const sceneObj = sceneItemsMap.get(item.uuid);
-
-      if (sceneObj) {
-        // ---------- FLOOR ----------
-        if (item.type === "floor") {
-          const hasChanged =
-            JSON.stringify(sceneObj.userData.points) !==
-              JSON.stringify(item.points) ||
-            sceneObj.userData.floorMaterial !== item.floorMaterial ||
-            sceneObj.userData.textureUrl !== item.textureUrl ||
-            sceneObj.userData.textureScale !== item.textureScale ||
-            sceneObj.userData.textureRotation !== item.textureRotation;
-
-          if (hasChanged) {
-            this.scene.remove(sceneObj);
-            this.objectManager.recreateFloor(item);
-            sceneItemsMap.delete(item.uuid);
-            continue;
-          }
-        }
-
-        // ---------- FENCE ----------
-        if (item.type === "fence") {
-          const hasConfigChanged =
-            JSON.stringify(sceneObj.userData.fenceConfig) !==
-            JSON.stringify(item.fenceConfig);
-          const hasPointsChanged =
-            JSON.stringify(sceneObj.userData.points) !==
-            JSON.stringify(item.points);
-
-          if (hasConfigChanged || hasPointsChanged) {
-            this.scene.remove(sceneObj);
-            this.objectManager.recreateFence(item);
-            sceneItemsMap.delete(item.uuid);
-            continue;
-          }
-        }
-
-        // ---------- MODEL / TRANSFORM ----------
-        sceneObj.position.fromArray(item.position);
-        sceneObj.rotation.fromArray(item.rotation);
-        sceneObj.scale.fromArray(item.scale);
-        sceneItemsMap.delete(item.uuid);
-      } else {
-        // No existe en escena → crearlo
-        if (item.type === "model" && item.modelUrl) {
-          await this.objectManager.recreateModel(item);
-        } else if (item.type === "floor" && item.points) {
-          this.objectManager.recreateFloor(item);
-        } else if (item.type === "fence" && item.points) {
-          this.objectManager.recreateFence(item);
-        }
-      }
-    }
-
-    // Eliminar objetos que sobran
-    for (const [uuid, obj] of sceneItemsMap) {
-      this.scene.remove(obj);
-
-      if (this.interactionManager.transformControl?.object?.uuid === uuid) {
-        this.interactionManager.transformControl.detach();
-        this.interactionManager.transformControl.visible = false;
-      }
-      if (this.toolsManager.activeFloorId === uuid) {
-        this.toolsManager.activeFloorId = null;
-        this.toolsManager.clearFloorEditMarkers();
-      }
-    }
-  }
-
-  // -------------------------------------------------------
-  // INPUT / TECLAS
-  // -------------------------------------------------------
-  private onKeyDown = (e: KeyboardEvent) => {
-    if (this.walkManager.isEnabled) return;
-
-    const editor = useEditorStore.getState();
-    const selection = useSelectionStore.getState();
-
-    if (editor.mode !== "editing") return;
-
-    // CTRL+Z -> undo
-    if (e.key === "z" && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault();
-      editor.undo();
-      return;
-    }
-
-    const tc = this.interactionManager.transformControl;
-    if (!tc?.visible) return;
-
-    if (e.key === "t") tc.setMode("translate");
-    else if (e.key === "r") tc.setMode("rotate");
-    else if (e.key === "e") tc.setMode("scale");
-    else if (e.key === "Delete" || e.key === "Backspace") {
-      const obj = tc.object;
-      if (obj && !obj.userData.isFloorMarker) {
-        tc.detach();
-        tc.visible = false;
-        this.scene.remove(obj);
-        this.sceneManager.controls.enabled = true;
-
-        editor.removeItem(obj.uuid);
-        selection.selectItem(null);
-        this.toolsManager.activeFloorId = null;
-        this.toolsManager.clearFloorEditMarkers();
-      }
-    }
-  };
-
-  private onWindowResize = () => {
-    this.sceneManager.onWindowResize();
-  };
-
-  // -------------------------------------------------------
-  // CICLO VIDA
-  // -------------------------------------------------------
-  public init() {
-    this.initAR();
-    this.renderer.setAnimationLoop(this.render);
-  }
-
-  private render = () => {
-    const delta = this.clock.getDelta();
-    this.walkManager.update(delta);
-    this.recorderManager.update(delta);
-
-    this.checkSafetyCollisions();
-
-    if (!this.walkManager.isEnabled) {
-      this.sceneManager.controls.update();
-    }
-    this.sceneManager.renderer.render(this.scene, this.activeCamera);
-  };
-
-  public dispose() {
-    this.renderer.setAnimationLoop(null);
-    window.removeEventListener("keydown", this.onKeyDown);
-    window.removeEventListener("resize", this.onWindowResize);
-    this.sceneManager.dispose();
-  }
-}
-// --- END OF FILE src/features/editor/engine/A42Engine.ts ---
-</file>
-
-<file path="src/features/editor/engine/A42Engine_old_gpt.txt">
-// --- START OF FILE src/features/editor/engine/A42Engine.ts ---
-import * as THREE from "three";
-import { ARButton } from "three/examples/jsm/webxr/ARButton.js";
-
-import type { SceneItem, CameraView } from "@/types/editor";
-
-import { SceneManager } from "./managers/SceneManager";
-import { ObjectManager } from "./managers/ObjectManager";
-import { ToolsManager } from "./managers/ToolsManager";
-import { InteractionManager } from "./managers/InteractionManager";
-import { WalkManager } from "./managers/WalkManager";
-import { RecorderManager } from "./managers/RecorderManager";
-import { ExportManager } from "./managers/ExportManager";
-import { PDFManager } from "./managers/PDFManager";
-
-import { useEditorStore } from "@/stores/editor/useEditorStore";
-import { useSelectionStore } from "@/stores/selection/useSelectionStore";
-
-export class A42Engine {
-  public sceneManager: SceneManager;
-  public objectManager: ObjectManager;
-  public toolsManager: ToolsManager;
-  public interactionManager: InteractionManager;
-  public walkManager: WalkManager;
-  public recorderManager: RecorderManager;
-  public exportManager: ExportManager;
-  public pdfManager: PDFManager;
-
-  private clock: THREE.Clock;
-  private savedBackground: THREE.Color | THREE.Texture | null = null;
-  private wasSkyVisible: boolean = true;
-  private transparentElements: HTMLElement[] = [];
-
-  constructor(container: HTMLElement) {
-    this.clock = new THREE.Clock();
-
-    this.sceneManager = new SceneManager(container);
-    this.sceneManager.renderer.xr.enabled = true;
-
-    this.objectManager = new ObjectManager(this.sceneManager.scene);
-    this.toolsManager = new ToolsManager(this.sceneManager.scene);
-    this.interactionManager = new InteractionManager(this);
-    this.walkManager = new WalkManager(this);
-    this.recorderManager = new RecorderManager(this);
-    this.exportManager = new ExportManager(this);
-    this.pdfManager = new PDFManager(this);
-
-    window.addEventListener("resize", this.onWindowResize);
-    window.addEventListener("keydown", this.onKeyDown);
-
-    // @ts-ignore
-    window.editorEngine = this;
-  }
-
-  public get scene() {
-    return this.sceneManager.scene;
-  }
-  public get activeCamera() {
-    return this.sceneManager.activeCamera;
-  }
-  public get renderer() {
-    return this.sceneManager.renderer;
-  }
-
-  public onMouseDown = (event: MouseEvent) => {
-    this.interactionManager.onMouseDown(event);
-  };
-
-  public setBackgroundColor(color: string) {
-    this.sceneManager.setBackgroundColor(color);
-  }
-  public setSkyVisible(visible: boolean) {
-    this.sceneManager.setSkyVisible(visible);
-  }
-  public setGridVisible(v: boolean) {
-    this.sceneManager.setGridVisible(v);
-  }
-  public updateSunPosition(azimuth: number, elevation: number) {
-    this.sceneManager.updateSunPosition(azimuth, elevation);
-  }
-
-  // Marco portada PDF
-  public togglePDFFraming(visible: boolean) {
-    this.sceneManager.setFrameVisible(visible);
-  }
-
-  public switchCamera(type: "perspective" | "orthographic") {
-    this.sceneManager.switchCamera(type);
-    this.interactionManager.updateCamera(this.sceneManager.activeCamera);
-  }
-
-  public setView(view: CameraView) {
-    this.sceneManager.setView(view);
-  }
-
-  public clearTools() {
-    this.toolsManager.clearTools();
-    if (this.interactionManager.transformControl) {
-      this.interactionManager.transformControl.detach();
-    }
-  }
-
-  public setGizmoMode(mode: "translate" | "rotate" | "scale") {
-    this.interactionManager.setGizmoMode(mode);
-  }
-
-  public updateSafetyZones(visible: boolean) {
-    this.scene.traverse((obj) => {
-      if (obj.userData?.isSafetyZone) {
-        obj.visible = visible;
-      }
-    });
-  }
-
-  // ---------------- SAFETY COLLISIONS ----------------
-
-  public checkSafetyCollisions() {
-    const { safetyZonesVisible } = useEditorStore.getState();
-    if (!safetyZonesVisible) return;
-
-    const zones: THREE.Mesh[] = [];
-    const boxes: THREE.Box3[] = [];
-
-    this.scene.traverse((obj) => {
-      if (obj.userData?.isSafetyZone && obj.visible) {
-        zones.push(obj as THREE.Mesh);
-        boxes.push(new THREE.Box3().setFromObject(obj));
-
-        (obj as THREE.Mesh).material = new THREE.MeshBasicMaterial({
-          color: 0xff0000,
-          transparent: true,
-          opacity: 0.3,
-          depthWrite: false,
-          side: THREE.DoubleSide,
-        });
-      }
-    });
-
-    for (let i = 0; i < zones.length; i++) {
-      for (let j = i + 1; j < zones.length; j++) {
-        if (boxes[i].intersectsBox(boxes[j])) {
-          const alertMat = new THREE.MeshBasicMaterial({
-            color: 0xff0000,
-            transparent: true,
-            opacity: 0.8,
-            depthWrite: false,
-            side: THREE.DoubleSide,
-          });
-          zones[i].material = alertMat;
-          zones[j].material = alertMat;
-        }
-      }
-    }
-  }
-
-  public isObjectColliding(target: THREE.Object3D): boolean {
-    const { safetyZonesVisible } = useEditorStore.getState();
-    if (!safetyZonesVisible) return false;
-
-    const targetZones: THREE.Box3[] = [];
-    target.traverse((child) => {
-      if (child.userData?.isSafetyZone) {
-        targetZones.push(new THREE.Box3().setFromObject(child));
-      }
-    });
-
-    if (targetZones.length === 0) return false;
-
-    const otherZones: THREE.Box3[] = [];
-    this.scene.traverse((obj) => {
-      if (obj.userData?.isSafetyZone && obj.visible) {
-        let isChildOfTarget = false;
-        let parent = obj.parent;
-        while (parent) {
-          if (parent === target) {
-            isChildOfTarget = true;
-            break;
-          }
-          parent = parent.parent;
-        }
-        if (!isChildOfTarget) {
-          otherZones.push(new THREE.Box3().setFromObject(obj));
-        }
-      }
-    });
-
-    for (const tBox of targetZones) {
-      for (const oBox of otherZones) {
-        if (tBox.intersectsBox(oBox)) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
-
-  // ---------------- AR INIT ----------------
-
-  private async initAR() {
-    if (!("xr" in navigator)) return;
-    try {
-      // @ts-ignore
-      const isSupported = await navigator.xr.isSessionSupported("immersive-ar");
-      if (!isSupported) return;
-    } catch (e) {
-      return;
-    }
-
-    const arBtn = ARButton.createButton(this.renderer, {
-      requiredFeatures: ["hit-test"],
-      optionalFeatures: ["dom-overlay"],
-      domOverlay: { root: document.body },
-    });
-
-    this.renderer.xr.addEventListener("sessionstart", () => {
-      this.savedBackground = this.scene.background;
-      this.wasSkyVisible = this.sceneManager.sky
-        ? this.sceneManager.sky.visible
-        : false;
-
-      this.scene.background = null;
-      this.setSkyVisible(false);
-      this.setGridVisible(false);
-      this.renderer.setClearColor(0x000000, 0);
-
-      this.transparentElements = [];
-      let el: HTMLElement | null = this.renderer.domElement;
-      while (el && el !== document.documentElement) {
-        this.transparentElements.push(el);
-        el.style.setProperty("background", "transparent", "important");
-        el.style.setProperty("background-color", "transparent", "important");
-        el = el.parentElement;
-      }
-      document.body.style.setProperty("background", "transparent", "important");
-      document.documentElement.style.setProperty(
-        "background",
-        "transparent",
-        "important"
-      );
-    });
-
-    this.renderer.xr.addEventListener("sessionend", () => {
-      const { gridVisible } = useEditorStore.getState();
-
-      if (this.savedBackground) this.scene.background = this.savedBackground;
-      if (this.wasSkyVisible) this.setSkyVisible(true);
-      this.setGridVisible(gridVisible);
-
-      this.transparentElements.forEach((el) => {
-        el.style.removeProperty("background");
-        el.style.removeProperty("background-color");
-      });
-      document.body.style.removeProperty("background");
-      document.documentElement.style.removeProperty("background");
-    });
-
-    const arContainer = document.createElement("div");
-    arContainer.style.position = "absolute";
-    arContainer.style.bottom = "20px";
-    arContainer.style.right = "20px";
-    arContainer.style.zIndex = "1000";
-    arContainer.style.display = "flex";
-    arContainer.style.justifyContent = "flex-end";
-    arContainer.style.pointerEvents = "none";
-
-    arBtn.style.position = "static";
-    arBtn.style.transform = "none";
-    arBtn.style.left = "auto";
-    arBtn.style.bottom = "auto";
-    arBtn.style.width = "160px";
-    arBtn.style.background = "rgba(0,0,0,0.85)";
-    arBtn.style.border = "1px solid rgba(255,255,255,0.3)";
-    arBtn.style.borderRadius = "30px";
-    arBtn.style.color = "#fff";
-    arBtn.style.fontFamily = "sans-serif";
-    arBtn.style.fontSize = "12px";
-    arBtn.style.fontWeight = "bold";
-    arBtn.style.padding = "10px 0";
-    arBtn.style.cursor = "pointer";
-    arBtn.style.pointerEvents = "auto";
-
-    arContainer.appendChild(arBtn);
-    document.body.appendChild(arContainer);
-  }
-
-  // ---------------- SYNC ESCENA <-> STORE ----------------
-
   public async syncSceneFromStore(storeItems: SceneItem[]) {
     const sceneItemsMap = new Map<string, THREE.Object3D>();
     this.scene.children.forEach((child) => {
@@ -4277,6 +3810,7 @@ export class A42Engine {
 
     for (const item of storeItems) {
       const sceneObj = sceneItemsMap.get(item.uuid);
+
       if (sceneObj) {
         // FLOOR
         if (item.type === "floor") {
@@ -4319,6 +3853,7 @@ export class A42Engine {
         sceneObj.scale.fromArray(item.scale);
         sceneItemsMap.delete(item.uuid);
       } else {
+        // CREATE NEW
         if (item.type === "model" && item.modelUrl) {
           await this.objectManager.recreateModel(item);
         } else if (item.type === "floor" && item.points) {
@@ -4329,473 +3864,6 @@ export class A42Engine {
       }
     }
 
-    // Eliminar objetos que sobran
-    for (const [uuid, obj] of sceneItemsMap) {
-      this.scene.remove(obj);
-      if (this.interactionManager.transformControl?.object?.uuid === uuid) {
-        this.interactionManager.transformControl.detach();
-      }
-      if (this.toolsManager.activeFloorId === uuid) {
-        this.toolsManager.activeFloorId = null;
-        this.toolsManager.clearFloorEditMarkers();
-      }
-    }
-  }
-
-  // ---------------- INPUT / TECLAS ----------------
-
-  private onKeyDown = (e: KeyboardEvent) => {
-    if (this.walkManager.isEnabled) return;
-
-    const editor = useEditorStore.getState();
-    const selection = useSelectionStore.getState();
-
-    if (editor.mode !== "editing") return;
-
-    // CTRL+Z -> undo
-    if (e.key === "z" && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault();
-      editor.undo();
-      return;
-    }
-
-    const tc = this.interactionManager.transformControl;
-    if (!tc?.visible) return;
-
-    if (e.key === "t") tc.setMode("translate");
-    else if (e.key === "r") tc.setMode("rotate");
-    else if (e.key === "e") tc.setMode("scale");
-    else if (e.key === "Delete" || e.key === "Backspace") {
-      const obj = tc.object;
-      if (obj && !obj.userData.isFloorMarker) {
-        tc.detach();
-        tc.visible = false;
-        this.scene.remove(obj);
-        this.sceneManager.controls.enabled = true;
-
-        editor.removeItem(obj.uuid);
-        selection.selectItem(null);
-        this.toolsManager.activeFloorId = null;
-        this.toolsManager.clearFloorEditMarkers();
-      }
-    }
-  };
-
-  private onWindowResize = () => {
-    this.sceneManager.onWindowResize();
-  };
-
-  // ---------------- CICLO VIDA ----------------
-
-  public init() {
-    this.initAR();
-    this.renderer.setAnimationLoop(this.render);
-  }
-
-  private render = () => {
-    const delta = this.clock.getDelta();
-    this.walkManager.update(delta);
-    this.recorderManager.update(delta);
-
-    this.checkSafetyCollisions();
-
-    if (!this.walkManager.isEnabled) {
-      this.sceneManager.controls.update();
-    }
-    this.sceneManager.renderer.render(this.scene, this.activeCamera);
-  };
-
-  public dispose() {
-    this.renderer.setAnimationLoop(null);
-    window.removeEventListener("keydown", this.onKeyDown);
-    window.removeEventListener("resize", this.onWindowResize);
-    this.sceneManager.dispose();
-  }
-}
-// --- END OF FILE src/features/editor/engine/A42Engine.ts ---
-</file>
-
-<file path="src/features/editor/engine/A42Engine.ts">
-// --- START OF FILE src/features/editor/engine/A42Engine.ts ---
-import * as THREE from "three";
-import { ARButton } from "three/examples/jsm/webxr/ARButton.js";
-
-import type { SceneItem, CameraView, CameraType } from "@/types/editor";
-
-import { SceneManager } from "./managers/SceneManager";
-import { ObjectManager } from "./managers/ObjectManager";
-import { ToolsManager } from "./managers/ToolsManager";
-import { InteractionManager } from "./managers/InteractionManager";
-import { WalkManager } from "./managers/WalkManager";
-import { RecorderManager } from "./managers/RecorderManager";
-import { ExportManager } from "./managers/ExportManager";
-import { PDFManager } from "./managers/PDFManager";
-
-import { useEditorStore } from "@/stores/editor/useEditorStore";
-import { useSelectionStore } from "@/stores/selection/useSelectionStore";
-
-export class A42Engine {
-  public sceneManager: SceneManager;
-  public objectManager: ObjectManager;
-  public toolsManager: ToolsManager;
-  public interactionManager: InteractionManager;
-  public walkManager: WalkManager;
-  public recorderManager: RecorderManager;
-  public exportManager: ExportManager;
-  public pdfManager: PDFManager;
-
-  private clock: THREE.Clock;
-  private savedBackground: THREE.Color | THREE.Texture | null = null;
-  private wasSkyVisible = true;
-  private transparentElements: HTMLElement[] = [];
-
-  constructor(container: HTMLElement) {
-    this.clock = new THREE.Clock();
-
-    // --- CORE MANAGERS ---
-    this.sceneManager = new SceneManager(container);
-    this.sceneManager.renderer.xr.enabled = true;
-
-    this.objectManager = new ObjectManager(this.sceneManager.scene);
-    this.toolsManager = new ToolsManager(this.sceneManager.scene);
-    this.interactionManager = new InteractionManager(this);
-    this.walkManager = new WalkManager(this);
-    this.recorderManager = new RecorderManager(this);
-    this.exportManager = new ExportManager(this);
-    this.pdfManager = new PDFManager(this);
-
-    // --- GLOBAL EVENTS ---
-    window.addEventListener("resize", this.onWindowResize);
-    window.addEventListener("keydown", this.onKeyDown);
-
-    // Exponer para debug
-    // @ts-ignore
-    window.editorEngine = this;
-  }
-
-  // -------------------------------------------------------
-  // GETTERS CÓMODOS
-  // -------------------------------------------------------
-  public get scene() {
-    return this.sceneManager.scene;
-  }
-  public get activeCamera() {
-    return this.sceneManager.activeCamera;
-  }
-  public get renderer() {
-    return this.sceneManager.renderer;
-  }
-
-  // -------------------------------------------------------
-  // INPUT RATÓN DESDE REACT
-  // -------------------------------------------------------
-  public onMouseDown = (event: MouseEvent) => {
-    this.interactionManager.onMouseDown(event);
-  };
-
-  // -------------------------------------------------------
-  // AJUSTES DE ESCENA
-  // -------------------------------------------------------
-  public setBackgroundColor(color: string) {
-    this.sceneManager.setBackgroundColor(color);
-  }
-  public setSkyVisible(visible: boolean) {
-    this.sceneManager.setSkyVisible(visible);
-  }
-  public setGridVisible(v: boolean) {
-    this.sceneManager.setGridVisible(v);
-  }
-  public updateSunPosition(azimuth: number, elevation: number) {
-    this.sceneManager.updateSunPosition(azimuth, elevation);
-  }
-
-  // Marco portada PDF
-  public togglePDFFraming(visible: boolean) {
-    this.sceneManager.setFrameVisible(visible);
-  }
-
-  // -------------------------------------------------------
-  // CÁMARAS / VISTAS
-  // -------------------------------------------------------
-  public switchCamera(type: CameraType) {
-    this.sceneManager.switchCamera(type);
-
-    // actualizar cámara en control orbital y gizmo
-    this.sceneManager.controls.object = this.sceneManager.activeCamera;
-    this.interactionManager.updateCamera(this.sceneManager.activeCamera);
-  }
-
-  public setView(view: CameraView) {
-    this.sceneManager.setView(view);
-  }
-
-  // -------------------------------------------------------
-  // TOOLS / GIZMO
-  // -------------------------------------------------------
-  public clearTools() {
-    this.toolsManager.clearTools();
-    if (this.interactionManager.transformControl) {
-      this.interactionManager.transformControl.detach();
-      this.interactionManager.transformControl.visible = false;
-    }
-  }
-
-  public setGizmoMode(mode: "translate" | "rotate" | "scale") {
-    this.interactionManager.setGizmoMode(mode);
-  }
-
-  // -------------------------------------------------------
-  // SAFETY ZONES
-  // -------------------------------------------------------
-  public updateSafetyZones(visible: boolean) {
-    this.scene.traverse((obj) => {
-      if (obj.userData?.isSafetyZone) {
-        obj.visible = visible;
-      }
-    });
-  }
-
-  public checkSafetyCollisions() {
-    const { safetyZonesVisible } = useEditorStore.getState();
-    if (!safetyZonesVisible) return;
-
-    const zones: THREE.Mesh[] = [];
-    const boxes: THREE.Box3[] = [];
-
-    this.scene.traverse((obj) => {
-      if (obj.userData?.isSafetyZone && obj.visible) {
-        zones.push(obj as THREE.Mesh);
-        boxes.push(new THREE.Box3().setFromObject(obj));
-
-        (obj as THREE.Mesh).material = new THREE.MeshBasicMaterial({
-          color: 0xff0000,
-          transparent: true,
-          opacity: 0.3,
-          depthWrite: false,
-          side: THREE.DoubleSide,
-        });
-      }
-    });
-
-    for (let i = 0; i < zones.length; i++) {
-      for (let j = i + 1; j < zones.length; j++) {
-        if (boxes[i].intersectsBox(boxes[j])) {
-          const alertMat = new THREE.MeshBasicMaterial({
-            color: 0xff0000,
-            transparent: true,
-            opacity: 0.8,
-            depthWrite: false,
-            side: THREE.DoubleSide,
-          });
-          zones[i].material = alertMat;
-          zones[j].material = alertMat;
-        }
-      }
-    }
-  }
-
-  public isObjectColliding(target: THREE.Object3D): boolean {
-    const { safetyZonesVisible } = useEditorStore.getState();
-    if (!safetyZonesVisible) return false;
-
-    const targetZones: THREE.Box3[] = [];
-    target.traverse((child) => {
-      if (child.userData?.isSafetyZone) {
-        targetZones.push(new THREE.Box3().setFromObject(child));
-      }
-    });
-
-    if (targetZones.length === 0) return false;
-
-    const otherZones: THREE.Box3[] = [];
-    this.scene.traverse((obj) => {
-      if (obj.userData?.isSafetyZone && obj.visible) {
-        let isChildOfTarget = false;
-        let parent = obj.parent;
-        while (parent) {
-          if (parent === target) {
-            isChildOfTarget = true;
-            break;
-          }
-          parent = parent.parent;
-        }
-        if (!isChildOfTarget) {
-          otherZones.push(new THREE.Box3().setFromObject(obj));
-        }
-      }
-    });
-
-    for (const tBox of targetZones) {
-      for (const oBox of otherZones) {
-        if (tBox.intersectsBox(oBox)) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
-
-  // -------------------------------------------------------
-  // AR INIT
-  // -------------------------------------------------------
-  private async initAR() {
-    if (!("xr" in navigator)) return;
-    try {
-      // @ts-ignore
-      const isSupported = await navigator.xr.isSessionSupported("immersive-ar");
-      if (!isSupported) return;
-    } catch {
-      return;
-    }
-
-    const arBtn = ARButton.createButton(this.renderer, {
-      requiredFeatures: ["hit-test"],
-      optionalFeatures: ["dom-overlay"],
-      domOverlay: { root: document.body },
-    });
-
-    this.renderer.xr.addEventListener("sessionstart", () => {
-      this.savedBackground = this.scene.background;
-      this.wasSkyVisible = this.sceneManager.sky
-        ? this.sceneManager.sky.visible
-        : false;
-
-      this.scene.background = null;
-      this.setSkyVisible(false);
-      this.setGridVisible(false);
-      this.renderer.setClearColor(0x000000, 0);
-
-      this.transparentElements = [];
-      let el: HTMLElement | null = this.renderer.domElement;
-      while (el && el !== document.documentElement) {
-        this.transparentElements.push(el);
-        el.style.setProperty("background", "transparent", "important");
-        el.style.setProperty("background-color", "transparent", "important");
-        el = el.parentElement;
-      }
-      document.body.style.setProperty("background", "transparent", "important");
-      document.documentElement.style.setProperty(
-        "background",
-        "transparent",
-        "important"
-      );
-    });
-
-    this.renderer.xr.addEventListener("sessionend", () => {
-      const { gridVisible } = useEditorStore.getState();
-
-      if (this.savedBackground) this.scene.background = this.savedBackground;
-      if (this.wasSkyVisible) this.setSkyVisible(true);
-      this.setGridVisible(gridVisible);
-
-      this.transparentElements.forEach((el) => {
-        el.style.removeProperty("background");
-        el.style.removeProperty("background-color");
-      });
-      document.body.style.removeProperty("background");
-      document.documentElement.style.removeProperty("background");
-    });
-
-    const arContainer = document.createElement("div");
-    arContainer.style.position = "absolute";
-    arContainer.style.bottom = "20px";
-    arContainer.style.right = "20px";
-    arContainer.style.zIndex = "1000";
-    arContainer.style.display = "flex";
-    arContainer.style.justifyContent = "flex-end";
-    arContainer.style.pointerEvents = "none";
-
-    arBtn.style.position = "static";
-    arBtn.style.transform = "none";
-    arBtn.style.left = "auto";
-    arBtn.style.bottom = "auto";
-    arBtn.style.width = "160px";
-    arBtn.style.background = "rgba(0,0,0,0.85)";
-    arBtn.style.border = "1px solid rgba(255,255,255,0.3)";
-    arBtn.style.borderRadius = "30px";
-    arBtn.style.color = "#fff";
-    arBtn.style.fontFamily = "sans-serif";
-    arBtn.style.fontSize = "12px";
-    arBtn.style.fontWeight = "bold";
-    arBtn.style.padding = "10px 0";
-    arBtn.style.cursor = "pointer";
-    arBtn.style.pointerEvents = "auto";
-
-    arContainer.appendChild(arBtn);
-    document.body.appendChild(arContainer);
-  }
-
-  // -------------------------------------------------------
-  // SYNC ESCENA <-> STORE
-  //  (MODELO 1: NO RECREAR SI NO HACE FALTA)
-  // -------------------------------------------------------
-  public async syncSceneFromStore(storeItems: SceneItem[]) {
-    // mapa de objetos de escena actuales
-    const sceneItemsMap = new Map<string, THREE.Object3D>();
-    this.scene.children.forEach((child) => {
-      if (child.userData?.isItem && child.uuid) {
-        sceneItemsMap.set(child.uuid, child);
-      }
-    });
-
-    for (const item of storeItems) {
-      const sceneObj = sceneItemsMap.get(item.uuid);
-
-      if (sceneObj) {
-        // ---------- FLOOR ----------
-        if (item.type === "floor") {
-          const hasChanged =
-            JSON.stringify(sceneObj.userData.points) !==
-              JSON.stringify(item.points) ||
-            sceneObj.userData.floorMaterial !== item.floorMaterial ||
-            sceneObj.userData.textureUrl !== item.textureUrl ||
-            sceneObj.userData.textureScale !== item.textureScale ||
-            sceneObj.userData.textureRotation !== item.textureRotation;
-
-          if (hasChanged) {
-            this.scene.remove(sceneObj);
-            this.objectManager.recreateFloor(item);
-            sceneItemsMap.delete(item.uuid);
-            continue;
-          }
-        }
-
-        // ---------- FENCE ----------
-        if (item.type === "fence") {
-          const hasConfigChanged =
-            JSON.stringify(sceneObj.userData.fenceConfig) !==
-            JSON.stringify(item.fenceConfig);
-          const hasPointsChanged =
-            JSON.stringify(sceneObj.userData.points) !==
-            JSON.stringify(item.points);
-
-          if (hasConfigChanged || hasPointsChanged) {
-            this.scene.remove(sceneObj);
-            this.objectManager.recreateFence(item);
-            sceneItemsMap.delete(item.uuid);
-            continue;
-          }
-        }
-
-        // ---------- MODEL / TRANSFORM ----------
-        sceneObj.position.fromArray(item.position);
-        sceneObj.rotation.fromArray(item.rotation);
-        sceneObj.scale.fromArray(item.scale);
-        sceneItemsMap.delete(item.uuid);
-      } else {
-        // No existe en escena → crearlo
-        if (item.type === "model" && item.modelUrl) {
-          await this.objectManager.recreateModel(item);
-        } else if (item.type === "floor" && item.points) {
-          this.objectManager.recreateFloor(item);
-        } else if (item.type === "fence" && item.points) {
-          this.objectManager.recreateFence(item);
-        }
-      }
-    }
-
-    // Eliminar objetos que sobran
     for (const [uuid, obj] of sceneItemsMap) {
       this.scene.remove(obj);
 
@@ -4808,24 +3876,20 @@ export class A42Engine {
         this.toolsManager.clearFloorEditMarkers();
       }
     }
-
   }
 
-  // -------------------------------------------------------
-  // INPUT / TECLAS
-  // -------------------------------------------------------
   private onKeyDown = (e: KeyboardEvent) => {
     if (this.walkManager.isEnabled) return;
 
     const editor = useEditorStore.getState();
     const selection = useSelectionStore.getState();
+    const scene = useSceneStore.getState(); // 🔥 USAR STORE DE DATOS
 
     if (editor.mode !== "editing") return;
 
-    // CTRL+Z -> undo
     if (e.key === "z" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
-      editor.undo();
+      scene.undo(); // 🔥 Corregido: scene.undo()
       return;
     }
 
@@ -4843,7 +3907,7 @@ export class A42Engine {
         this.scene.remove(obj);
         this.sceneManager.controls.enabled = true;
 
-        editor.removeItem(obj.uuid);
+        scene.removeItem(obj.uuid); // 🔥 Corregido: scene.removeItem()
         selection.selectItem(null);
         this.toolsManager.activeFloorId = null;
         this.toolsManager.clearFloorEditMarkers();
@@ -4855,9 +3919,6 @@ export class A42Engine {
     this.sceneManager.onWindowResize();
   };
 
-  // -------------------------------------------------------
-  // CICLO VIDA
-  // -------------------------------------------------------
   public init() {
     this.initAR();
     this.renderer.setAnimationLoop(this.render);
@@ -4883,7 +3944,7 @@ export class A42Engine {
     this.sceneManager.dispose();
   }
 }
-// --- END OF FILE src/features/editor/engine/A42Engine.ts ---
+// --- END OF FILE ---
 </file>
 
 <file path="src/features/editor/engine/managers/ExportManager.ts">
@@ -5080,780 +4141,6 @@ export class ExportManager {
 // --- END OF FILE ---
 </file>
 
-<file path="src/features/editor/engine/managers/InteractionManager_old_gpt_01.txt">
-// --- START OF FILE src/features/editor/engine/managers/InteractionManager.ts ---
-import * as THREE from "three";
-import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
-
-import type { A42Engine } from "../A42Engine";
-
-import { useEditorStore } from "@/stores/editor/useEditorStore";
-import { useSelectionStore } from "@/stores/selection/useSelectionStore";
-import { useCatalogStore } from "@/stores/catalog/useCatalogStore";
-
-export class InteractionManager {
-  private engine: A42Engine;
-  public transformControl: TransformControls | null = null;
-
-  private raycaster: THREE.Raycaster;
-  private pointer: THREE.Vector2;
-  public interactionPlane: THREE.Mesh;
-
-  public isDraggingGizmo = false;
-  private dragStartPosition = new THREE.Vector3();
-
-  constructor(engine: A42Engine) {
-    this.engine = engine;
-    this.raycaster = new THREE.Raycaster();
-    this.pointer = new THREE.Vector2();
-
-    // Plano "suelo" para colocar/dibujar cosas
-    this.interactionPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(5000, 5000),
-      new THREE.MeshBasicMaterial({ visible: false })
-    );
-    this.interactionPlane.rotation.x = -Math.PI / 2;
-    this.interactionPlane.userData.isInteractionPlane = true;
-    this.engine.scene.add(this.interactionPlane);
-
-    this.initTransformControls();
-  }
-
-  // --------------------------------------------------
-  // INIT TRANSFORM CONTROLS (GIZMO)
-  // --------------------------------------------------
-  private initTransformControls() {
-    try {
-      this.transformControl = new TransformControls(
-        this.engine.activeCamera as THREE.Camera,
-        this.engine.renderer.domElement
-      );
-
-      this.transformControl.rotationSnap = Math.PI / 12;
-
-      // NO capas raras → mismo layer que todo lo demás
-      this.engine.scene.add(this.transformControl);
-
-      // --- Evento cuando empieza/termina drag ---
-      this.transformControl.addEventListener(
-        "dragging-changed",
-        (event: any) => {
-          const editor = useEditorStore.getState();
-
-          this.isDraggingGizmo = event.value;
-          this.engine.sceneManager.controls.enabled = !event.value;
-
-          const obj = this.transformControl?.object;
-          if (!obj) return;
-
-          if (event.value) {
-            // Empezar drag → snapshot para UNDO
-            this.dragStartPosition.copy(obj.position);
-            editor.saveSnapshot();
-          } else {
-            // Terminar drag
-            if (this.engine.isObjectColliding(obj)) {
-              // Rebote si choca zona de seguridad
-              this.animateRevert(obj, this.dragStartPosition);
-            } else {
-              if (obj.userData.isFloorMarker) {
-                this.engine.toolsManager.updateFloorFromMarkers(obj);
-              } else if (obj.userData.isItem) {
-                this.engine.objectManager.adjustObjectToGround(obj);
-                this.syncTransformToStore(obj);
-              }
-            }
-          }
-        }
-      );
-
-      // Ajustar al suelo mientras se mueve
-      this.transformControl.addEventListener("objectChange", () => {
-        const obj = this.transformControl?.object;
-        if (obj && obj.userData.isItem && !this.isDraggingGizmo) {
-          this.engine.objectManager.adjustObjectToGround(obj);
-        }
-      });
-
-      this.transformControl.detach();
-      this.transformControl.visible = false;
-    } catch (e) {
-      console.error("ERROR: TransformControls", e);
-      this.transformControl = null;
-    }
-  }
-
-  // --------------------------------------------------
-  // REBOTE EN CASO DE COLISIÓN
-  // --------------------------------------------------
-  private animateRevert(obj: THREE.Object3D, targetPos: THREE.Vector3) {
-    const startPos = obj.position.clone();
-    let t = 0;
-
-    const animate = () => {
-      t += 0.1;
-      if (t >= 1) {
-        obj.position.copy(targetPos);
-        this.engine.checkSafetyCollisions();
-        return;
-      }
-      obj.position.lerpVectors(startPos, targetPos, t);
-      this.engine.checkSafetyCollisions();
-      requestAnimationFrame(animate);
-    };
-
-    animate();
-  }
-
-  // --------------------------------------------------
-  // ACTUALIZAR CÁMARA ACTIVA PARA EL GIZMO
-  // --------------------------------------------------
-  public updateCamera(camera: THREE.Camera) {
-    if (this.transformControl) {
-      this.transformControl.camera = camera;
-    }
-  }
-
-  // --------------------------------------------------
-  // MOUSE DOWN PRINCIPAL
-  // --------------------------------------------------
-  public onMouseDown = (event: MouseEvent) => {
-    // Si estamos arrastrando el gizmo, no hacemos nada más
-    if (this.transformControl && this.isDraggingGizmo) return;
-
-    const rect = this.engine.renderer.domElement.getBoundingClientRect();
-    this.pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    this.pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-    this.raycaster.setFromCamera(this.pointer, this.engine.activeCamera);
-
-    const editor = useEditorStore.getState();
-    const catalog = useCatalogStore.getState();
-    const selectionStore = useSelectionStore.getState();
-
-    const mode = editor.mode;
-
-    // ----------------------------
-    // DRAW FLOOR
-    // ----------------------------
-    if (mode === "drawing_floor") {
-      const intersects = this.raycaster.intersectObject(this.interactionPlane);
-      if (intersects.length > 0) {
-        if (event.button === 0) {
-          this.engine.toolsManager.addDraftPoint(intersects[0].point);
-        } else if (event.button === 2) {
-          if (this.engine.toolsManager.floorPoints.length >= 3) {
-            this.engine.toolsManager.createSolidFloor();
-          }
-        }
-      }
-      return;
-    }
-
-    // ----------------------------
-    // DRAW FENCE
-    // ----------------------------
-    if (mode === "drawing_fence") {
-      const intersects = this.raycaster.intersectObject(this.interactionPlane);
-      if (intersects.length > 0) {
-        if (event.button === 0) {
-          this.engine.toolsManager.addFenceDraftPoint(intersects[0].point);
-        } else if (event.button === 2) {
-          this.engine.toolsManager.createSolidFence();
-        }
-      }
-      return;
-    }
-
-    // ----------------------------
-    // MEASURING
-    // ----------------------------
-    if (mode === "measuring") {
-      const planeHit = this.raycaster.intersectObject(this.interactionPlane);
-      if (planeHit.length > 0) {
-        this.engine.toolsManager.handleMeasurementClick(planeHit[0].point);
-      }
-      return;
-    }
-
-    // ----------------------------
-    // PLACE ITEM
-    // ----------------------------
-    if (mode === "placing_item" && catalog.selectedProduct) {
-      if (event.button !== 0) return;
-
-      const intersects = this.raycaster.intersectObject(this.interactionPlane);
-      if (intersects.length > 0) {
-        this.engine.objectManager.placeObject(
-          intersects[0].point.x,
-          intersects[0].point.z,
-          catalog.selectedProduct,
-          (uuid) => {
-            // Seleccionamos el nuevo objeto y entramos en edición
-            selectionStore.selectItem(uuid);
-            editor.setMode("editing");
-          }
-        );
-      }
-      return;
-    }
-
-    // ----------------------------
-    // IDLE / EDITING
-    // ----------------------------
-    if (mode === "idle" || mode === "editing") {
-      if (event.button !== 0) return;
-
-      // --- Edición de vértices de suelo ---
-      if (this.engine.toolsManager.floorEditMarkers.length > 0) {
-        const markerIntersects = this.raycaster.intersectObjects(
-          this.engine.toolsManager.floorEditMarkers
-        );
-
-        if (markerIntersects.length > 0) {
-          const hit = markerIntersects[0].object;
-          const index = hit.userData.pointIndex;
-
-          if (event.shiftKey || event.ctrlKey) {
-            this.engine.toolsManager.selectVertex(index, true);
-            if (this.transformControl) this.transformControl.detach();
-            return;
-          }
-
-          this.engine.toolsManager.selectVertex(index, false);
-          if (this.transformControl) {
-            this.transformControl.attach(hit);
-            this.transformControl.setMode("translate");
-            this.transformControl.visible = true;
-          }
-          return;
-        }
-      }
-
-      // --- Selección de objetos ---
-      const interactables = this.engine.scene.children.filter(
-        (obj) => obj.userData?.isItem && obj !== this.transformControl
-      );
-
-      const intersects = this.raycaster.intersectObjects(interactables, true);
-
-      if (intersects.length > 0) {
-        let target: THREE.Object3D | null = intersects[0].object;
-
-        while (
-          target &&
-          !target.userData?.isItem &&
-          target.parent &&
-          target.parent !== this.engine.scene
-        ) {
-          target = target.parent;
-        }
-
-        if (target && target.userData?.isItem) {
-          this.selectObject(target);
-
-          // Buscar el SceneItem correspondiente EN EL EDITOR STORE
-          const floor = useEditorStore
-            .getState()
-            .items.find(
-              (item) => item.uuid === target!.uuid && item.type === "floor"
-            );
-
-          if (floor?.points) {
-            this.engine.toolsManager.showFloorEditMarkers(
-              target.uuid,
-              floor.points
-            );
-          } else {
-            this.engine.toolsManager.clearFloorEditMarkers();
-          }
-        }
-      } else {
-        // Click en vacío → deseleccionar (si no estamos en un marker)
-        if (
-          this.transformControl?.object &&
-          !this.engine.toolsManager.floorEditMarkers.includes(
-            this.transformControl.object as THREE.Mesh
-          )
-        ) {
-          this.selectObject(null);
-          this.engine.toolsManager.clearFloorEditMarkers();
-        }
-      }
-    }
-  };
-
-  // --------------------------------------------------
-  // SELECCIÓN DE OBJETO + MODO
-  // --------------------------------------------------
-  public selectObject(object: THREE.Object3D | null) {
-    const selection = useSelectionStore.getState();
-    const editor = useEditorStore.getState();
-
-    if (!this.transformControl) {
-      selection.selectItem(null);
-      editor.setMode("idle");
-      return;
-    }
-
-    // Quitamos cualquier selección previa
-    if (this.transformControl.object) {
-      this.transformControl.detach();
-      this.transformControl.visible = false;
-      this.engine.sceneManager.controls.enabled = true;
-    }
-
-    // Si no hay objeto → deseleccionar
-    if (!object) {
-      selection.selectItem(null);
-      editor.setMode("idle");
-      return;
-    }
-
-    // Nueva selección
-    this.transformControl.attach(object);
-    selection.selectItem(object.uuid);
-    editor.setMode("editing");
-    this.transformControl.visible = true;
-  }
-
-  // --------------------------------------------------
-  // SINCRONIZAR POS / ROT / SCALE CON STORE
-  // --------------------------------------------------
-  private syncTransformToStore(obj: THREE.Object3D) {
-    const editor = useEditorStore.getState();
-    if (obj.userData.isItem) {
-      editor.updateItemTransform(
-        obj.uuid,
-        [obj.position.x, obj.position.y, obj.position.z],
-        [obj.rotation.x, obj.rotation.y, obj.rotation.z],
-        [obj.scale.x, obj.scale.y, obj.scale.z]
-      );
-    }
-  }
-
-  // --------------------------------------------------
-  // CAMBIAR MODO DEL GIZMO
-  // --------------------------------------------------
-  public setGizmoMode(mode: "translate" | "rotate" | "scale") {
-    if (this.transformControl) this.transformControl.setMode(mode);
-  }
-}
-// --- END OF FILE src/features/editor/engine/managers/InteractionManager.ts ---
-</file>
-
-<file path="src/features/editor/engine/managers/InteractionManager_old_gpt.txt">
-// --- START OF FILE src/features/editor/engine/managers/InteractionManager.ts ---
-import * as THREE from "three";
-import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
-
-import type { A42Engine } from "../A42Engine";
-
-import { useEditorStore } from "@/stores/editor/useEditorStore";
-import { useSelectionStore } from "@/stores/selection/useSelectionStore";
-import { useCatalogStore } from "@/stores/catalog/useCatalogStore";
-import { useSceneStore } from "@/stores/scene/useSceneStore";
-
-export class InteractionManager {
-  private engine: A42Engine;
-  public transformControl: TransformControls | null = null;
-
-  private raycaster: THREE.Raycaster;
-  private pointer: THREE.Vector2;
-  private interactionPlane: THREE.Mesh;
-
-  public isDraggingGizmo = false;
-  private dragStartPosition = new THREE.Vector3();
-
-  constructor(engine: A42Engine) {
-    this.engine = engine;
-    this.raycaster = new THREE.Raycaster();
-    this.pointer = new THREE.Vector2();
-
-    // Plano "suelo" para colocar/dibujar cosas
-    this.interactionPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(1000, 1000),
-      new THREE.MeshBasicMaterial({ visible: false })
-    );
-    this.interactionPlane.rotation.x = -Math.PI / 2;
-    this.interactionPlane.layers.set(0);
-    this.engine.scene.add(this.interactionPlane);
-
-    this.initTransformControls();
-  }
-
-  // --------------------------------------------------
-  // INIT TRANSFORM CONTROLS (GIZMO)
-  // --------------------------------------------------
-  private initTransformControls() {
-    try {
-      this.transformControl = new TransformControls(
-        this.engine.activeCamera as THREE.Camera,
-        this.engine.renderer.domElement
-      );
-
-      this.transformControl.rotationSnap = Math.PI / 12;
-
-      // Añadimos el gizmo a la escena en la misma capa que el resto
-      this.engine.scene.add(this.transformControl);
-
-      // --- Evento cuando empieza/termina drag ---
-      this.transformControl.addEventListener(
-        "dragging-changed",
-        (event: any) => {
-          const editor = useEditorStore.getState();
-
-          this.isDraggingGizmo = event.value;
-          this.engine.sceneManager.controls.enabled = !event.value;
-
-          const obj = this.transformControl?.object;
-          if (!obj) return;
-
-          if (event.value) {
-            // Empezar drag → snapshot para UNDO
-            this.dragStartPosition.copy(obj.position);
-            editor.saveSnapshot();
-          } else {
-            // Terminar drag
-            if (this.engine.isObjectColliding(obj)) {
-              // Rebote si choca zona de seguridad
-              this.animateRevert(obj, this.dragStartPosition);
-            } else {
-              if (obj.userData.isFloorMarker) {
-                this.engine.toolsManager.updateFloorFromMarkers(obj);
-              } else if (obj.userData.isItem) {
-                this.engine.objectManager.adjustObjectToGround(obj);
-                this.syncTransformToStore(obj);
-              }
-            }
-          }
-        }
-      );
-
-      // Ajustar al suelo mientras se mueve (para items)
-      this.transformControl.addEventListener("objectChange", () => {
-        const obj = this.transformControl?.object;
-        if (obj && obj.userData.isItem) {
-          this.engine.objectManager.adjustObjectToGround(obj);
-        }
-      });
-
-      this.transformControl.detach();
-      this.transformControl.visible = false;
-    } catch (e) {
-      console.error("ERROR: TransformControls", e);
-      this.transformControl = null;
-    }
-  }
-
-  // --------------------------------------------------
-  // REBOTE EN CASO DE COLISIÓN
-  // --------------------------------------------------
-  private animateRevert(obj: THREE.Object3D, targetPos: THREE.Vector3) {
-    const startPos = obj.position.clone();
-    let t = 0;
-
-    const animate = () => {
-      t += 0.1;
-      if (t >= 1) {
-        obj.position.copy(targetPos);
-        this.engine.checkSafetyCollisions();
-        return;
-      }
-      obj.position.lerpVectors(startPos, targetPos, t);
-      this.engine.checkSafetyCollisions();
-      requestAnimationFrame(animate);
-    };
-
-    animate();
-  }
-
-  // --------------------------------------------------
-  // ACTUALIZAR CÁMARA ACTIVA PARA EL GIZMO
-  // --------------------------------------------------
-  public updateCamera(camera: THREE.Camera) {
-    if (this.transformControl) {
-      this.transformControl.camera = camera;
-    }
-  }
-
-  // --------------------------------------------------
-  // MOUSE DOWN PRINCIPAL
-  // --------------------------------------------------
-  public onMouseDown = (event: MouseEvent) => {
-    // Si estamos arrastrando el gizmo, no hacemos nada más
-    if (this.transformControl && this.isDraggingGizmo) return;
-
-    const rect = this.engine.renderer.domElement.getBoundingClientRect();
-    this.pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    this.pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-    this.raycaster.setFromCamera(this.pointer, this.engine.activeCamera);
-
-    const editor = useEditorStore.getState();
-    const catalog = useCatalogStore.getState();
-    const selectionStore = useSelectionStore.getState();
-    const scene = useSceneStore.getState();
-
-    const mode = editor.mode;
-
-    // ------------------------------------------------
-    // 1) CLICK EN GIZMO → dejar que TransformControls actúe
-    // ------------------------------------------------
-    if (this.transformControl) {
-      const gizmoObjects: THREE.Object3D[] = [];
-      this.transformControl.traverse((child) => gizmoObjects.push(child));
-
-      const gizmoHits = this.raycaster.intersectObjects(gizmoObjects, true);
-      if (gizmoHits.length > 0) {
-        // Click sobre el gizmo → NO tocar selección ni modos
-        return;
-      }
-    }
-
-    // ----------------------------
-    // DRAW FLOOR
-    // ----------------------------
-    if (mode === "drawing_floor") {
-      const intersects = this.raycaster.intersectObject(this.interactionPlane);
-      if (intersects.length > 0) {
-        if (event.button === 0) {
-          this.engine.toolsManager.addDraftPoint(intersects[0].point);
-        } else if (event.button === 2) {
-          if (this.engine.toolsManager.floorPoints.length >= 3) {
-            this.engine.toolsManager.createSolidFloor();
-          }
-        }
-      }
-      return;
-    }
-
-    // ----------------------------
-    // DRAW FENCE
-    // ----------------------------
-    if (mode === "drawing_fence") {
-      const intersects = this.raycaster.intersectObject(this.interactionPlane);
-      if (intersects.length > 0) {
-        if (event.button === 0) {
-          this.engine.toolsManager.addFenceDraftPoint(intersects[0].point);
-        } else if (event.button === 2) {
-          this.engine.toolsManager.createSolidFence();
-        }
-      }
-      return;
-    }
-
-    // ----------------------------
-    // MEASURING
-    // ----------------------------
-    if (mode === "measuring") {
-      const intersects = this.raycaster.intersectObjects(
-        this.engine.scene.children,
-        true
-      );
-      const hit = intersects.find(
-        (i) =>
-          i.object.visible &&
-          (i.object.userData.isItem || i.object === this.interactionPlane)
-      );
-
-      if (hit) {
-        this.engine.toolsManager.handleMeasurementClick(hit.point);
-      } else {
-        const planeHit = this.raycaster.intersectObject(this.interactionPlane);
-        if (planeHit.length > 0) {
-          this.engine.toolsManager.handleMeasurementClick(planeHit[0].point);
-        }
-      }
-      return;
-    }
-
-    // ----------------------------
-    // PLACE ITEM
-    // ----------------------------
-    if (mode === "placing_item" && catalog.selectedProduct) {
-      if (event.button !== 0) return;
-
-      const intersects = this.raycaster.intersectObject(this.interactionPlane);
-      if (intersects.length > 0) {
-        this.engine.objectManager.placeObject(
-          intersects[0].point.x,
-          intersects[0].point.z,
-          catalog.selectedProduct,
-          (uuid) => {
-            // Seleccionamos el nuevo objeto y entramos en edición
-            selectionStore.selectItem(uuid);
-            editor.setMode("editing");
-          }
-        );
-      }
-      return;
-    }
-
-    // ----------------------------
-    // IDLE / EDITING
-    // ----------------------------
-    if (mode === "idle" || mode === "editing") {
-      if (event.button !== 0) return;
-
-      // --- Edición de vértices de suelo ---
-      if (this.engine.toolsManager.floorEditMarkers.length > 0) {
-        const markerIntersects = this.raycaster.intersectObjects(
-          this.engine.toolsManager.floorEditMarkers
-        );
-
-        if (markerIntersects.length > 0) {
-          const hit = markerIntersects[0].object;
-          const index = hit.userData.pointIndex;
-
-          if (event.shiftKey || event.ctrlKey) {
-            this.engine.toolsManager.selectVertex(index, true);
-            if (this.transformControl) this.transformControl.detach();
-            return;
-          }
-
-          this.engine.toolsManager.selectVertex(index, false);
-          if (this.transformControl) {
-            this.transformControl.attach(hit);
-            this.transformControl.setMode("translate");
-            this.transformControl.visible = true;
-          }
-          return;
-        }
-      }
-
-      // --- Selección de objetos ---
-      const intersects = this.raycaster.intersectObjects(
-        this.engine.scene.children,
-        true
-      );
-
-      let target: THREE.Object3D | null = null;
-
-      for (const hit of intersects) {
-        let obj: THREE.Object3D | null = hit.object;
-        let isGizmo = false;
-
-        while (obj) {
-          if (this.transformControl && obj === this.transformControl) {
-            isGizmo = true;
-            break;
-          }
-          if (obj.userData?.isItem) break;
-          obj = obj.parent as THREE.Object3D | null;
-        }
-
-        if (isGizmo) {
-          // Click en el gizmo → no cambiar selección
-          return;
-        }
-
-        if (obj && obj.userData?.isItem) {
-          target = obj;
-          break;
-        }
-      }
-
-      if (target && target.userData?.isItem) {
-        this.selectObject(target);
-
-        // Buscar el SceneItem correspondiente
-        const floor = scene.items.find(
-          (item) => item.uuid === target!.uuid && item.type === "floor"
-        );
-
-        if (floor?.points) {
-          this.engine.toolsManager.showFloorEditMarkers(
-            target.uuid,
-            floor.points
-          );
-        } else {
-          this.engine.toolsManager.clearFloorEditMarkers();
-        }
-      } else {
-        // Click en vacío → deseleccionar (si no estamos en un marker)
-        if (
-          this.transformControl?.object &&
-          !this.engine.toolsManager.floorEditMarkers.includes(
-            this.transformControl.object as THREE.Mesh
-          )
-        ) {
-          this.selectObject(null);
-          this.engine.toolsManager.clearFloorEditMarkers();
-        }
-      }
-    }
-  };
-
-  // --------------------------------------------------
-  // SELECCIÓN DE OBJETO + MODO
-  // --------------------------------------------------
-  public selectObject(object: THREE.Object3D | null) {
-    const selection = useSelectionStore.getState();
-    const editor = useEditorStore.getState();
-
-    if (!this.transformControl) {
-      selection.selectItem(null);
-      editor.setMode("idle");
-      return;
-    }
-
-    // Si clicamos de nuevo en el mismo objeto ya enganchado
-    if (
-      object &&
-      this.transformControl.object?.uuid === object.uuid &&
-      selection.selectedItemId !== object.uuid
-    ) {
-      selection.selectItem(object.uuid);
-      editor.setMode("editing");
-      return;
-    }
-
-    // Quitamos cualquier selección previa
-    if (this.transformControl.object) {
-      this.transformControl.detach();
-      this.transformControl.visible = false;
-      this.engine.sceneManager.controls.enabled = true;
-    }
-
-    // Si no hay objeto → deseleccionar
-    if (!object) {
-      selection.selectItem(null);
-      editor.setMode("idle");
-      return;
-    }
-
-    // Nueva selección
-    this.transformControl.attach(object);
-    selection.selectItem(object.uuid);
-    editor.setMode("editing");
-    this.transformControl.visible = true;
-  }
-
-  // --------------------------------------------------
-  // SINCRONIZAR POS / ROT / SCALE CON STORE
-  // --------------------------------------------------
-  private syncTransformToStore(obj: THREE.Object3D) {
-    const scene = useSceneStore.getState();
-    if (obj.userData.isItem) {
-      scene.updateItem(obj.uuid, {
-        position: [obj.position.x, obj.position.y, obj.position.z],
-        rotation: [obj.rotation.x, obj.rotation.y, obj.rotation.z],
-        scale: [obj.scale.x, obj.scale.y, obj.scale.z],
-      });
-    }
-  }
-
-  // --------------------------------------------------
-  // CAMBIAR MODO DEL GIZMO
-  // --------------------------------------------------
-  public setGizmoMode(mode: "translate" | "rotate" | "scale") {
-    if (this.transformControl) this.transformControl.setMode(mode);
-  }
-}
-// --- END OF FILE src/features/editor/engine/managers/InteractionManager.ts ---
-</file>
-
 <file path="src/features/editor/engine/managers/InteractionManager.ts">
 // --- START OF FILE src/features/editor/engine/managers/InteractionManager.ts ---
 import * as THREE from "three";
@@ -5862,6 +4149,7 @@ import { TransformControls } from "three/examples/jsm/controls/TransformControls
 import type { A42Engine } from "../A42Engine";
 
 import { useEditorStore } from "@/stores/editor/useEditorStore";
+import { useSceneStore } from "@/stores/scene/useSceneStore"; // 🔥 NUEVO
 import { useSelectionStore } from "@/stores/selection/useSelectionStore";
 import { useCatalogStore } from "@/stores/catalog/useCatalogStore";
 
@@ -5881,7 +4169,6 @@ export class InteractionManager {
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
 
-    // Plano para clicks
     this.interactionPlane = new THREE.Mesh(
       new THREE.PlaneGeometry(5000, 5000),
       new THREE.MeshBasicMaterial({ visible: false })
@@ -5893,9 +4180,6 @@ export class InteractionManager {
     this.initTransformControls();
   }
 
-  // ---------------------------------------------
-  // TRANSFORM CONTROLS (GIZMO)
-  // ---------------------------------------------
   private initTransformControls() {
     try {
       this.transformControl = new TransformControls(
@@ -5906,9 +4190,8 @@ export class InteractionManager {
       this.transformControl.rotationSnap = Math.PI / 12;
       this.engine.scene.add(this.transformControl);
 
-      // Evento arrastrar
       this.transformControl.addEventListener("dragging-changed", (event: any) => {
-        const editor = useEditorStore.getState();
+        const scene = useSceneStore.getState(); // 🔥 Usamos SceneStore para datos
 
         this.isDraggingGizmo = event.value;
         this.engine.sceneManager.controls.enabled = !event.value;
@@ -5918,7 +4201,7 @@ export class InteractionManager {
 
         if (event.value) {
           this.dragStartPosition.copy(obj.position);
-          editor.saveSnapshot();
+          scene.saveSnapshot(); // 🔥 Snapshot en SceneStore
         } else {
           if (this.engine.isObjectColliding(obj)) {
             this.animateRevert(obj, this.dragStartPosition);
@@ -5933,7 +4216,15 @@ export class InteractionManager {
         }
       });
 
-      // Ajuste al suelo durante movimiento
+      this.transformControl.addEventListener("change", () => {
+        if (this.isDraggingGizmo && this.transformControl?.object) {
+           const obj = this.transformControl.object;
+           if (obj.userData.isItem && (obj.userData.type === 'floor' || obj.userData.type === 'fence')) {
+             this.engine.toolsManager.syncMarkersWithObject(obj);
+           }
+        }
+      });
+
       this.transformControl.addEventListener("objectChange", () => {
         const obj = this.transformControl?.object;
         if (obj && obj.userData.isItem && !this.isDraggingGizmo) {
@@ -5952,7 +4243,6 @@ export class InteractionManager {
   private animateRevert(obj: THREE.Object3D, targetPos: THREE.Vector3) {
     const startPos = obj.position.clone();
     let t = 0;
-
     const animate = () => {
       t += 0.1;
       if (t >= 1) {
@@ -5964,7 +4254,6 @@ export class InteractionManager {
       this.engine.checkSafetyCollisions();
       requestAnimationFrame(animate);
     };
-
     animate();
   }
 
@@ -5974,26 +4263,29 @@ export class InteractionManager {
     }
   }
 
-  // ============================================================
-  // 🔥 EVENTOS DE PUNTERO — FIX REAL DEL GIZMO
-  // ============================================================
+  public selectItemByUUID(uuid: string | null) {
+    if (!uuid) {
+      this.selectObject(null);
+      return;
+    }
+    let foundObject: THREE.Object3D | null = null;
+    this.engine.scene.traverse((obj) => {
+      if (obj.userData?.uuid === uuid && obj.userData?.isItem) {
+        foundObject = obj;
+      }
+    });
+    if (foundObject) {
+      if (this.transformControl?.object === foundObject) return;
+      this.attachGizmo(foundObject);
+    } else {
+      this.selectObject(null);
+    }
+  }
 
   public onPointerDown = (event: MouseEvent) => {
-    if (this.transformControl) this.transformControl.pointerDown(event);
     this.handleMouseDown(event);
   };
 
-  public onPointerMove = (event: MouseEvent) => {
-    if (this.transformControl) this.transformControl.pointerMove(event);
-  };
-
-  public onPointerUp = (event: MouseEvent) => {
-    if (this.transformControl) this.transformControl.pointerUp(event);
-  };
-
-  // ============================================================
-  // 🔥 TODA TU LÓGICA ORIGINAL DE onMouseDown AHORA VA AQUÍ
-  // ============================================================
   private handleMouseDown(event: MouseEvent) {
     if (this.transformControl && this.isDraggingGizmo) return;
 
@@ -6003,13 +4295,12 @@ export class InteractionManager {
 
     this.raycaster.setFromCamera(this.pointer, this.engine.activeCamera);
 
-    const editor = useEditorStore.getState();
+    const editor = useEditorStore.getState(); // UI State
     const catalog = useCatalogStore.getState();
     const selectionStore = useSelectionStore.getState();
 
     const mode = editor.mode;
 
-    // FLOOR DRAW
     if (mode === "drawing_floor") {
       const hit = this.raycaster.intersectObject(this.interactionPlane);
       if (hit.length > 0) {
@@ -6019,7 +4310,6 @@ export class InteractionManager {
       return;
     }
 
-    // FENCE DRAW
     if (mode === "drawing_fence") {
       const hit = this.raycaster.intersectObject(this.interactionPlane);
       if (hit.length > 0) {
@@ -6029,17 +4319,14 @@ export class InteractionManager {
       return;
     }
 
-    // MEASURE
     if (mode === "measuring") {
       const hit = this.raycaster.intersectObject(this.interactionPlane);
       if (hit.length > 0) this.engine.toolsManager.handleMeasurementClick(hit[0].point);
       return;
     }
 
-    // PLACE OBJECT
     if (mode === "placing_item" && catalog.selectedProduct) {
       if (event.button !== 0) return;
-
       const hit = this.raycaster.intersectObject(this.interactionPlane);
       if (hit.length > 0) {
         this.engine.objectManager.placeObject(
@@ -6055,26 +4342,20 @@ export class InteractionManager {
       return;
     }
 
-    // ---------------------------------------------
-    // IDLE / EDITING – SELECCIÓN
-    // ---------------------------------------------
     if (mode === "idle" || mode === "editing") {
       if (event.button !== 0) return;
 
-      // Click en markers de suelos
       const markerHit = this.raycaster.intersectObjects(
         this.engine.toolsManager.floorEditMarkers
       );
       if (markerHit.length > 0) {
         const hit = markerHit[0].object;
         const idx = hit.userData.pointIndex;
-
         if (event.shiftKey || event.ctrlKey) {
           this.engine.toolsManager.selectVertex(idx, true);
           this.transformControl?.detach();
           return;
         }
-
         this.engine.toolsManager.selectVertex(idx, false);
         if (this.transformControl) {
           this.transformControl.attach(hit);
@@ -6084,94 +4365,69 @@ export class InteractionManager {
         return;
       }
 
-      // Selección normal
       const interactables = this.engine.scene.children.filter(
         (obj) => obj.userData?.isItem && obj !== this.transformControl
       );
-
       const intersects = this.raycaster.intersectObjects(interactables, true);
       if (intersects.length > 0) {
         let target: THREE.Object3D | null = intersects[0].object;
-
-        while (
-          target &&
-          !target.userData?.isItem &&
-          target.parent &&
-          target.parent !== this.engine.scene
-        ) {
+        while (target && !target.userData?.isItem && target.parent && target.parent !== this.engine.scene) {
           target = target.parent;
         }
-
         if (target && target.userData?.isItem) {
           this.selectObject(target);
-
-          const floorItem = useEditorStore
-            .getState()
-            .items.find(
-              (i) => i.uuid === target!.userData.uuid && i.type === "floor"
-            );
-
-          if (floorItem?.points) {
-            this.engine.toolsManager.showFloorEditMarkers(
-              target.userData.uuid,
-              floorItem.points
-            );
-          } else {
-            this.engine.toolsManager.clearFloorEditMarkers();
-          }
         }
       } else {
-        if (
-          this.transformControl?.object &&
-          !this.engine.toolsManager.floorEditMarkers.includes(
-            this.transformControl.object as THREE.Mesh
-          )
-        ) {
+        if (this.transformControl?.object && !this.engine.toolsManager.floorEditMarkers.includes(this.transformControl.object as THREE.Mesh)) {
           this.selectObject(null);
-          this.engine.toolsManager.clearFloorEditMarkers();
         }
       }
     }
   }
 
-  // ---------------------------------------------
-  // SELECCIÓN
-  // ---------------------------------------------
+  private attachGizmo(object: THREE.Object3D) {
+    if (!this.transformControl) return;
+    this.transformControl.attach(object);
+    this.transformControl.visible = true;
+    
+    // 🔥 BUSCAMOS EN SCENE STORE
+    const item = useSceneStore.getState().items.find(
+      (i) => i.uuid === object.userData.uuid
+    );
+
+    if (item && (item.type === "floor" || item.type === "fence")) {
+      this.engine.toolsManager.showFloorEditMarkers(object.userData.uuid, item.points);
+    } else {
+      this.engine.toolsManager.clearFloorEditMarkers();
+    }
+  }
+
   public selectObject(object: THREE.Object3D | null) {
     const selection = useSelectionStore.getState();
     const editor = useEditorStore.getState();
 
-    if (!this.transformControl) {
-      selection.selectItem(null);
-      editor.setMode("idle");
-      return;
-    }
+    if (!this.transformControl) return;
 
-    if (this.transformControl.object) {
+    if (!object) {
       this.transformControl.detach();
       this.transformControl.visible = false;
       this.engine.sceneManager.controls.enabled = true;
-    }
-
-    if (!object) {
+      this.engine.toolsManager.clearFloorEditMarkers();
+      
       selection.selectItem(null);
       editor.setMode("idle");
       return;
     }
 
-    this.transformControl.attach(object);
     selection.selectItem(object.userData.uuid);
     editor.setMode("editing");
-    this.transformControl.visible = true;
+    this.attachGizmo(object);
   }
 
-  // ---------------------------------------------
-  // SYNC TRANSFORM
-  // ---------------------------------------------
   private syncTransformToStore(obj: THREE.Object3D) {
-    const editor = useEditorStore.getState();
+    const scene = useSceneStore.getState(); // 🔥 SceneStore para updates
     if (obj.userData.isItem) {
-      editor.updateItemTransform(
+      scene.updateItemTransform(
         obj.userData.uuid,
         [obj.position.x, obj.position.y, obj.position.z],
         [obj.rotation.x, obj.rotation.y, obj.rotation.z],
@@ -6193,14 +4449,10 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 import { useEditorStore } from "@/stores/editor/useEditorStore";
+import { useSceneStore } from "@/stores/scene/useSceneStore"; // 🔥 NUEVO
 import { FENCE_PRESETS } from "@/features/editor/data/fence_presets";
 
-import type {
-  SceneItem,
-  FenceConfig,
-  FloorMaterialType,
-} from "@/types/editor";
-
+import type { SceneItem, FenceConfig, FloorMaterialType, ModelItem } from "@/types/editor";
 import type { Product } from "@/services/catalogService";
 
 type PlaceableProduct = Product & { initialScale?: [number, number, number] };
@@ -6209,9 +4461,7 @@ export class ObjectManager {
   private scene: THREE.Scene;
   private loader: GLTFLoader;
   private textureLoader: THREE.TextureLoader;
-
   private assetCache: Record<string, THREE.Group> = {};
-
   private floorMaterials: Record<FloorMaterialType, THREE.Material>;
 
   constructor(scene: THREE.Scene) {
@@ -6220,32 +4470,13 @@ export class ObjectManager {
     this.textureLoader = new THREE.TextureLoader();
 
     this.floorMaterials = {
-      rubber_red: new THREE.MeshStandardMaterial({
-        color: 0xa04040,
-        roughness: 0.9,
-      }),
-      rubber_green: new THREE.MeshStandardMaterial({
-        color: 0x22c55e,
-        roughness: 0.9,
-      }),
-      rubber_blue: new THREE.MeshStandardMaterial({
-        color: 0x3b82f6,
-        roughness: 0.9,
-      }),
-      grass: new THREE.MeshStandardMaterial({
-        color: 0x4ade80,
-        roughness: 1,
-      }),
-      concrete: new THREE.MeshStandardMaterial({
-        color: 0x9ca3af,
-        roughness: 0.8,
-      }),
+      rubber_red: new THREE.MeshStandardMaterial({ color: 0xa04040, roughness: 0.9 }),
+      rubber_green: new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.9 }),
+      rubber_blue: new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.9 }),
+      grass: new THREE.MeshStandardMaterial({ color: 0x4ade80, roughness: 1 }),
+      concrete: new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.8 }),
     };
   }
-
-  // ----------------------------------------------------------
-  //  CARGA DE MODELOS CON CACHÉ
-  // ----------------------------------------------------------
 
   public async loadModel(url: string): Promise<THREE.Group> {
     if (this.assetCache[url]) return this.assetCache[url].clone();
@@ -6254,22 +4485,16 @@ export class ObjectManager {
     return gltf.scene.clone();
   }
 
-  // ----------------------------------------------------------
-  //  RECREAR OBJETO 'model'
-  // ----------------------------------------------------------
-
   public async recreateModel(item: SceneItem) {
-    if (!item.modelUrl) return;
+    if (item.type !== 'model' || !item.modelUrl) return;
 
     try {
       const model = await this.loadModel(item.modelUrl);
-
       model.uuid = item.uuid;
       model.position.fromArray(item.position);
       model.rotation.fromArray(item.rotation);
       model.scale.fromArray(item.scale);
 
-      // 👇 SOLO el grupo raíz es el "item" seleccionable
       model.userData = {
         isItem: true,
         type: "model",
@@ -6277,36 +4502,18 @@ export class ObjectManager {
         productId: item.productId,
       };
 
-      // Zonas de seguridad
       const editor = useEditorStore.getState();
       const isZonesVisible = editor.safetyZonesVisible;
-
-      const safetyMat = new THREE.MeshBasicMaterial({
-        color: 0xff0000,
-        transparent: true,
-        opacity: 0.3,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      });
+      const safetyMat = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide });
 
       model.traverse((child) => {
         if ((child as THREE.Mesh).isMesh) {
           const mesh = child as THREE.Mesh;
           mesh.castShadow = true;
           mesh.receiveShadow = true;
-
           const name = mesh.name.toLowerCase();
-          const mat =
-            (mesh.material as THREE.Material).name?.toLowerCase() ?? "";
-
-          if (
-            name.includes("zona") ||
-            name.includes("seguridad") ||
-            name.includes("safety") ||
-            mat.includes("zona") ||
-            mat.includes("seguridad") ||
-            mat.includes("safety")
-          ) {
+          const mat = (mesh.material as THREE.Material).name?.toLowerCase() ?? "";
+          if (name.includes("zona") || name.includes("seguridad") || name.includes("safety") || mat.includes("zona") || mat.includes("seguridad") || mat.includes("safety")) {
             mesh.material = safetyMat.clone();
             mesh.visible = isZonesVisible;
             mesh.userData.isSafetyZone = true;
@@ -6315,62 +4522,40 @@ export class ObjectManager {
           }
         }
       });
-
       this.scene.add(model);
     } catch (e) {
       console.error("Error recreating model:", e);
     }
   }
 
-  // ----------------------------------------------------------
-  //  RECREAR SUELO
-  // ----------------------------------------------------------
-
   public recreateFloor(item: SceneItem) {
-    if (!item.points || item.points.length < 3) return;
-
+    if (item.type !== 'floor' || !item.points || item.points.length < 3) return;
     const shape = new THREE.Shape();
     shape.moveTo(item.points[0].x, -item.points[0].z);
-    for (let i = 1; i < item.points.length; i++) {
-      shape.lineTo(item.points[i].x, -item.points[i].z);
-    }
+    for (let i = 1; i < item.points.length; i++) shape.lineTo(item.points[i].x, -item.points[i].z);
     shape.lineTo(item.points[0].x, -item.points[0].z);
 
-    const geometry = new THREE.ExtrudeGeometry(shape, {
-      depth: 0.05,
-      bevelEnabled: false,
-    });
-
+    const geometry = new THREE.ExtrudeGeometry(shape, { depth: 0.05, bevelEnabled: false });
     geometry.rotateX(-Math.PI / 2);
-
     const pos = geometry.attributes.position;
     const uv = geometry.attributes.uv;
-
     const scale = item.textureScale ?? 1;
     const rotRad = THREE.MathUtils.degToRad(item.textureRotation ?? 0);
 
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i);
       const z = pos.getZ(i);
-
       const u = (x * Math.cos(rotRad) - z * Math.sin(rotRad)) / scale;
       const v = (x * Math.sin(rotRad) + z * Math.cos(rotRad)) / scale;
-
       uv.setXY(i, u, v);
     }
 
     let material: THREE.Material;
-
     if (item.textureUrl) {
       const tex = this.textureLoader.load(item.textureUrl);
       tex.wrapS = THREE.RepeatWrapping;
       tex.wrapT = THREE.RepeatWrapping;
-
-      material = new THREE.MeshStandardMaterial({
-        map: tex,
-        roughness: 0.8,
-        side: THREE.DoubleSide,
-      });
+      material = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8, side: THREE.DoubleSide });
     } else {
       material = this.floorMaterials[item.floorMaterial ?? "concrete"];
     }
@@ -6378,6 +4563,9 @@ export class ObjectManager {
     const mesh = new THREE.Mesh(geometry, material);
     mesh.uuid = item.uuid;
     mesh.receiveShadow = true;
+    mesh.position.fromArray(item.position || [0, 0, 0]);
+    mesh.rotation.fromArray(item.rotation || [0, 0, 0]);
+    mesh.scale.fromArray(item.scale || [1, 1, 1]);
 
     mesh.userData = {
       isItem: true,
@@ -6389,25 +4577,20 @@ export class ObjectManager {
       textureScale: item.textureScale,
       textureRotation: item.textureRotation,
     };
-
     this.scene.add(mesh);
   }
 
-  // ----------------------------------------------------------
-  //  RECREAR VALLA
-  // ----------------------------------------------------------
-
   public recreateFence(item: SceneItem) {
-    if (!item.points || !item.fenceConfig) return;
-
+    if (item.type !== 'fence' || !item.points || !item.fenceConfig) return;
     const points = item.points.map((p) => new THREE.Vector3(p.x, 0, p.z));
     const fence = this.createFenceObject(points, item.fenceConfig);
-
     if (!fence) return;
 
     fence.uuid = item.uuid;
+    fence.position.fromArray(item.position || [0, 0, 0]);
+    fence.rotation.fromArray(item.rotation || [0, 0, 0]);
+    fence.scale.fromArray(item.scale || [1, 1, 1]);
 
-    // 👇 SOLO el grupo raíz tiene isItem
     fence.userData = {
       isItem: true,
       type: "fence",
@@ -6416,115 +4599,58 @@ export class ObjectManager {
       points: item.points,
       fenceConfig: item.fenceConfig,
     };
-
     this.scene.add(fence);
   }
 
-  // ----------------------------------------------------------
-  //  CREAR VALLA (instanced meshes)
-  // ----------------------------------------------------------
-
-  public createFenceObject(
-    points: THREE.Vector3[],
-    config: FenceConfig
-  ): THREE.Group | null {
+  public createFenceObject(points: THREE.Vector3[], config: FenceConfig): THREE.Group | null {
     if (!points || points.length < 2) return null;
-
     const preset = FENCE_PRESETS[config.presetId] || FENCE_PRESETS["wood"];
     const colors = config.colors;
-
-    const parts: Record<
-      string,
-      { geo: THREE.BufferGeometry; matrices: THREE.Matrix4[]; colors: number[] }
-    > = {};
+    const parts: Record<string, { geo: THREE.BufferGeometry; matrices: THREE.Matrix4[]; colors: number[] }> = {};
     const temp = new THREE.Object3D();
 
-    const addPart = (
-      key: string,
-      geo: THREE.BufferGeometry,
-      pos: THREE.Vector3,
-      rot: THREE.Euler,
-      scl: THREE.Vector3,
-      colorHex: number
-    ) => {
-      if (!parts[key]) {
-        parts[key] = { geo, matrices: [], colors: [] };
-      }
-
+    const addPart = (key: string, geo: THREE.BufferGeometry, pos: THREE.Vector3, rot: THREE.Euler, scl: THREE.Vector3, colorHex: number) => {
+      if (!parts[key]) parts[key] = { geo, matrices: [], colors: [] };
       temp.position.copy(pos);
       temp.rotation.copy(rot);
       temp.scale.copy(scl);
       temp.updateMatrix();
-
       parts[key].matrices.push(temp.matrix.clone());
       parts[key].colors.push(colorHex);
     };
 
-    // POSTES
     let postGeo: THREE.BufferGeometry;
     if (preset.postType === "round") {
-      postGeo = new THREE.CylinderGeometry(
-        preset.postRadius!,
-        preset.postRadius!,
-        preset.postHeight,
-        16
-      );
+      postGeo = new THREE.CylinderGeometry(preset.postRadius!, preset.postRadius!, preset.postHeight, 16);
       postGeo.translate(0, preset.postHeight / 2, 0);
     } else {
-      postGeo = new THREE.BoxGeometry(
-        preset.postWidth!,
-        preset.postHeight,
-        preset.postWidth!
-      );
+      postGeo = new THREE.BoxGeometry(preset.postWidth!, preset.postHeight, preset.postWidth!);
       postGeo.translate(0, preset.postHeight / 2, 0);
     }
 
-    // RIELES
     let railGeo: THREE.BufferGeometry | null = null;
     if (preset.railType === "frame") {
       if (preset.railShape === "square") {
-        railGeo = new THREE.BoxGeometry(
-          preset.railThickness!,
-          preset.railThickness!,
-          1
-        );
+        railGeo = new THREE.BoxGeometry(preset.railThickness!, preset.railThickness!, 1);
       } else {
-        railGeo = new THREE.CylinderGeometry(
-          preset.railRadius!,
-          preset.railRadius!,
-          1,
-          12
-        );
+        railGeo = new THREE.CylinderGeometry(preset.railRadius!, preset.railRadius!, 1, 12);
         railGeo.rotateX(Math.PI / 2);
       }
     }
 
-    // LAMAS
-    const slatGeo = new THREE.BoxGeometry(
-      preset.slatThickness,
-      1,
-      preset.slatWidth
-    );
-
+    const slatGeo = new THREE.BoxGeometry(preset.slatThickness, 1, preset.slatWidth);
     const topRailY = preset.postHeight - 0.12;
     const botRailY = 0.12;
     const slatHeight = topRailY - botRailY - 0.08;
     const slatCenterY = (topRailY + botRailY) * 0.5;
-
-    const slatColorList = [
-      colors.slatA,
-      colors.slatB ?? colors.slatA,
-      colors.slatC ?? colors.slatA,
-    ];
+    const slatColorList = [colors.slatA, colors.slatB ?? colors.slatA, colors.slatC ?? colors.slatA];
 
     for (let i = 0; i < points.length - 1; i++) {
       const A = points[i];
       const B = points[i + 1];
       const dist = A.distanceTo(B);
-
       const dir = new THREE.Vector3().subVectors(B, A).normalize();
       const angle = Math.atan2(dir.x, dir.z);
-
       const module = 2.0;
       const count = Math.max(1, Math.ceil(dist / module));
       const moduleLen = dist / count;
@@ -6532,178 +4658,76 @@ export class ObjectManager {
       for (let m = 0; m < count; m++) {
         const t0 = m / count;
         const t1 = (m + 1) / count;
-
         const P0 = new THREE.Vector3().lerpVectors(A, B, t0);
         const P1 = new THREE.Vector3().lerpVectors(A, B, t1);
         const PC = new THREE.Vector3().lerpVectors(P0, P1, 0.5);
 
-        // Poste inicio de módulo
-        addPart(
-          "post",
-          postGeo,
-          P0,
-          new THREE.Euler(0, angle, 0),
-          new THREE.Vector3(1, 1, 1),
-          colors.post
-        );
+        addPart("post", postGeo, P0, new THREE.Euler(0, angle, 0), new THREE.Vector3(1, 1, 1), colors.post);
 
-        // Rieles
         if (railGeo) {
           const railLen = Math.max(moduleLen - 0.1, 0.05);
-
-          addPart(
-            "rail",
-            railGeo,
-            new THREE.Vector3(PC.x, topRailY, PC.z),
-            new THREE.Euler(0, angle, 0),
-            new THREE.Vector3(1, 1, railLen),
-            colors.post
-          );
-
-          addPart(
-            "rail",
-            railGeo,
-            new THREE.Vector3(PC.x, botRailY, PC.z),
-            new THREE.Euler(0, angle, 0),
-            new THREE.Vector3(1, 1, railLen),
-            colors.post
-          );
+          addPart("rail", railGeo, new THREE.Vector3(PC.x, topRailY, PC.z), new THREE.Euler(0, angle, 0), new THREE.Vector3(1, 1, railLen), colors.post);
+          addPart("rail", railGeo, new THREE.Vector3(PC.x, botRailY, PC.z), new THREE.Euler(0, angle, 0), new THREE.Vector3(1, 1, railLen), colors.post);
         }
 
-        // Panel o lamas
         if (preset.isSolidPanel) {
           const panelLen = moduleLen - 0.1;
-          addPart(
-            "slat",
-            slatGeo,
-            new THREE.Vector3(PC.x, slatCenterY, PC.z),
-            new THREE.Euler(0, angle, 0),
-            new THREE.Vector3(1, slatHeight, panelLen / preset.slatWidth),
-            slatColorList[0]
-          );
+          addPart("slat", slatGeo, new THREE.Vector3(PC.x, slatCenterY, PC.z), new THREE.Euler(0, angle, 0), new THREE.Vector3(1, slatHeight, panelLen / preset.slatWidth), slatColorList[0]);
         } else {
-          let slatCount: number;
-          if (preset.fixedCount) {
-            slatCount = preset.fixedCount;
-          } else {
-            const unit = preset.slatWidth + (preset.slatGap ?? 0.05);
-            slatCount = Math.max(1, Math.floor(moduleLen / unit));
-          }
-
+          let slatCount = preset.fixedCount ? preset.fixedCount : Math.max(1, Math.floor(moduleLen / (preset.slatWidth + (preset.slatGap ?? 0.05))));
           for (let s = 0; s < slatCount; s++) {
             const tSlat = (s + 0.5) / slatCount;
             const Pslat = new THREE.Vector3().lerpVectors(P0, P1, tSlat);
             Pslat.y = slatCenterY;
-
-            const color = slatColorList[s % slatColorList.length];
-
-            addPart(
-              "slat",
-              slatGeo,
-              Pslat,
-              new THREE.Euler(0, angle, 0),
-              new THREE.Vector3(1, slatHeight, 1),
-              color
-            );
+            addPart("slat", slatGeo, Pslat, new THREE.Euler(0, angle, 0), new THREE.Vector3(1, slatHeight, 1), slatColorList[s % slatColorList.length]);
           }
         }
       }
     }
-
     const last = points[points.length - 1];
-    addPart(
-      "post",
-      postGeo,
-      last,
-      new THREE.Euler(0, 0, 0),
-      new THREE.Vector3(1, 1, 1),
-      colors.post
-    );
+    addPart("post", postGeo, last, new THREE.Euler(0, 0, 0), new THREE.Vector3(1, 1, 1), colors.post);
 
     const group = new THREE.Group();
-
     for (const key in parts) {
       const { geo, matrices, colors } = parts[key];
       const count = matrices.length;
-
-      const mat = new THREE.MeshStandardMaterial({
-        roughness: 0.5,
-        metalness: 0.1,
-      });
+      const mat = new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0.1 });
       const mesh = new THREE.InstancedMesh(geo, mat, count);
-
       for (let i = 0; i < count; i++) {
         mesh.setMatrixAt(i, matrices[i]);
         mesh.setColorAt(i, new THREE.Color(colors[i]));
       }
-
       mesh.instanceMatrix!.needsUpdate = true;
       mesh.instanceColor!.needsUpdate = true;
-
       mesh.castShadow = true;
       mesh.receiveShadow = true;
-
       group.add(mesh);
     }
-
     return group;
   }
 
-  // ----------------------------------------------------------
-  //  COLOCAR OBJETO NUEVO (CATÁLOGO)
-  // ----------------------------------------------------------
-
-  public async placeObject(
-    x: number,
-    z: number,
-    product: PlaceableProduct,
-    afterPlace?: (uuid: string) => void
-  ) {
+  public async placeObject(x: number, z: number, product: PlaceableProduct, afterPlace?: (uuid: string) => void) {
     if (!product.modelUrl) return;
-
     try {
       const model = await this.loadModel(product.modelUrl);
-
       model.position.set(x, 0, z);
-
-      const initialScale = product.initialScale
-        ? new THREE.Vector3(...product.initialScale)
-        : new THREE.Vector3(1, 1, 1);
-
+      const initialScale = product.initialScale ? new THREE.Vector3(...product.initialScale) : new THREE.Vector3(1, 1, 1);
       model.scale.copy(initialScale);
       model.updateMatrixWorld(true);
-
       this.adjustObjectToGround(model);
 
       const editor = useEditorStore.getState();
       const isZonesVisible = editor.safetyZonesVisible;
-
-      const safetyMat = new THREE.MeshBasicMaterial({
-        color: 0xff0000,
-        transparent: true,
-        opacity: 0.3,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      });
+      const safetyMat = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide });
 
       model.traverse((child) => {
         if ((child as THREE.Mesh).isMesh) {
           const mesh = child as THREE.Mesh;
           mesh.castShadow = true;
           mesh.receiveShadow = true;
-
           const name = mesh.name.toLowerCase();
-          const mat =
-            (mesh.material as THREE.Material).name?.toLowerCase() ?? "";
-
-          if (
-            name.includes("zona") ||
-            name.includes("seguridad") ||
-            name.includes("safety") ||
-            mat.includes("zona") ||
-            mat.includes("seguridad") ||
-            mat.includes("safety")
-          ) {
+          const mat = (mesh.material as THREE.Material).name?.toLowerCase() ?? "";
+          if (name.includes("zona") || name.includes("seguridad") || name.includes("safety") || mat.includes("zona") || mat.includes("seguridad") || mat.includes("safety")) {
             mesh.material = safetyMat.clone();
             mesh.visible = isZonesVisible;
             mesh.userData.isSafetyZone = true;
@@ -6712,11 +4736,9 @@ export class ObjectManager {
         }
       });
 
-      // Animación pop
       const targetScale = model.scale.clone();
       model.scale.set(0, 0, 0);
       let t = 0;
-
       const animate = () => {
         t += 0.05;
         if (t < 1) {
@@ -6728,37 +4750,20 @@ export class ObjectManager {
       };
       animate();
 
-      // --- GUARDAR EN STORE ---
       const uuid = THREE.MathUtils.generateUUID();
       model.uuid = uuid;
+      model.userData = { isItem: true, type: "model", uuid, productId: product.id };
 
-      model.userData = {
-        isItem: true,
-        type: "model",
-        uuid,
-        productId: product.id,
+      // 🔥 USE SCENE STORE PARA AÑADIR (y tipado ModelItem)
+      const newItem: ModelItem = {
+        uuid, productId: product.id, name: product.name, price: product.price, type: "model",
+        modelUrl: product.modelUrl,
+        position: [x, model.position.y, z], rotation: [0, 0, 0], scale: [initialScale.x, initialScale.y, initialScale.z],
+        url_tech: product.url_tech, url_cert: product.url_cert, url_inst: product.url_inst,
+        description: product.description, data: product,
       };
 
-      useEditorStore.getState().addItem({
-        uuid,
-        productId: product.id,
-        name: product.name,
-        price: product.price,
-        modelUrl: product.modelUrl,
-
-        position: [x, model.position.y, z],
-        rotation: [0, 0, 0],
-        scale: [initialScale.x, initialScale.y, initialScale.z],
-
-        type: "model",
-
-        url_tech: product.url_tech,
-        url_cert: product.url_cert,
-        url_inst: product.url_inst,
-
-        description: product.description,
-        data: product,
-      });
+      useSceneStore.getState().addItem(newItem); // 🔥 AQUÍ EL CAMBIO
 
       this.scene.add(model);
       afterPlace?.(uuid);
@@ -6766,10 +4771,6 @@ export class ObjectManager {
       console.error("Error placing object:", e);
     }
   }
-
-  // ----------------------------------------------------------
-  //  AJUSTAR OBJETO AL SUELO
-  // ----------------------------------------------------------
 
   public adjustObjectToGround(object: THREE.Object3D) {
     object.updateMatrixWorld();
@@ -6790,6 +4791,7 @@ import type { A42Engine } from "../A42Engine";
 import type { SceneItem } from "@/types/editor";
 
 import { useEditorStore } from "@/stores/editor/useEditorStore";
+import { useSceneStore } from "@/stores/scene/useSceneStore"; // 🔥 NUEVO IMPORT
 import { useUserStore } from "@/stores/user/useUserStore";
 import { PriceCalculator } from "@/utils/PriceCalculator";
 
@@ -6812,9 +4814,10 @@ export class PDFManager {
 
   public async generatePDF() {
     const editor = useEditorStore.getState();
+    const scene = useSceneStore.getState(); // 🔥 Accedemos a la escena (Datos)
     const { user } = useUserStore.getState();
 
-    const items = editor.items;
+    const items = scene.items; // 🔥 items vienen de SceneStore
 
     const projectName = await editor.requestInput(
       "Nombre del Proyecto:",
@@ -6890,7 +4893,9 @@ export class PDFManager {
 
     // -- ITEMS (únicos) --
     const uniqueItemsMap = new Map<string, SceneItem>();
-    items.forEach((item) => {
+    
+    // 🔥 CORRECCIÓN TS: Tipado explícito
+    items.forEach((item: SceneItem) => {
       const key = item.productId === "custom_upload" ? item.uuid : item.productId;
       if (!uniqueItemsMap.has(key)) uniqueItemsMap.set(key, item);
     });
@@ -7897,28 +5902,22 @@ export class SceneManager {
 import * as THREE from "three";
 
 import { useEditorStore } from "@/stores/editor/useEditorStore";
+import { useSceneStore } from "@/stores/scene/useSceneStore"; // 🔥 NUEVO
 import { useCADStore } from "@/stores/cad/useCADStore";
 import { useFenceStore } from "@/stores/fence/useFenceStore";
+import type { FloorItem, FenceItem } from "@/types/editor";
 
 export class ToolsManager {
   private scene: THREE.Scene;
-
-  // Floor Tools
   public floorPoints: THREE.Vector3[] = [];
   private floorMarkers: THREE.Mesh[] = [];
   private previewLine: THREE.Line | null = null;
   public floorEditMarkers: THREE.Mesh[] = [];
   public activeFloorId: string | null = null;
-
-  // FENCE TOOLS
   public fencePoints: THREE.Vector3[] = [];
   private fenceMarkers: THREE.Mesh[] = [];
   private fencePreviewLine: THREE.Line | null = null;
-
-  // CAD Selection (índices de marcadores)
   private selectedMarkerIndices: number[] = [];
-
-  // Measure Tools
   private measurePoints: THREE.Vector3[] = [];
   private measureLine: THREE.Line | null = null;
   private measureMarkers: THREE.Mesh[] = [];
@@ -7928,38 +5927,24 @@ export class ToolsManager {
   }
 
   public clearTools() {
-    // Medidas
     this.measureMarkers.forEach((m) => this.scene.remove(m));
     this.measureMarkers = [];
-    if (this.measureLine) {
-      this.scene.remove(this.measureLine);
-      this.measureLine = null;
-    }
+    if (this.measureLine) { this.scene.remove(this.measureLine); this.measureLine = null; }
     this.measurePoints = [];
 
-    // Suelos (dibujo)
     this.floorMarkers.forEach((m) => this.scene.remove(m));
     this.floorMarkers = [];
-    if (this.previewLine) {
-      this.scene.remove(this.previewLine);
-      this.previewLine = null;
-    }
+    if (this.previewLine) { this.scene.remove(this.previewLine); this.previewLine = null; }
     this.floorPoints = [];
 
-    // Vallas
     this.fenceMarkers.forEach((m) => this.scene.remove(m));
     this.fenceMarkers = [];
-    if (this.fencePreviewLine) {
-      this.scene.remove(this.fencePreviewLine);
-      this.fencePreviewLine = null;
-    }
+    if (this.fencePreviewLine) { this.scene.remove(this.fencePreviewLine); this.fencePreviewLine = null; }
     this.fencePoints = [];
 
-    // CAD
     this.selectedMarkerIndices = [];
     useCADStore.getState().setSelectedVertices([], null, null);
 
-    // Si no estamos en modo edición, quitamos también marcadores de edición de suelo
     const editor = useEditorStore.getState();
     if (editor.mode !== "editing") {
       this.clearFloorEditMarkers();
@@ -7967,161 +5952,104 @@ export class ToolsManager {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // DRAWING FLOOR
-  // ---------------------------------------------------------------------------
   public addDraftPoint(point: THREE.Vector3) {
     const p = point.clone();
     p.y = 0.05;
-    if (
-      this.floorPoints.length > 0 &&
-      p.distanceTo(this.floorPoints[this.floorPoints.length - 1]) < 0.1
-    )
-      return;
-
+    if (this.floorPoints.length > 0 && p.distanceTo(this.floorPoints[this.floorPoints.length - 1]) < 0.1) return;
     this.floorPoints.push(p);
-    const marker = new THREE.Mesh(
-      new THREE.SphereGeometry(0.15),
-      new THREE.MeshBasicMaterial({ color: 0xe67e22 })
-    );
+    const marker = new THREE.Mesh(new THREE.SphereGeometry(0.15), new THREE.MeshBasicMaterial({ color: 0xe67e22 }));
     marker.position.copy(p);
     this.scene.add(marker);
     this.floorMarkers.push(marker);
-
     if (this.previewLine) this.scene.remove(this.previewLine);
     if (this.floorPoints.length > 1) {
-      const geometry = new THREE.BufferGeometry().setFromPoints(
-        this.floorPoints
-      );
-      this.previewLine = new THREE.Line(
-        geometry,
-        new THREE.LineBasicMaterial({ color: 0x9b59b6 })
-      );
+      const geometry = new THREE.BufferGeometry().setFromPoints(this.floorPoints);
+      this.previewLine = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 0x9b59b6 }));
       this.scene.add(this.previewLine);
     }
   }
 
   public createSolidFloor() {
     if (this.floorPoints.length < 3) return;
-
     const editor = useEditorStore.getState();
     const uuid = THREE.MathUtils.generateUUID();
-    const points2D = this.floorPoints.map((p) => ({ x: p.x, z: p.z }));
+    const box = new THREE.Box3().setFromPoints(this.floorPoints);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    center.y = 0;
+    const localPoints = this.floorPoints.map((p) => ({ x: p.x - center.x, z: p.z - center.z }));
 
-    editor.addItem({
-      uuid,
-      productId: "custom_floor",
-      name: "Suelo a medida",
-      price: 100,
-      position: [0, 0, 0],
-      rotation: [0, 0, 0],
-      scale: [1, 1, 1],
-      type: "floor",
-      points: points2D,
-      floorMaterial: "rubber_red",
-    });
+    const newFloor: FloorItem = {
+      uuid, productId: "custom_floor", name: "Suelo a medida", price: 100, type: "floor",
+      points: localPoints, floorMaterial: "rubber_red",
+      position: [center.x, 0, center.z], rotation: [0, 0, 0], scale: [1, 1, 1],
+    };
+
+    useSceneStore.getState().addItem(newFloor); // 🔥 SceneStore
 
     this.clearTools();
     editor.setMode("idle");
   }
 
-  // ---------------------------------------------------------------------------
-  // DRAWING FENCE
-  // ---------------------------------------------------------------------------
   public addFenceDraftPoint(point: THREE.Vector3) {
     const p = point.clone();
     p.y = 0;
-    if (
-      this.fencePoints.length > 0 &&
-      p.distanceTo(this.fencePoints[this.fencePoints.length - 1]) < 0.1
-    )
-      return;
-
+    if (this.fencePoints.length > 0 && p.distanceTo(this.fencePoints[this.fencePoints.length - 1]) < 0.1) return;
     this.fencePoints.push(p);
-    const marker = new THREE.Mesh(
-      new THREE.SphereGeometry(0.15),
-      new THREE.MeshBasicMaterial({ color: 0x3b82f6 })
-    );
+    const marker = new THREE.Mesh(new THREE.SphereGeometry(0.15), new THREE.MeshBasicMaterial({ color: 0x3b82f6 }));
     marker.position.copy(p);
     this.scene.add(marker);
     this.fenceMarkers.push(marker);
-
     if (this.fencePreviewLine) this.scene.remove(this.fencePreviewLine);
     if (this.fencePoints.length > 1) {
-      const geometry = new THREE.BufferGeometry().setFromPoints(
-        this.fencePoints
-      );
-      this.fencePreviewLine = new THREE.Line(
-        geometry,
-        new THREE.LineBasicMaterial({ color: 0x3b82f6, linewidth: 2 })
-      );
+      const geometry = new THREE.BufferGeometry().setFromPoints(this.fencePoints);
+      this.fencePreviewLine = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 0x3b82f6, linewidth: 2 }));
       this.scene.add(this.fencePreviewLine);
     }
   }
 
   public createSolidFence() {
     if (this.fencePoints.length < 2) return;
-
-    // @ts-ignore – el engine global ya lo estás usando en otros sitios
-    const engine = window.editorEngine as any;
-    if (!engine) return;
-
     const fenceStore = useFenceStore.getState();
     const editor = useEditorStore.getState();
-
-    const points2D = this.fencePoints.map((p) => ({ x: p.x, z: p.z }));
     const currentConfig = fenceStore.config;
+    const box = new THREE.Box3().setFromPoints(this.fencePoints);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    center.y = 0;
+    const points2D = this.fencePoints.map((p) => ({ x: p.x - center.x, z: p.z - center.z }));
+    const uuid = THREE.MathUtils.generateUUID();
 
-    const fenceGroup = engine.objectManager.createFenceObject(
-      this.fencePoints,
-      currentConfig
-    );
+    const newFence: FenceItem = {
+      uuid, productId: "fence_" + currentConfig.presetId, name: "Valla", price: 100, type: "fence",
+      points: points2D, fenceConfig: JSON.parse(JSON.stringify(currentConfig)),
+      position: [center.x, 0, center.z], rotation: [0, 0, 0], scale: [1, 1, 1],
+    };
 
-    if (fenceGroup) {
-      const uuid = THREE.MathUtils.generateUUID();
-      fenceGroup.uuid = uuid;
-      fenceGroup.userData.isItem = true;
-      fenceGroup.userData.type = "fence";
-      engine.scene.add(fenceGroup);
-
-      editor.addItem({
-        uuid,
-        productId: "fence_" + currentConfig.presetId,
-        name: "Valla",
-        price: 100,
-        position: [0, 0, 0],
-        rotation: [0, 0, 0],
-        scale: [1, 1, 1],
-        type: "fence",
-        points: points2D,
-        fenceConfig: JSON.parse(JSON.stringify(currentConfig)),
-      });
-    }
+    useSceneStore.getState().addItem(newFence); // 🔥 SceneStore
 
     this.clearTools();
     editor.setMode("idle");
   }
 
-  // ---------------------------------------------------------------------------
-  // EDIT FLOOR (CAD sobre suelos)
-  // ---------------------------------------------------------------------------
-  public showFloorEditMarkers(
-    itemUuid: string,
-    points: { x: number; z: number }[]
-  ) {
+  public clearFloorEditMarkers() {
+    this.floorEditMarkers.forEach((m) => this.scene.remove(m));
+    this.floorEditMarkers = [];
+    this.selectedMarkerIndices = [];
+    useCADStore.getState().setSelectedVertices([], null, null);
+  }
+
+  public showFloorEditMarkers(itemUuid: string, points: { x: number; z: number }[]) {
     this.clearFloorEditMarkers();
     this.activeFloorId = itemUuid;
-
+    const parentObj = this.scene.getObjectByProperty('uuid', itemUuid);
+    if (!parentObj) return;
+    parentObj.updateMatrixWorld(true);
     points.forEach((pt, index) => {
-      const marker = new THREE.Mesh(
-        new THREE.BoxGeometry(0.4, 0.4, 0.4),
-        new THREE.MeshBasicMaterial({
-          color: 0x00ff00,
-          transparent: true,
-          opacity: 0.8,
-        })
-      );
-      marker.position.set(pt.x, 0.0, pt.z);
+      const marker = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.8 }));
+      const localPos = new THREE.Vector3(pt.x, 0, pt.z);
+      localPos.applyMatrix4(parentObj.matrixWorld);
+      marker.position.copy(localPos);
       marker.userData.isFloorMarker = true;
       marker.userData.pointIndex = index;
       marker.userData.parentUuid = itemUuid;
@@ -8130,21 +6058,52 @@ export class ToolsManager {
     });
   }
 
+  public syncMarkersWithObject(parentObj: THREE.Object3D) {
+    if (this.activeFloorId !== parentObj.userData.uuid) return;
+    const scene = useSceneStore.getState(); // 🔥 SceneStore para leer datos
+    const item = scene.items.find(i => i.uuid === parentObj.userData.uuid);
+    if (!item || (item.type !== 'floor' && item.type !== 'fence')) return;
+    this.floorEditMarkers.forEach(marker => {
+      const idx = marker.userData.pointIndex;
+      const pointData = item.points[idx]; 
+      const worldPos = new THREE.Vector3(pointData.x, 0, pointData.z);
+      worldPos.applyMatrix4(parentObj.matrixWorld);
+      marker.position.copy(worldPos);
+    });
+  }
+
+  public updateFloorFromMarkers(marker: THREE.Object3D) {
+    const uuid = marker.userData.parentUuid;
+    const idx = marker.userData.pointIndex;
+    const parentObj = this.scene.getObjectByProperty('uuid', uuid);
+    if (!parentObj) return;
+    const scene = useSceneStore.getState(); // 🔥 SceneStore
+    const item = scene.items.find((i) => i.uuid === uuid);
+    if (item && (item.type === 'floor' || item.type === 'fence')) {
+      const localPos = marker.position.clone();
+      const inverseMatrix = parentObj.matrixWorld.clone().invert();
+      localPos.applyMatrix4(inverseMatrix);
+      const newPoints = item.points.map((p) => ({ ...p }));
+      newPoints[idx] = { x: localPos.x, z: localPos.z };
+      if (item.type === 'floor') {
+        scene.updateFloorPoints(uuid, newPoints);
+      } else if (item.type === 'fence') {
+        scene.updateFencePoints(uuid, newPoints);
+      }
+    }
+  }
+
   public selectVertex(index: number, multiSelect: boolean) {
     if (!multiSelect) {
       this.selectedMarkerIndices = [index];
     } else {
       if (this.selectedMarkerIndices.includes(index)) {
-        this.selectedMarkerIndices = this.selectedMarkerIndices.filter(
-          (i) => i !== index
-        );
+        this.selectedMarkerIndices = this.selectedMarkerIndices.filter((i) => i !== index);
       } else {
         this.selectedMarkerIndices.push(index);
-        if (this.selectedMarkerIndices.length > 3)
-          this.selectedMarkerIndices.shift();
+        if (this.selectedMarkerIndices.length > 3) this.selectedMarkerIndices.shift();
       }
     }
-
     this.updateMarkerColors();
     this.calculateAndSyncData();
   }
@@ -8161,13 +6120,11 @@ export class ToolsManager {
     this.floorEditMarkers.forEach((m) => {
       const idx = m.userData.pointIndex;
       const mat = m.material as THREE.MeshBasicMaterial;
-      let color = 0x00ff00; // normal
-
+      let color = 0x00ff00;
       const posInArray = this.selectedMarkerIndices.indexOf(idx);
-      if (posInArray === 0) color = 0x3b82f6; // primero
-      if (posInArray === 1) color = 0xff0000; // segundo
-      if (posInArray === 2) color = 0xffff00; // tercero
-
+      if (posInArray === 0) color = 0x3b82f6;
+      if (posInArray === 1) color = 0xff0000;
+      if (posInArray === 2) color = 0xffff00;
       mat.color.setHex(color);
     });
   }
@@ -8175,18 +6132,15 @@ export class ToolsManager {
   private calculateAndSyncData() {
     let dist: number | null = null;
     let angle: number | null = null;
-
     if (this.selectedMarkerIndices.length >= 2) {
       const m0 = this.getMarker(this.selectedMarkerIndices[0]);
       const m1 = this.getMarker(this.selectedMarkerIndices[1]);
       if (m0 && m1) dist = m0.position.distanceTo(m1.position);
     }
-
     if (this.selectedMarkerIndices.length === 3) {
       const pRef = this.getMarker(this.selectedMarkerIndices[0])?.position;
       const pPiv = this.getMarker(this.selectedMarkerIndices[1])?.position;
       const pMov = this.getMarker(this.selectedMarkerIndices[2])?.position;
-
       if (pRef && pPiv && pMov) {
         const v1 = new THREE.Vector3().subVectors(pRef, pPiv).normalize();
         const v2 = new THREE.Vector3().subVectors(pMov, pPiv).normalize();
@@ -8194,35 +6148,19 @@ export class ToolsManager {
         angle = THREE.MathUtils.radToDeg(angleRad);
       }
     }
-
-    useCADStore
-      .getState()
-      .setSelectedVertices([...this.selectedMarkerIndices], dist, angle);
+    useCADStore.getState().setSelectedVertices([...this.selectedMarkerIndices], dist, angle);
   }
 
   private getMarker(index: number) {
-    return this.floorEditMarkers.find(
-      (m) => m.userData.pointIndex === index
-    );
+    return this.floorEditMarkers.find((m) => m.userData.pointIndex === index);
   }
 
-  public setSegmentLength(
-    newLength: number,
-    indexToMove: number,
-    indexAnchor: number
-  ) {
+  public setSegmentLength(newLength: number, indexToMove: number, indexAnchor: number) {
     const markerMove = this.getMarker(indexToMove);
     const markerAnchor = this.getMarker(indexAnchor);
     if (!markerMove || !markerAnchor) return;
-
-    const direction = new THREE.Vector3()
-      .subVectors(markerMove.position, markerAnchor.position)
-      .normalize();
-
-    const newPos = markerAnchor.position
-      .clone()
-      .add(direction.multiplyScalar(newLength));
-
+    const direction = new THREE.Vector3().subVectors(markerMove.position, markerAnchor.position).normalize();
+    const newPos = markerAnchor.position.clone().add(direction.multiplyScalar(newLength));
     markerMove.position.copy(newPos);
     this.updateFloorFromMarkers(markerMove);
     this.calculateAndSyncData();
@@ -8230,99 +6168,48 @@ export class ToolsManager {
 
   public setVertexAngle(targetAngleDeg: number) {
     if (this.selectedMarkerIndices.length !== 3) return;
-
     const idxRef = this.selectedMarkerIndices[0];
     const idxPiv = this.selectedMarkerIndices[1];
     const idxMov = this.selectedMarkerIndices[2];
-
     const mRef = this.getMarker(idxRef);
     const mPiv = this.getMarker(idxPiv);
     const mMov = this.getMarker(idxMov);
     if (!mRef || !mPiv || !mMov) return;
-
-    const vecRef = new THREE.Vector3().subVectors(
-      mRef.position,
-      mPiv.position
-    );
+    const vecRef = new THREE.Vector3().subVectors(mRef.position, mPiv.position);
     const angleRef = Math.atan2(vecRef.z, vecRef.x);
     const distMov = mPiv.position.distanceTo(mMov.position);
     const targetAngleRad = THREE.MathUtils.degToRad(targetAngleDeg);
     const newAngleAbs = angleRef + targetAngleRad;
-
     const newX = mPiv.position.x + distMov * Math.cos(newAngleAbs);
     const newZ = mPiv.position.z + distMov * Math.sin(newAngleAbs);
-
     mMov.position.set(newX, 0, newZ);
-
     this.updateFloorFromMarkers(mMov);
     this.calculateAndSyncData();
   }
 
-  public clearFloorEditMarkers() {
-    this.floorEditMarkers.forEach((m) => this.scene.remove(m));
-    this.floorEditMarkers = [];
-    this.selectedMarkerIndices = [];
-    useCADStore.getState().setSelectedVertices([], null, null);
-  }
-
-  public updateFloorFromMarkers(marker: THREE.Object3D) {
-    const uuid = marker.userData.parentUuid;
-    const idx = marker.userData.pointIndex;
-
-    const editor = useEditorStore.getState();
-    const items = editor.items;
-    const floorItem = items.find((i) => i.uuid === uuid);
-
-    if (floorItem && floorItem.points) {
-      const newPoints = floorItem.points.map((p) => ({ ...p }));
-      newPoints[idx] = { x: marker.position.x, z: marker.position.z };
-      editor.updateFloorPoints(uuid, newPoints);
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // MEDICIONES (herramienta de medir)
-  // ---------------------------------------------------------------------------
   public handleMeasurementClick(point: THREE.Vector3) {
     const p = point.clone();
     p.y += 0.05;
-
     this.measurePoints.push(p);
-    const marker = new THREE.Mesh(
-      new THREE.SphereGeometry(0.1),
-      new THREE.MeshBasicMaterial({
-        color: 0xffff00,
-        depthTest: false,
-        transparent: true,
-      })
-    );
+    const marker = new THREE.Mesh(new THREE.SphereGeometry(0.1), new THREE.MeshBasicMaterial({ color: 0xffff00, depthTest: false, transparent: true }));
     marker.position.copy(p);
     this.scene.add(marker);
     this.measureMarkers.push(marker);
-
     const editor = useEditorStore.getState();
-
     if (this.measurePoints.length === 2) {
       const dist = this.measurePoints[0].distanceTo(this.measurePoints[1]);
-      const material = new THREE.LineBasicMaterial({
-        color: 0xffff00,
-        linewidth: 2,
-        depthTest: false,
-      });
-      const geometry = new THREE.BufferGeometry().setFromPoints(
-        this.measurePoints
-      );
+      const material = new THREE.LineBasicMaterial({ color: 0xffff00, linewidth: 2, depthTest: false });
+      const geometry = new THREE.BufferGeometry().setFromPoints(this.measurePoints);
       this.measureLine = new THREE.Line(geometry, material);
       this.scene.add(this.measureLine);
       editor.setMeasurementResult(dist);
     } else if (this.measurePoints.length > 2) {
-      // Reiniciamos si clican una tercera vez
       this.clearTools();
       this.handleMeasurementClick(point);
     }
   }
 }
-// --- END OF FILE src/features/editor/engine/managers/ToolsManager.ts ---
+// --- END OF FILE ---
 </file>
 
 <file path="src/features/editor/engine/managers/WalkManager.ts">
@@ -8499,22 +6386,18 @@ export class WalkManager {
 import { Trash2, X } from "lucide-react";
 
 import { useUIStore } from "@/stores/ui/useUIStore"; // UI toggles
-import { useEditorStore } from "@/stores/editor/useEditorStore"; // items y precios
-import { useSelectionStore } from "@/stores/selection/useSelectionStore"; // selección
+import { useSceneStore } from "@/stores/scene/useSceneStore"; // 🔥 items y acciones
+import { useSelectionStore } from "@/stores/selection/useSelectionStore"; 
 
 export const BudgetPanel = () => {
-  // UI (mostrar u ocultar panel)
   const { budgetVisible, toggleBudget } = useUIStore();
 
-  // Datos de la escena
-  const items = useEditorStore((s) => s.items);
-  const totalPrice = useEditorStore((s) => s.totalPrice);
+  // Datos de la escena desde SceneStore
+  const items = useSceneStore((s) => s.items);
+  const totalPrice = useSceneStore((s) => s.totalPrice);
+  const removeItem = useSceneStore((s) => s.removeItem);
+  const resetScene = useSceneStore((s) => s.resetScene);
 
-  // Acciones de escena
-  const removeItem = useEditorStore((s) => s.removeItem);
-  const resetScene = useEditorStore((s) => s.resetScene);
-
-  // Selección
   const selectItem = useSelectionStore((s) => s.selectItem);
 
   if (!budgetVisible) return null;
@@ -8522,7 +6405,6 @@ export const BudgetPanel = () => {
   return (
     <div className="absolute top-20 left-6 bg-neutral-900/95 backdrop-blur-md border border-neutral-700 rounded-xl shadow-2xl w-80 max-h-[70vh] flex flex-col z-30 animate-in fade-in slide-in-from-left-5 duration-200">
 
-      {/* HEADER */}
       <div className="p-4 border-b border-neutral-700 flex justify-between items-center bg-neutral-800/50 rounded-t-xl">
         <h2 className="text-white font-bold text-lg flex items-center gap-2">
           🧾 Presupuesto
@@ -8532,7 +6414,6 @@ export const BudgetPanel = () => {
         </button>
       </div>
 
-      {/* LISTA */}
       <div className="flex-grow overflow-y-auto p-2 custom-scrollbar space-y-2">
         {items.length === 0 ? (
           <div className="text-center py-8 text-neutral-500 italic">
@@ -8575,7 +6456,6 @@ export const BudgetPanel = () => {
         )}
       </div>
 
-      {/* FOOTER */}
       <div className="p-4 border-t border-neutral-700 bg-neutral-800/50 rounded-b-xl space-y-3">
         <div className="flex justify-between items-end">
           <span className="text-neutral-400 text-sm">Total Estimado</span>
@@ -8606,7 +6486,8 @@ export const BudgetPanel = () => {
 // --- START OF FILE src/features/editor/ui/CadControl.tsx ---
 import { useEffect, useState } from "react";
 import { useSelectionStore } from "@/stores/selection/useSelectionStore";
-import { ArrowLeftRight, Ruler, ScanLine } from "lucide-react";
+// 🔥 Eliminamos importaciones no usadas como ScanLine o Ruler si no se usan
+import { ArrowLeftRight } from "lucide-react";
 
 export const CadControl = () => {
   const selectedVertexIndices = useSelectionStore((s) => s.selectedVertices);
@@ -8659,7 +6540,35 @@ export const CadControl = () => {
           : "border-blue-500 bg-neutral-800"
       }`}
     >
-      {/* ... resto igual ... */}
+      <div className="flex justify-between items-center mb-2">
+        <span className="text-xs font-bold uppercase text-white">
+          {mode === "ANGLE" ? "📐 Ángulo" : "📏 Distancia"}
+        </span>
+        {mode === "DISTANCE" && (
+          <button
+            onClick={handleSwap}
+            className="p-1 hover:bg-white/10 rounded text-blue-400"
+            title="Cambiar dirección"
+          >
+            <ArrowLeftRight size={14} />
+          </button>
+        )}
+      </div>
+
+      <div className="flex gap-2">
+        <input
+          type="number"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          className="w-full bg-black/30 border border-white/10 rounded px-2 py-1 text-sm text-white font-mono"
+        />
+        <button
+          onClick={handleApply}
+          className="bg-blue-600 hover:bg-blue-500 px-3 rounded text-xs font-bold text-white"
+        >
+          OK
+        </button>
+      </div>
     </div>
   );
 };
@@ -8667,9 +6576,8 @@ export const CadControl = () => {
 </file>
 
 <file path="src/features/editor/ui/Catalog.tsx">
-// --- START OF FILE src/features/editor/ui/Catalog.tsx ---
 import { useEffect, useState, useMemo } from 'react';
-import { Search, X } from 'lucide-react'; // Importamos iconos
+import { Search, X } from 'lucide-react'; 
 import { useEditorStore } from '@/stores/editor/useEditorStore';
 import { useCatalogStore } from '@/stores/catalog/useCatalogStore';
 import { 
@@ -8683,16 +6591,17 @@ import {
 
 export const Catalog = () => {
   const { setMode } = useEditorStore();
-  const { setSelectedProduct } = useCatalogStore();
+  
+  // 🔥 CORRECCIÓN: El nombre correcto en el store es 'selectProduct'
+  const { selectProduct } = useCatalogStore();
+  
   const [catalogDB, setCatalogDB] = useState<CatalogDB | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Navegación
   const [currentLine, setCurrentLine] = useState<string | null>(null);
   const [currentCategory, setCurrentCategory] = useState<string | null>(null);
   
-  // Búsqueda
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
@@ -8711,8 +6620,6 @@ export const Catalog = () => {
     fetchCatalog();
   }, []);
 
-  // --- LÓGICA DE BÚSQUEDA ---
-  // Aplanamos el catálogo para buscar en todos los productos a la vez
   const allProducts = useMemo(() => {
     if (!catalogDB) return [];
     const products: Product[] = [];
@@ -8724,31 +6631,26 @@ export const Catalog = () => {
     return products;
   }, [catalogDB]);
 
-  // Filtramos según lo que escriba el usuario
   const filteredProducts = useMemo(() => {
     if (!searchTerm) return [];
     const lowerTerm = searchTerm.toLowerCase();
     return allProducts.filter(p => 
       p.name.toLowerCase().includes(lowerTerm) || 
-      p.id.toLowerCase().includes(lowerTerm) // Buscamos también por REF/ID
+      p.id.toLowerCase().includes(lowerTerm)
     );
   }, [searchTerm, allProducts]);
 
   const handleSelectProduct = (product: Product) => {
-    setSelectedProduct(product);
+    // 🔥 CORRECCIÓN: Usar la función correcta
+    selectProduct(product);
     setMode('placing_item');
   };
 
   const handleBackToLines = () => {
     setCurrentCategory(null);
     setCurrentLine(null);
-    setSearchTerm(''); // Limpiar búsqueda al navegar con breadcrumbs
+    setSearchTerm(''); 
   };
-  // *** se supone que no lo uso ya
-  //const handleBackToCategories = () => {
-    //setCurrentCategory(null);
-    //setSearchTerm('');
-  //};
 
   if (loading) {
     return (
@@ -8773,10 +6675,8 @@ export const Catalog = () => {
 
   if (!catalogDB) return null;
 
-  // --- RENDERIZADO DEL CONTENIDO ---
-
   const renderContent = () => {
-    // 0. VISTA DE BÚSQUEDA (Si hay texto en el buscador)
+    // 0. BUSQUEDA
     if (searchTerm) {
       if (filteredProducts.length === 0) {
         return (
@@ -8804,7 +6704,6 @@ export const Catalog = () => {
                   ) : (
                     <span className="text-neutral-500 text-sm">Sin imagen</span>
                   )}
-                  {/* Etiqueta pequeña para saber de qué línea viene al buscar */}
                   <span className="absolute top-2 right-2 bg-black/60 text-xs px-2 py-1 rounded text-white/70 backdrop-blur-sm">
                     {product.category}
                   </span>
@@ -8823,7 +6722,7 @@ export const Catalog = () => {
       );
     }
 
-    // 1. VISTA DE PRODUCTOS DE CATEGORÍA
+    // 1. PRODUCTOS DE CATEGORÍA
     if (currentLine && currentCategory) {
       const products = catalogDB.lines[currentLine]?.categories[currentCategory];
       
@@ -8858,7 +6757,7 @@ export const Catalog = () => {
         </>
       );
 
-    // 2. VISTA DE CATEGORÍAS
+    // 2. CATEGORÍAS
     } else if (currentLine) {
       const categories = catalogDB.lines[currentLine]?.categories;
       const categoryNames = Object.keys(categories || {});
@@ -8898,7 +6797,7 @@ export const Catalog = () => {
         </>
       );
 
-    // 3. VISTA DE LÍNEAS (Home)
+    // 3. LÍNEAS (HOME)
     } else {
       const lineNames = Object.keys(catalogDB.lines);
       if (lineNames.length === 0) return <p className="text-neutral-400 mt-10 text-center">El catálogo está vacío.</p>;
@@ -8943,9 +6842,7 @@ export const Catalog = () => {
 
   return (
     <div className="absolute inset-0 bg-neutral-950/95 backdrop-blur-md z-40 flex flex-col animate-in fade-in duration-200">
-      {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-center p-6 border-b border-white/10 bg-black/20 gap-4">
-        {/* Breadcrumbs (Navegación) */}
         <div className="flex items-center space-x-3 overflow-hidden flex-grow min-w-0">
           <button 
             onClick={() => { setCurrentLine(null); setCurrentCategory(null); setSearchTerm(''); }}
@@ -8976,7 +6873,6 @@ export const Catalog = () => {
           )}
         </div>
 
-        {/* BUSCADOR */}
         <div className="relative w-full md:w-80">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <Search size={18} className="text-neutral-400" />
@@ -8998,23 +6894,20 @@ export const Catalog = () => {
           )}
         </div>
 
-        {/* BOTÓN CERRAR */}
         <button
           onClick={() => setMode('idle')}
           className="p-2 hover:bg-white/10 rounded-full text-white/50 hover:text-white transition-all ml-2"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          <X size={32} />
         </button>
       </div>
 
-      {/* BODY */}
       <div className="flex-grow p-6 overflow-hidden relative">
         {renderContent()}
       </div>
     </div>
   );
 };
-// --- END OF FILE src/features/editor/ui/Catalog.tsx ---
 </file>
 
 <file path="src/features/editor/ui/Editor.css">
@@ -9200,32 +7093,27 @@ import { FENCE_PRESETS } from "../data/fence_presets";
 
 import { CadControl } from "./CadControl";
 
-// Stores correctos
-import { useEditorStore } from "@/stores/editor/useEditorStore";
+// 🔥 CAMBIO CLAVE: Usamos useSceneStore para los datos
+import { useSceneStore } from "@/stores/scene/useSceneStore";
 import { useSelectionStore } from "@/stores/selection/useSelectionStore";
 
 export const FenceProperties = () => {
-  // Suscripción reactiva correcta
-  const items = useEditorStore((s) => s.items);
-  const updateItemFenceConfig = useEditorStore((s) => s.updateItemFenceConfig);
-
   const selectedItemId = useSelectionStore((s) => s.selectedItemId);
 
-  // Buscar el item seleccionado
+  // Leemos items y la acción de actualizar desde SceneStore
+  const items = useSceneStore((s) => s.items);
+  const updateItemFenceConfig = useSceneStore((s) => s.updateItemFenceConfig);
+
+  // Buscamos el item seleccionado
   const selectedItem = items.find((i) => i.uuid === selectedItemId);
-console.log("%c[FENCE-PROPS] Render", "color: #3bf");
-console.log(" selectedItemId:", selectedItemId);
-console.log(" selectedItem:", selectedItem);
-console.log(" type:", selectedItem?.type);
-  // Si no hay item o no es valla → no renderizar
-  if (!selectedItem || selectedItem.type !== "fence") {
+
+  // 🔥 Type Guard: Si no hay item, o no es valla, o no tiene config -> no renderizar
+  if (!selectedItem || selectedItem.type !== "fence" || !selectedItem.fenceConfig) {
     return null;
-    
   }
 
-  const currentConfig = selectedItem.fenceConfig!;
-  const currentPreset =
-    FENCE_PRESETS[currentConfig.presetId] || FENCE_PRESETS["wood"];
+  const currentConfig = selectedItem.fenceConfig;
+  const currentPreset = FENCE_PRESETS[currentConfig.presetId] || FENCE_PRESETS["wood"];
 
   // Cambiar preset
   const handlePresetChange = (key: string) => {
@@ -9362,28 +7250,26 @@ console.log(" type:", selectedItem?.type);
 </file>
 
 <file path="src/features/editor/ui/FloorProperties.tsx">
-// --- FILE: src/features/editor/ui/FloorProperties.tsx ---
 import React, { useRef } from "react";
 import { Palette, Upload, RotateCw, Move } from "lucide-react";
 
-import { useEditorStore } from "@/stores/editor/useEditorStore";
+import { useSceneStore } from "@/stores/scene/useSceneStore"; // 🔥
 import { useSelectionStore } from "@/stores/selection/useSelectionStore";
 import type { FloorMaterialType } from "@/types/editor";
 import { CadControl } from "./CadControl";
 
 export const FloorProperties: React.FC = () => {
-  // Selección (qué item está seleccionado)
   const selectedItemId = useSelectionStore((s) => s.selectedItemId);
 
-  // --- STORE FIX (cada selector independiente → evita bucles infinitos)
-  const items = useEditorStore((s) => s.items);
-  const updateFloorMaterial = useEditorStore((s) => s.updateFloorMaterial);
-  const updateFloorTexture = useEditorStore((s) => s.updateFloorTexture);
-  // -------------------------------------------------------------
+  const items = useSceneStore((s) => s.items);
+  const updateFloorMaterial = useSceneStore((s) => s.updateFloorMaterial);
+  const updateFloorTexture = useSceneStore((s) => s.updateFloorTexture);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selectedItem = items.find((i) => i.uuid === selectedItemId);
+  
+  // 🔥 Type Guard en componente también es útil
   if (!selectedItem || selectedItem.type !== "floor") return null;
 
   const materials: { id: FloorMaterialType; color: string; name: string }[] = [
@@ -9397,7 +7283,6 @@ export const FloorProperties: React.FC = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const url = URL.createObjectURL(file);
     updateFloorTexture(selectedItem.uuid, url, 1, 0);
   };
@@ -9413,14 +7298,12 @@ export const FloorProperties: React.FC = () => {
 
   return (
     <div className="absolute top-20 right-4 bg-neutral-900/95 backdrop-blur-md border border-neutral-700 rounded-xl p-4 shadow-xl z-20 w-80 animate-in fade-in slide-in-from-right-2">
-      {/* CAD Control arriba */}
       <CadControl />
 
       <h3 className="text-white text-sm font-bold mb-4 flex items-center gap-2 border-b border-white/10 pb-2">
         <Palette size={16} /> Propiedades del Suelo
       </h3>
 
-      {/* MATERIAL BASE */}
       <div className="mb-4">
         <label className="text-xs text-neutral-400 mb-2 block uppercase font-bold">
           Material Base
@@ -9430,7 +7313,6 @@ export const FloorProperties: React.FC = () => {
             <button
               key={mat.id}
               onClick={() => {
-                // si pongo material base, quito textura custom
                 updateFloorTexture(selectedItem.uuid, undefined, 1, 0);
                 updateFloorMaterial(selectedItem.uuid, mat.id);
               }}
@@ -9447,7 +7329,6 @@ export const FloorProperties: React.FC = () => {
         </div>
       </div>
 
-      {/* TEXTURA PERSONALIZADA */}
       <div className="mb-2">
         <label className="text-xs text-neutral-400 mb-2 block uppercase font-bold">
           Textura Personalizada
@@ -9471,7 +7352,6 @@ export const FloorProperties: React.FC = () => {
 
         {selectedItem.textureUrl && (
           <div className="grid grid-cols-2 gap-3">
-            {/* ESCALA */}
             <div className="bg-neutral-800 p-2 rounded">
               <div className="flex justify-between mb-1">
                 <span className="text-[10px] text-neutral-400 flex items-center gap-1">
@@ -9497,7 +7377,6 @@ export const FloorProperties: React.FC = () => {
               />
             </div>
 
-            {/* ROTACIÓN */}
             <div className="bg-neutral-800 p-2 rounded">
               <div className="flex justify-between mb-1">
                 <span className="text-[10px] text-neutral-400 flex items-center gap-1">
@@ -9726,7 +7605,7 @@ import {
   MousePointer2, Grid3X3, Component, Trees, Grid, Undo2, Redo2, Eye, Box, ArrowUp, ArrowRight, GalleryVerticalEnd, Square, Sun, Upload, Ruler, Footprints, Video, Camera, Film, Download, FileText, ShieldAlert, FileDown, Save, LayoutDashboard
 } from 'lucide-react';
 import { useEditorStore } from "@/stores/editor/useEditorStore";
-import { useSceneStore } from "@/stores/scene/useSceneStore";
+import { useSceneStore } from "@/stores/scene/useSceneStore"; // 🔥
 import { useProjectStore } from "@/stores/project/useProjectStore";
 import { supabase } from '../../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
@@ -9734,25 +7613,27 @@ import './Editor.css';
 
 export const Toolbar = () => {
   const navigate = useNavigate();
-const {
-  mode, setMode, gridVisible, toggleGrid,
-  undo, redo, past, future,
-  cameraType, setCameraType, triggerView,
-  envPanelVisible, toggleEnvPanel,
-  setMeasurementResult,
-  safetyZonesVisible, toggleSafetyZones,
-  requestInput,
-} = useEditorStore();
+  
+  // UI Actions
+  const {
+    mode, setMode, gridVisible, toggleGrid,
+    cameraType, setCameraType, triggerView,
+    envPanelVisible, toggleEnvPanel,
+    setMeasurementResult,
+    safetyZonesVisible, toggleSafetyZones,
+    requestInput,
+  } = useEditorStore();
 
-const {
-  items, addItem, fenceConfig, totalPrice,
-  removeItem, resetScene,
-} = useSceneStore();
+  // Data Actions
+  const {
+    items, addItem, fenceConfig, totalPrice,
+    undo, redo, past, future // Undo/Redo movidos aquí
+  } = useSceneStore(); // 🔥
 
-const {
-  user, currentProjectId, currentProjectName,
-  isReadOnlyMode, setProjectInfo,
-} = useProjectStore();
+  const {
+    user, currentProjectId, currentProjectName,
+    isReadOnlyMode, setProjectInfo,
+  } = useProjectStore();
 
   const [showViews, setShowViews] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -9766,32 +7647,22 @@ const {
     { id: 'catalog', icon: <Trees size={20} />, label: 'Catálogo' },
   ];
 
-  // --- LÓGICA DE GUARDADO ---
   const handleSaveProject = async () => {
-    // Doble seguridad: Si es solo lectura, no hacemos nada
     if (isReadOnlyMode) return alert("Modo de Solo Lectura. No puedes sobrescribir este proyecto.");
     if (!user) return alert("Debes iniciar sesión para guardar.");
 
-    // 1. Captura de pantalla (Miniatura)
     const engine = (window as any).editorEngine;
+    if (!engine || !engine.renderer) return;
     
-    if (!engine || !engine.renderer) {
-        console.error("No se encontró el motor gráfico");
-        return;
-    }
-    
-    // Forzamos un render para asegurar que salga todo
     engine.render(); 
-    const thumbnailBase64 = engine.renderer.domElement.toDataURL('image/jpeg', 0.5); // Calidad media
+    const thumbnailBase64 = engine.renderer.domElement.toDataURL('image/jpeg', 0.5);
 
-    // 2. Preparar datos JSON
     const projectData = {
       items,
       fenceConfig,
       camera: cameraType
     };
 
-    // 3. Determinar Nombre
     let nameToSave = currentProjectName;
     let isOverwrite = false;
 
@@ -9814,7 +7685,6 @@ const {
     setIsSaving(true);
     try {
       if (isOverwrite && currentProjectId) {
-        // UPDATE
         const { error } = await supabase.from('projects').update({
           name: nameToSave,
           data: projectData,
@@ -9822,12 +7692,9 @@ const {
           total_price: totalPrice,
           updated_at: new Date()
         }).eq('id', currentProjectId);
-        
         if (error) throw error;
         alert("Proyecto actualizado correctamente.");
-
       } else {
-        // INSERT
         const { data, error } = await supabase.from('projects').insert([{
           user_id: user.id,
           name: nameToSave,
@@ -9835,10 +7702,8 @@ const {
           thumbnail_url: thumbnailBase64,
           total_price: totalPrice
         }]).select().single();
-
         if (error) throw error;
         alert("Proyecto guardado correctamente.");
-        
         if (data) setProjectInfo(data.id, data.name);
       }
     } catch (err: any) {
@@ -9848,12 +7713,15 @@ const {
     }
   };
 
-  // --- OTRAS FUNCIONES ---
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]; if (!file) return;
     const url = URL.createObjectURL(file);
     const fileName = file.name.replace('.glb', '').replace('.gltf', '');
-    addItem({ uuid: crypto.randomUUID(), productId: 'custom_upload', name: fileName, price: 0, type: 'model', modelUrl: url, position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] });
+    // Importación con any para simplificar, se recomienda usar ObjectManager directamente
+    addItem({ 
+        uuid: crypto.randomUUID(), productId: 'custom_upload', name: fileName, price: 0, 
+        type: 'model', modelUrl: url, position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] 
+    } as any);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -9862,9 +7730,7 @@ const {
     else { setMode('measuring'); setShowViews(false); } 
   };
 
-  // Funciones auxiliares usando (window as any) para evitar errores TS
   const getEngine = () => (window as any).editorEngine;
-
   const generatePDF = () => { getEngine()?.pdfManager.generatePDF(); };
   const activateWalkMode = () => { getEngine()?.walkManager.enable(); };
   const takePhoto = () => { getEngine()?.recorderManager.takeScreenshot(); };
@@ -9881,7 +7747,6 @@ const {
 
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center">
-      {/* Vistas Popup */}
       {showViews && (
         <div className="absolute bottom-full mb-4 glass-panel flex-row animate-in slide-in-from-bottom-2 fade-in duration-200">
            <button className={`tool-btn ${cameraType === 'perspective' ? 'active' : ''}`} onClick={() => setCameraType('perspective')} title="3D"><Eye size={18} /></button>
@@ -9895,17 +7760,13 @@ const {
       )}
 
       <div className="glass-panel">
-        
-        {/* Botón DASHBOARD */}
         {user && (
            <button className="tool-btn text-blue-400 hover:text-blue-300" onClick={() => navigate(user.email?.includes('admin') || user.email?.includes('levipark') ? '/admin/crm' : '/portal?tab=projects')} title="Ir a Mis Proyectos">
              <LayoutDashboard size={20} /> <span className="tool-label">Portal</span>
            </button>
         )}
-        
         {user && <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />}
 
-        {/* HERRAMIENTAS PRINCIPALES */}
         {tools.map((tool) => (
           <button key={tool.id} className={`tool-btn ${mode === tool.id ? 'active' : ''}`} onClick={() => { setMode(tool.id as any); setShowViews(false); }}>
             {tool.icon} <span className="tool-label">{tool.label}</span>
@@ -9914,17 +7775,13 @@ const {
 
         <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
 
-        {/* 💡 BOTÓN GUARDAR (BLOQUEADO EN MODO LECTURA) */}
         {user ? (
             <button 
                 className={`tool-btn ${isSaving ? 'text-yellow-400' : ''}`} 
                 onClick={handleSaveProject} 
-                disabled={isSaving || isReadOnlyMode} // <--- BLOQUEO
+                disabled={isSaving || isReadOnlyMode}
                 title={isReadOnlyMode ? "Modo Lectura (No se puede guardar)" : "Guardar Proyecto en Nube"}
-                style={{
-                    opacity: isReadOnlyMode ? 0.5 : 1, // <--- OPACIDAD VISUAL
-                    cursor: isReadOnlyMode ? 'not-allowed' : 'pointer' // <--- CURSOR PROHIBIDO
-                }}
+                style={{ opacity: isReadOnlyMode ? 0.5 : 1, cursor: isReadOnlyMode ? 'not-allowed' : 'pointer' }}
             >
                 <Save size={20} className={isSaving ? 'animate-pulse' : ''} /> 
                 <span className="tool-label">{isSaving ? '...' : 'Guardar'}</span>
@@ -9964,7 +7821,6 @@ const {
             <Film size={20} /> <span className="tool-label">360º</span>
         </button>
 
-        {/* --- SOLO SI ESTÁ REGISTRADO: DESCARGAS 3D Y CAD --- */}
         {user && (
           <>
             <button className="tool-btn" onClick={exportGLB} title="Exportar 3D (.glb)">
@@ -10360,25 +8216,13 @@ export const useCRMStore = create<CRMState>((set) => ({
 <file path="src/stores/editor/useEditorStore.ts">
 // --- FILE: src/stores/editor/useEditorStore.ts ---
 import { create } from "zustand";
-import * as THREE from "three";
-
-// Importamos tipos
-import type {
-  SceneItem,
-  FloorMaterialType,
-  FenceConfig,
-  EditorMode,
-  CameraType,
-  CameraView,
-} from "@/types/editor";
+import type { EditorMode, CameraType, CameraView } from "@/types/editor";
 
 declare global {
   interface Window {
     editorEngine?: any;
   }
 }
-
-import { FENCE_PRESETS } from "@/features/editor/data/fence_presets";
 
 interface InputModalState {
   isOpen: boolean;
@@ -10388,11 +8232,9 @@ interface InputModalState {
 }
 
 interface EditorState {
-  items: SceneItem[];
-  totalPrice: number;
-
+  // UI STATE
   mode: EditorMode;
-
+  
   gridVisible: boolean;
   budgetVisible: boolean;
   envPanelVisible: boolean;
@@ -10404,49 +8246,11 @@ interface EditorState {
   cameraType: CameraType;
   pendingView: CameraView | null;
 
-  past: SceneItem[][];
-  future: SceneItem[][];
-
   measurementResult: number | null;
-
-  fenceConfig: FenceConfig;
 
   inputModal: InputModalState;
 
-  // actions
-  saveSnapshot: () => void;
-
-  addItem: (item: SceneItem) => void;
-  removeItem: (uuid: string) => void;
-  duplicateItem: (uuid: string) => void;
-
-  updateItemTransform: (
-    uuid: string,
-    pos: number[],
-    rot: number[],
-    scale: number[]
-  ) => void;
-
-  updateFloorMaterial: (uuid: string, material: FloorMaterialType) => void;
-  updateFloorTexture: (
-    uuid: string,
-    url: string | undefined,
-    scale: number,
-    rotation: number
-  ) => void;
-
-  updateFloorPoints: (
-    uuid: string,
-    points: { x: number; z: number }[]
-  ) => void;
-
-  setFenceConfig: (config: Partial<FenceConfig>) => void;
-  updateItemFenceConfig: (uuid: string, config: Partial<FenceConfig>) => void;
-
-  undo: () => void;
-  redo: () => void;
-  resetScene: () => void;
-
+  // ACTIONS (Solo UI y Modos)
   setMode: (mode: EditorMode) => void;
 
   toggleGrid: () => void;
@@ -10468,10 +8272,6 @@ interface EditorState {
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
-  // --- ESTADO INICIAL ---
-  items: [],
-  totalPrice: 0,
-
   mode: "idle",
 
   gridVisible: false,
@@ -10487,14 +8287,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   measurementResult: null,
 
-  past: [],
-  future: [],
-
-  fenceConfig: {
-    presetId: "wood",
-    colors: FENCE_PRESETS["wood"].defaultColors,
-  },
-
   inputModal: {
     isOpen: false,
     title: "",
@@ -10502,217 +8294,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     resolve: null,
   },
 
-  // -----------------------------
-  // SNAPSHOTS PARA UNDO/REDO
-  // -----------------------------
-  saveSnapshot: () => {
-    const snapshot = structuredClone(get().items);
-    set((state) => ({
-      past: [...state.past.slice(-19), snapshot],
-      future: [],
-    }));
-  },
-
-  // -----------------------------
-  // ADD ITEM
-  // -----------------------------
-  addItem: (item) => {
-    const price = item.price ?? 0;
-    get().saveSnapshot();
-    set((s) => ({
-      items: [...s.items, item],
-      totalPrice: s.totalPrice + price,
-    }));
-  },
-
-  // -----------------------------
-  // REMOVE ITEM
-  // -----------------------------
-  removeItem: (uuid) => {
-    get().saveSnapshot();
-    set((s) => {
-      const newItems = s.items.filter((i) => i.uuid !== uuid);
-      return {
-        items: newItems,
-        totalPrice: newItems.reduce((sum, it) => sum + it.price, 0),
-        mode: "idle",
-      };
-    });
-  },
-
-  // -----------------------------
-  // DUPLICATE ITEM
-  // -----------------------------
-  duplicateItem: (uuid) => {
-    const s = get();
-    const original = s.items.find((i) => i.uuid === uuid);
-    if (!original) return;
-
-    s.saveSnapshot();
-
-    const cloned = structuredClone(original);
-    cloned.uuid = THREE.MathUtils.generateUUID();
-    cloned.position = [
-      original.position[0] + 1,
-      original.position[1],
-      original.position[2] + 1,
-    ];
-
-    set({
-      items: [...s.items, cloned],
-      totalPrice: s.totalPrice + cloned.price,
-      mode: "editing",
-    });
-  },
-
-  // -----------------------------
-  // UPDATE TRANSFORM
-  // -----------------------------
-  updateItemTransform: (uuid, pos, rot, scale) =>
-    set((s) => ({
-      items: s.items.map((i) =>
-        i.uuid === uuid
-          ? {
-              ...i,
-              position: pos as [number, number, number],
-              rotation: rot as [number, number, number],
-              scale: scale as [number, number, number],
-            }
-          : i
-      ),
-    })),
-
-  // -----------------------------
-  // FLOOR MATERIAL
-  // -----------------------------
-  updateFloorMaterial: (uuid, material) =>
-    set((s) => ({
-      items: s.items.map((i) =>
-        i.uuid === uuid
-          ? { ...i, floorMaterial: material, textureUrl: undefined }
-          : i
-      ),
-    })),
-
-  // -----------------------------
-  // FLOOR TEXTURE
-  // -----------------------------
-  updateFloorTexture: (uuid, url, scale, rotation) =>
-    set((s) => ({
-      items: s.items.map((i) =>
-        i.uuid === uuid
-          ? {
-              ...i,
-              textureUrl: url,
-              textureScale: scale,
-              textureRotation: rotation,
-              floorMaterial: undefined,
-            }
-          : i
-      ),
-    })),
-
-  // -----------------------------
-  // FLOOR POINTS
-  // -----------------------------
-  updateFloorPoints: (uuid, points) => {
-    get().saveSnapshot();
-    set((s) => ({
-      items: s.items.map((i) =>
-        i.uuid === uuid ? { ...i, points } : i
-      ),
-    }));
-  },
-
-  // -----------------------------
-  // GLOBAL FENCE CONFIG
-  // -----------------------------
-  setFenceConfig: (config) =>
-    set((s) => ({
-      fenceConfig: { ...s.fenceConfig, ...config },
-    })),
-
-  // -----------------------------
-  // ITEM FENCE CONFIG
-  // -----------------------------
-  updateItemFenceConfig: (uuid, config) => {
-    get().saveSnapshot();
-    set((s) => ({
-      items: s.items.map((i) =>
-        i.uuid === uuid && i.fenceConfig
-          ? { ...i, fenceConfig: { ...i.fenceConfig, ...config } }
-          : i
-      ),
-    }));
-  },
-
-  // -----------------------------
-  // UNDO
-  // -----------------------------
-  undo: () => {
-    const { past, items, future } = get();
-    if (past.length === 0) return;
-
-    const prev = past[past.length - 1];
-    set({
-      items: prev,
-      past: past.slice(0, -1),
-      future: [items, ...future],
-      mode: "idle",
-      totalPrice: prev.reduce((s, i) => s + i.price, 0),
-    });
-  },
-
-  // -----------------------------
-  // REDO
-  // -----------------------------
-  redo: () => {
-    const { past, items, future } = get();
-    if (future.length === 0) return;
-
-    const next = future[0];
-    set({
-      items: next,
-      past: [...past, items],
-      future: future.slice(1),
-      mode: "idle",
-      totalPrice: next.reduce((s, i) => s + i.price, 0),
-    });
-  },
-
-  // -----------------------------
-  // RESET SCENE
-  // -----------------------------
-  resetScene: () =>
-    set({
-      items: [],
-      totalPrice: 0,
-      mode: "idle",
-      past: [],
-      future: [],
-      pendingView: null,
-    }),
-
-  // -----------------------------
-  // MODE
-  // -----------------------------
   setMode: (mode) => {
+    // Limpiamos herramientas del motor si cambiamos de modo
     window.editorEngine?.clearTools?.();
     set({ mode });
   },
 
-  // -----------------------------
-  // UI TOGGLES
-  // -----------------------------
   toggleGrid: () => set((s) => ({ gridVisible: !s.gridVisible })),
   toggleBudget: () => set((s) => ({ budgetVisible: !s.budgetVisible })),
   toggleEnvPanel: () => set((s) => ({ envPanelVisible: !s.envPanelVisible })),
   toggleSafetyZones: () =>
     set((s) => ({ safetyZonesVisible: !s.safetyZonesVisible })),
 
-  // -----------------------------
-  // ENVIRONMENT
-  // -----------------------------
   setSunPosition: (azimuth, elevation) =>
     set({ sunPosition: { azimuth, elevation } }),
 
@@ -10720,16 +8313,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setMeasurementResult: (dist) => set({ measurementResult: dist }),
 
-  // -----------------------------
-  // CAMERA
-  // -----------------------------
   setCameraType: (type) => set({ cameraType: type }),
   triggerView: (view) => set({ pendingView: view }),
   clearPendingView: () => set({ pendingView: null }),
 
-  // -----------------------------
-  // INPUT MODAL
-  // -----------------------------
   requestInput: (title, defaultValue = "") =>
     new Promise((resolve) => {
       set({
@@ -10984,157 +8571,214 @@ export const useProjectStore = create<ProjectState>((set) => ({
 </file>
 
 <file path="src/stores/scene/useSceneStore.ts">
-// --- START OF FILE src/stores/scene/useSceneStore.ts ---
+// --- FILE: src/stores/scene/useSceneStore.ts ---
 import { create } from "zustand";
-import type { SceneItem, FenceConfig } from "@/types/editor";
-
-/**
- * Este store contiene SOLO la escena:
- * - items colocados
- * - fenceConfig temporal o global
- * - cálculos simples como totalPrice
- */
+import type { SceneItem, FenceConfig, FloorMaterialType } from "@/types/editor";
+import { FENCE_PRESETS } from "@/features/editor/data/fence_presets";
 
 interface SceneState {
+  // --- STATE ---
   items: SceneItem[];
+  totalPrice: number;
+  
+  // Config global temporal (para la próxima valla que dibujes)
   fenceConfig: FenceConfig;
 
-  // --- DERIVADOS ---
-  totalPrice: number;
+  // History
+  past: SceneItem[][];
+  future: SceneItem[][];
 
-  // --- ACCIONES CRUD ---
+  // --- ACTIONS (CRUD) ---
   addItem: (item: SceneItem) => void;
-  updateItem: (uuid: string, partial: Partial<SceneItem>) => void;
   removeItem: (uuid: string) => void;
+  
+  // Actualizaciones parciales
+  updateItemTransform: (uuid: string, pos: number[], rot: number[], scale: number[]) => void;
+  updateFloorMaterial: (uuid: string, material: FloorMaterialType) => void;
+  updateFloorTexture: (uuid: string, url: string | undefined, scale: number, rotation: number) => void;
+  updateFloorPoints: (uuid: string, points: { x: number; z: number }[]) => void;
+  updateFencePoints: (uuid: string, points: { x: number; z: number }[]) => void;
+  
+  // Configuración de vallas
+  setFenceConfig: (config: Partial<FenceConfig>) => void;
+  updateItemFenceConfig: (uuid: string, config: Partial<FenceConfig>) => void;
 
-  // --- FENCE ---
-  setFenceConfig: (cfg: Partial<FenceConfig>) => void;
-  updateItemFenceConfig: (uuid: string, cfg: Partial<FenceConfig>) => void;
-
-  // --- RESET ---
+  // Gestión de escena
   resetScene: () => void;
+  setItems: (items: SceneItem[]) => void; // Útil para cargar proyectos
+
+  // History Actions
+  saveSnapshot: () => void;
+  undo: () => void;
+  redo: () => void;
 }
 
-export const useSceneStore = create<SceneState>((set) => ({
-  // --- DEFAULT STATE ---
+export const useSceneStore = create<SceneState>((set, get) => ({
   items: [],
-
+  totalPrice: 0,
+  
   fenceConfig: {
     presetId: "wood",
-    colors: {
-      post: 0xffffff,
-      slatA: 0xffffff,
-      slatB: 0xffffff,
-      slatC: 0xffffff,
-    },
+    colors: FENCE_PRESETS["wood"].defaultColors,
   },
 
-  totalPrice: 0,
+  past: [],
+  future: [],
 
-  // -------------------------------------------------------------
-  // ADD ITEM
-  // -------------------------------------------------------------
-  addItem: (item) =>
-    set((state) => {
-      const items = [...state.items, item];
-      const totalPrice = items.reduce((sum, i) => sum + (i.price || 0), 0);
-      return { items, totalPrice };
-    }),
-
-  // -------------------------------------------------------------
-  // UPDATE ITEM
-  // -------------------------------------------------------------
-  updateItem: (uuid, partial) =>
-    set((state) => {
-      const items = state.items.map((i) =>
-        i.uuid === uuid ? { ...i, ...partial } : i
-      );
-      const totalPrice = items.reduce((sum, i) => sum + (i.price || 0), 0);
-      return { items, totalPrice };
-    }),
-
-  // -------------------------------------------------------------
-  // REMOVE ITEM
-  // -------------------------------------------------------------
-  removeItem: (uuid) =>
-    set((state) => {
-      const items = state.items.filter((i) => i.uuid !== uuid);
-      const totalPrice = items.reduce((sum, i) => sum + (i.price || 0), 0);
-      return { items, totalPrice };
-    }),
-
-  // -------------------------------------------------------------
-  // FENCE CONFIG (GLOBAL)
-  // -------------------------------------------------------------
-  setFenceConfig: (cfg) =>
+  // --- INTERNAL HELPER ---
+  saveSnapshot: () => {
+    const snapshot = structuredClone(get().items);
     set((state) => ({
-      fenceConfig: {
-        ...state.fenceConfig,
-        ...cfg,
-        colors: {
-          ...state.fenceConfig.colors,
-          ...(cfg.colors || {}),
-        },
-      },
-    })),
+      past: [...state.past.slice(-19), snapshot],
+      future: [],
+    }));
+  },
 
-  // -------------------------------------------------------------
-  // UPDATE FENCE CONFIG IN ITEM
-  // -------------------------------------------------------------
-updateItemFenceConfig: (uuid, cfg) =>
-  set((state) => {
-    const items = state.items.map((i) => {
-      if (i.uuid !== uuid) return i;
+  // --- ACTIONS ---
+  
+  addItem: (item) => {
+    get().saveSnapshot();
+    set((s) => ({
+      items: [...s.items, item],
+      totalPrice: s.totalPrice + (item.price || 0),
+    }));
+  },
 
-      const safeFence: FenceConfig = {
-        presetId: i.fenceConfig?.presetId ?? "wood",
-        colors: {
-          post: i.fenceConfig?.colors.post ?? 0xffffff,
-          slatA: i.fenceConfig?.colors.slatA ?? 0xffffff,
-          slatB: i.fenceConfig?.colors.slatB ?? 0xffffff,
-          slatC: i.fenceConfig?.colors.slatC ?? 0xffffff,
-        },
-      };
-
+  removeItem: (uuid) => {
+    get().saveSnapshot();
+    set((s) => {
+      const newItems = s.items.filter((i) => i.uuid !== uuid);
       return {
-        ...i,
-        fenceConfig: {
-          presetId: cfg.presetId ?? safeFence.presetId,
-          colors: {
-            ...safeFence.colors,
-            ...(cfg.colors || {}),
-          },
-        },
+        items: newItems,
+        totalPrice: newItems.reduce((sum, i) => sum + i.price, 0),
       };
     });
+  },
 
-    return { items };
-  }),
+  updateItemTransform: (uuid, pos, rot, scale) =>
+    set((s) => ({
+      items: s.items.map((i) =>
+        i.uuid === uuid
+          ? {
+              ...i,
+              position: pos as [number, number, number],
+              rotation: rot as [number, number, number],
+              scale: scale as [number, number, number],
+            }
+          : i
+      ),
+    })),
 
-  // -------------------------------------------------------------
-  // RESET SCENE
-  // -------------------------------------------------------------
+  updateFloorMaterial: (uuid, material) =>
+    set((s) => ({
+      items: s.items.map((i) =>
+        i.uuid === uuid && i.type === "floor"
+          ? { ...i, floorMaterial: material, textureUrl: undefined }
+          : i
+      ),
+    })),
+
+  updateFloorTexture: (uuid, url, scale, rotation) =>
+    set((s) => ({
+      items: s.items.map((i) =>
+        i.uuid === uuid && i.type === "floor"
+          ? {
+              ...i,
+              textureUrl: url,
+              textureScale: scale,
+              textureRotation: rotation,
+              floorMaterial: undefined,
+            }
+          : i
+      ),
+    })),
+
+  updateFloorPoints: (uuid, points) => {
+    // Nota: A veces no queremos snapshot en cada micro-movimiento, 
+    // pero para simplificar lo dejamos así o lo gestionamos desde el manager.
+    set((s) => ({
+      items: s.items.map((i) =>
+        i.uuid === uuid && i.type === "floor" ? { ...i, points } : i
+      ),
+    }));
+  },
+
+  updateFencePoints: (uuid, points) => {
+    set((s) => ({
+      items: s.items.map((i) =>
+        i.uuid === uuid && i.type === "fence" ? { ...i, points } : i
+      ),
+    }));
+  },
+
+  setFenceConfig: (config) =>
+    set((s) => ({
+      fenceConfig: { ...s.fenceConfig, ...config },
+    })),
+
+  updateItemFenceConfig: (uuid, config) => {
+    get().saveSnapshot();
+    set((s) => ({
+      items: s.items.map((i) => {
+        if (i.uuid === uuid && i.type === "fence") {
+          return {
+            ...i,
+            fenceConfig: { ...i.fenceConfig, ...config },
+          };
+        }
+        return i;
+      }),
+    }));
+  },
+
+  // --- HISTORY ---
+  undo: () => {
+    const { past, items, future } = get();
+    if (past.length === 0) return;
+
+    const prev = past[past.length - 1];
+    set({
+      items: prev,
+      past: past.slice(0, -1),
+      future: [items, ...future],
+      totalPrice: prev.reduce((s, i) => s + i.price, 0),
+    });
+  },
+
+  redo: () => {
+    const { past, items, future } = get();
+    if (future.length === 0) return;
+
+    const next = future[0];
+    set({
+      items: next,
+      past: [...past, items],
+      future: future.slice(1),
+      totalPrice: next.reduce((s, i) => s + i.price, 0),
+    });
+  },
+
   resetScene: () =>
     set({
       items: [],
       totalPrice: 0,
-      fenceConfig: {
-        presetId: "wood",
-        colors: {
-          post: 0xffffff,
-          slatA: 0xffffff,
-          slatB: 0xffffff,
-          slatC: 0xffffff,
-        },
-      },
+      past: [],
+      future: [],
     }),
+
+  setItems: (newItems) => 
+    set({
+        items: newItems,
+        totalPrice: newItems.reduce((s, i) => s + i.price, 0),
+        past: [],
+        future: []
+    })
 }));
-// --- END OF FILE src/stores/scene/useSceneStore.ts ---
 </file>
 
 <file path="src/stores/selection/useSelectionStore.ts">
 import { create } from "zustand";
-import { useEditorStore } from "../editor/useEditorStore";
+import { useSceneStore } from "../scene/useSceneStore"; // 🔥
 import { useProjectStore } from "../project/useProjectStore";
 import type { SceneItem } from "@/types/editor";
 
@@ -11163,9 +8807,6 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
   measuredDistance: null,
   measuredAngle: null,
 
-  // -----------------------------
-  // SELECT ITEM
-  // -----------------------------
   selectItem: (uuid) =>
     set({
       selectedItemId: uuid,
@@ -11174,9 +8815,6 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
       measuredAngle: null,
     }),
 
-  // -----------------------------
-  // CLEAR SELECTION
-  // -----------------------------
   clearSelection: () =>
     set({
       selectedItemId: null,
@@ -11185,9 +8823,6 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
       measuredAngle: null,
     }),
 
-  // -----------------------------
-  // VERTEX SELECTION (measure tool)
-  // -----------------------------
   setSelectedVertices: (indices, distance, angle) =>
     set({
       selectedVertices: indices,
@@ -11195,9 +8830,6 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
       measuredAngle: angle,
     }),
 
-  // -----------------------------
-  // DUPLICATE SELECTED ITEM
-  // -----------------------------
   duplicateSelection: () => {
     const { isReadOnlyMode } = useProjectStore.getState();
     if (isReadOnlyMode) {
@@ -11208,8 +8840,9 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
     const selectedId = get().selectedItemId;
     if (!selectedId) return;
 
-    const editor = useEditorStore.getState();
-    const item = editor.items.find((i: SceneItem) => i.uuid === selectedId);
+    // 🔥 Usamos SceneStore para leer y escribir
+    const scene = useSceneStore.getState();
+    const item = scene.items.find((i: SceneItem) => i.uuid === selectedId);
     if (!item) return;
 
     const cloned = structuredClone(item);
@@ -11220,16 +8853,11 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
       item.position[2] + 1,
     ];
 
-    useEditorStore.setState({
-      items: [...editor.items, cloned],
-    });
+    useSceneStore.getState().addItem(cloned);
 
     set({ selectedItemId: cloned.uuid });
   },
 
-  // -----------------------------
-  // REMOVE SELECTED ITEM
-  // -----------------------------
   removeSelection: () => {
     const { isReadOnlyMode } = useProjectStore.getState();
     if (isReadOnlyMode) {
@@ -11240,11 +8868,7 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
     const selectedId = get().selectedItemId;
     if (!selectedId) return;
 
-    const editor = useEditorStore.getState();
-
-    useEditorStore.setState({
-      items: editor.items.filter((i: SceneItem) => i.uuid !== selectedId),
-    });
+    useSceneStore.getState().removeItem(selectedId); // 🔥
 
     set({ selectedItemId: null });
   },
@@ -11376,11 +9000,14 @@ export interface ProductDefinition {
 </file>
 
 <file path="src/types/editor.ts">
-// ===============================
-//  SHARED EDITOR TYPES
-// ===============================
+// =============================================================================
+//  A42 EDITOR TYPES (STRICT)
+// =============================================================================
 
-// ---- Scene Item Types ----
+// --- 1. PRIMITIVES ---
+export type Vector3Array = [number, number, number]; // [x, y, z]
+export type Point2D = { x: number; z: number };
+
 export type FloorMaterialType =
   | "rubber_red"
   | "rubber_green"
@@ -11390,41 +9017,72 @@ export type FloorMaterialType =
 
 export interface FenceConfig {
   presetId: string;
-  colors: { post: number; slatA: number; slatB?: number; slatC?: number };
+  colors: {
+    post: number;
+    slatA: number;
+    slatB?: number;
+    slatC?: number;
+  };
 }
 
-export interface SceneItem {
+// --- 2. BASE ITEM (Shared properties) ---
+interface BaseSceneItem {
   uuid: string;
   productId: string;
-  name?: string;
+  name: string; // Hacemos obligatorio el nombre (aunque sea "Sin nombre")
   price: number;
 
-  position: [number, number, number];
-  rotation: [number, number, number];
-  scale: [number, number, number];
+  position: Vector3Array;
+  rotation: Vector3Array;
+  scale: Vector3Array;
 
-  type: "model" | "floor" | "fence";
-
-  modelUrl?: string;
+  // Metadata opcional del catálogo
+  description?: string;
   url_tech?: string;
   url_cert?: string;
   url_inst?: string;
-  description?: string;
   
-  // floor
-  points?: { x: number; z: number }[];
+  // Datos crudos del catálogo (para no perder info extra)
+  data?: Record<string, any>;
+}
+
+// --- 3. SPECIFIC ITEMS ---
+
+/** Objetos 3D importados (.glb/.gltf) */
+export interface ModelItem extends BaseSceneItem {
+  type: "model";
+  modelUrl: string; // Obligatorio para modelos
+  
+  // Propiedades que NO deben existir aquí:
+  // points?: never;
+  // fenceConfig?: never;
+}
+
+/** Suelos dibujados paramétricamente */
+export interface FloorItem extends BaseSceneItem {
+  type: "floor";
+  points: Point2D[]; // Obligatorio para suelos
+  
   floorMaterial?: FloorMaterialType;
   textureUrl?: string;
   textureScale?: number;
   textureRotation?: number;
-
-  fenceConfig?: FenceConfig;
-
-  // misc data
-  data?: any;
 }
 
-// ---- Editor State Types ----
+/** Vallas dibujadas paramétricamente */
+export interface FenceItem extends BaseSceneItem {
+  type: "fence";
+  points: Point2D[]; // Obligatorio para vallas
+  fenceConfig: FenceConfig; // Obligatorio para vallas
+}
+
+// --- 4. THE UNION (La "SceneItem" final) ---
+export type SceneItem = ModelItem | FloorItem | FenceItem;
+
+
+// =============================================================================
+//  EDITOR STATE TYPES
+// =============================================================================
 
 export type EditorMode =
   | "idle"
@@ -11482,6 +9140,7 @@ export interface Order {
 </file>
 
 <file path="src/utils/budgetUtils.ts">
+// --- START OF FILE src/utils/budgetUtils.ts ---
 import type { SceneItem } from '@/types/editor';
 
 export interface BudgetLineItem {
@@ -11503,6 +9162,9 @@ export const generateBillOfMaterials = (items: SceneItem[]): BudgetLineItem[] =>
     const key = item.productId;
 
     if (!groupedItems[key]) {
+      // 🔥 Type Guard para sacar la imagen solo si es modelo
+      const imageUrl = item.type === 'model' ? item.modelUrl : undefined;
+
       groupedItems[key] = {
         id: item.productId,
         name: item.name || 'Producto sin nombre',
@@ -11510,7 +9172,7 @@ export const generateBillOfMaterials = (items: SceneItem[]): BudgetLineItem[] =>
         quantity: 0,
         unitPrice: item.price || 0,
         totalPrice: 0,
-        image: item.modelUrl
+        image: imageUrl
       };
     }
 
@@ -11524,6 +9186,7 @@ export const generateBillOfMaterials = (items: SceneItem[]): BudgetLineItem[] =>
 export const calculateGrandTotal = (lines: BudgetLineItem[]) => {
   return lines.reduce((acc, line) => acc + line.totalPrice, 0);
 };
+// --- END OF FILE src/utils/budgetUtils.ts ---
 </file>
 
 <file path="src/utils/pdfGenerator.ts">

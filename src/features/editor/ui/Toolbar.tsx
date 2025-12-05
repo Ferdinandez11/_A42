@@ -3,14 +3,16 @@ import {
   MousePointer2, Grid3X3, Component, Trees, Grid, Undo2, Redo2, Eye, Box, ArrowUp, ArrowRight, GalleryVerticalEnd, Square, Sun, Upload, Ruler, Footprints, Video, Camera, Film, Download, FileText, ShieldAlert, FileDown, Save, LayoutDashboard
 } from 'lucide-react';
 import { useEditorStore } from "@/stores/editor/useEditorStore";
-import { useSceneStore } from "@/stores/scene/useSceneStore"; // 🔥
+import { useSceneStore } from "@/stores/scene/useSceneStore"; 
 import { useProjectStore } from "@/stores/project/useProjectStore";
+import { useEngine } from "../context/EngineContext"; // 👈 Importamos hook
 import { supabase } from '../../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import './Editor.css';
 
 export const Toolbar = () => {
   const navigate = useNavigate();
+  const engine = useEngine(); // 👈 Obtenemos la instancia
   
   // UI Actions
   const {
@@ -25,8 +27,8 @@ export const Toolbar = () => {
   // Data Actions
   const {
     items, addItem, fenceConfig, totalPrice,
-    undo, redo, past, future // Undo/Redo movidos aquí
-  } = useSceneStore(); // 🔥
+    undo, redo, past, future 
+  } = useSceneStore();
 
   const {
     user, currentProjectId, currentProjectName,
@@ -46,13 +48,12 @@ export const Toolbar = () => {
   ];
 
   const handleSaveProject = async () => {
-    if (isReadOnlyMode) return alert("Modo de Solo Lectura. No puedes sobrescribir este proyecto.");
-    if (!user) return alert("Debes iniciar sesión para guardar.");
+    if (isReadOnlyMode) return alert("Modo de Solo Lectura...");
+    if (!user) return alert("Debes iniciar sesión...");
+    if (!engine) return; // 👈 Check de seguridad
 
-    const engine = (window as any).editorEngine;
-    if (!engine || !engine.renderer) return;
-    
-    engine.render(); 
+    // Render para thumbnail
+    engine.renderer.render(engine.scene, engine.activeCamera); 
     const thumbnailBase64 = engine.renderer.domElement.toDataURL('image/jpeg', 0.5);
 
     const projectData = {
@@ -61,6 +62,11 @@ export const Toolbar = () => {
       camera: cameraType
     };
 
+    // ... (El resto de la lógica de guardado es idéntica, no cambia)
+    // Solo asegúrate de copiar el resto de la función handleSaveProject original
+    // ...
+    
+    // (Resumen para no copiar todo el bloque de lógica de supabase que ya tenías):
     let nameToSave = currentProjectName;
     let isOverwrite = false;
 
@@ -84,21 +90,13 @@ export const Toolbar = () => {
     try {
       if (isOverwrite && currentProjectId) {
         const { error } = await supabase.from('projects').update({
-          name: nameToSave,
-          data: projectData,
-          thumbnail_url: thumbnailBase64,
-          total_price: totalPrice,
-          updated_at: new Date()
+          name: nameToSave, data: projectData, thumbnail_url: thumbnailBase64, total_price: totalPrice, updated_at: new Date()
         }).eq('id', currentProjectId);
         if (error) throw error;
         alert("Proyecto actualizado correctamente.");
       } else {
         const { data, error } = await supabase.from('projects').insert([{
-          user_id: user.id,
-          name: nameToSave,
-          data: projectData,
-          thumbnail_url: thumbnailBase64,
-          total_price: totalPrice
+          user_id: user.id, name: nameToSave, data: projectData, thumbnail_url: thumbnailBase64, total_price: totalPrice
         }]).select().single();
         if (error) throw error;
         alert("Proyecto guardado correctamente.");
@@ -115,7 +113,6 @@ export const Toolbar = () => {
     const file = event.target.files?.[0]; if (!file) return;
     const url = URL.createObjectURL(file);
     const fileName = file.name.replace('.glb', '').replace('.gltf', '');
-    // Importación con any para simplificar, se recomienda usar ObjectManager directamente
     addItem({ 
         uuid: crypto.randomUUID(), productId: 'custom_upload', name: fileName, price: 0, 
         type: 'model', modelUrl: url, position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] 
@@ -128,23 +125,28 @@ export const Toolbar = () => {
     else { setMode('measuring'); setShowViews(false); } 
   };
 
-  const getEngine = () => (window as any).editorEngine;
-  const generatePDF = () => { getEngine()?.pdfManager.generatePDF(); };
-  const activateWalkMode = () => { getEngine()?.walkManager.enable(); };
-  const takePhoto = () => { getEngine()?.recorderManager.takeScreenshot(); };
-  const start360Video = () => { getEngine()?.recorderManager.startOrbitAnimation(); };
-  const exportGLB = () => { getEngine()?.exportManager.exportGLB(); };
-  const exportDXF = () => { getEngine()?.exportManager.exportDXF(); };
+  // Reemplazamos los getEngine() por el objeto engine directo
+  const generatePDF = () => { engine?.pdfManager.generatePDF(); };
+  const activateWalkMode = () => { engine?.walkManager.enable(); };
+  const takePhoto = () => { engine?.recorderManager.takeScreenshot(); };
+  const start360Video = () => { engine?.recorderManager.startOrbitAnimation(); };
+  const exportGLB = () => { engine?.exportManager.exportGLB(); };
+  const exportDXF = () => { engine?.exportManager.exportDXF(); };
   
   const toggleRecording = () => {
-    const manager = getEngine()?.recorderManager;
-    if (!manager) return;
+    if (!engine) return;
+    const manager = engine.recorderManager;
     if (isRecording) { manager.stopRecording(); setIsRecording(false); } 
     else { manager.startRecording(); setIsRecording(true); }
   };
 
+  // ... El JSX de renderizado es idéntico, solo asegúrate de envolver
+  // los botones que usan engine con un check `disabled={!engine}` si quieres ser muy estricto,
+  // aunque `engine` debería existir siempre que el Editor esté montado.
+  
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center">
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center">
+      {/* ... (Todo el JSX igual que antes) ... */}
       {showViews && (
         <div className="absolute bottom-full mb-4 glass-panel flex-row animate-in slide-in-from-bottom-2 fade-in duration-200">
            <button className={`tool-btn ${cameraType === 'perspective' ? 'active' : ''}`} onClick={() => setCameraType('perspective')} title="3D"><Eye size={18} /></button>

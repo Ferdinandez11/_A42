@@ -51,9 +51,7 @@ export class A42Engine {
     window.addEventListener("resize", this.onWindowResize);
     window.addEventListener("keydown", this.onKeyDown);
 
-    // Exponer para debug
-    // @ts-ignore
-    window.editorEngine = this;
+
   }
 
   public get scene() {

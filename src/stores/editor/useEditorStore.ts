@@ -2,11 +2,6 @@
 import { create } from "zustand";
 import type { EditorMode, CameraType, CameraView } from "@/types/editor";
 
-declare global {
-  interface Window {
-    editorEngine?: any;
-  }
-}
 
 interface InputModalState {
   isOpen: boolean;
@@ -80,8 +75,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setMode: (mode) => {
     // Limpiamos herramientas del motor si cambiamos de modo
-    window.editorEngine?.clearTools?.();
-    set({ mode });
+     set({ mode });
   },
 
   toggleGrid: () => set((s) => ({ gridVisible: !s.gridVisible })),

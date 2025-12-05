@@ -1,10 +1,10 @@
-// --- START OF FILE src/features/editor/ui/CadControl.tsx ---
 import { useEffect, useState } from "react";
 import { useSelectionStore } from "@/stores/selection/useSelectionStore";
-// 🔥 Eliminamos importaciones no usadas como ScanLine o Ruler si no se usan
+import { useEngine } from "../context/EngineContext"; // 👈 Importamos hook
 import { ArrowLeftRight } from "lucide-react";
 
 export const CadControl = () => {
+  const engine = useEngine(); // 👈 Obtenemos motor
   const selectedVertexIndices = useSelectionStore((s) => s.selectedVertices);
   const measuredDistance = useSelectionStore((s) => s.measuredDistance);
   const measuredAngle = useSelectionStore((s) => s.measuredAngle);
@@ -23,30 +23,26 @@ export const CadControl = () => {
 
   const handleApply = () => {
     const val = parseFloat(inputValue);
-    if (isNaN(val) || val <= 0) return;
+    if (isNaN(val) || val <= 0 || !engine) return;
 
-    // @ts-ignore
-    if (window.editorEngine) {
-      if (mode === "DISTANCE") {
-        window.editorEngine.toolsManager.setSegmentLength(
-          val,
-          selectedVertexIndices[1],
-          selectedVertexIndices[0]
-        );
-      } else {
-        window.editorEngine.toolsManager.setVertexAngle(val);
-      }
+    if (mode === "DISTANCE") {
+      engine.toolsManager.setSegmentLength(
+        val,
+        selectedVertexIndices[1],
+        selectedVertexIndices[0]
+      );
+    } else {
+      engine.toolsManager.setVertexAngle(val);
     }
   };
 
   const handleSwap = () => {
-    // @ts-ignore
-    if (window.editorEngine)
-      window.editorEngine.toolsManager.swapSelectionOrder();
+    if (engine) engine.toolsManager.swapSelectionOrder();
   };
 
   if (selectedVertexIndices.length < 2) return null;
 
+  // ... (Resto del renderizado igual)
   return (
     <div
       className={`p-3 rounded-lg mb-3 border-l-4 shadow-lg ${
@@ -87,4 +83,3 @@ export const CadControl = () => {
     </div>
   );
 };
-// --- END OF FILE ---
