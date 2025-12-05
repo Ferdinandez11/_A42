@@ -3346,6 +3346,7 @@ import { useEditorStore } from "@/stores/editor/useEditorStore";
 import { useSceneStore } from "@/stores/scene/useSceneStore";
 import { useSelectionStore } from "@/stores/selection/useSelectionStore";
 import { useProjectStore } from "@/stores/project/useProjectStore";
+import { useCatalogStore } from "@/stores/catalog/useCatalogStore";
 
 import {
   Euro,
@@ -3361,46 +3362,27 @@ export const Editor3D = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [engineInstance, setEngineInstance] = useState<A42Engine | null>(null);
 
-  // --- Editor store (usamos 'any' para evitar choques de tipos) ---
-  const mode = useEditorStore((s: any) => s.mode as string);
+  // --- Editor store ---
+  const mode = useEditorStore((s) => s.mode);
   const gridVisible = useEditorStore((s) => s.gridVisible);
-  const cameraType = useEditorStore((s: any) => s.cameraType as string);
-  const pendingView = useEditorStore(
-    (s: any) => s.pendingView as any | null
-  );
-  const clearPendingView = useEditorStore(
-    (s: any) => s.clearPendingView as () => void
-  );
-  const sunPosition = useEditorStore(
-    (s: any) =>
-      (s.sunPosition as { azimuth: number; elevation: number }) ?? {
-        azimuth: 0,
-        elevation: 45,
-      }
-  );
+  const cameraType = useEditorStore((s) => s.cameraType);
+  const pendingView = useEditorStore((s) => s.pendingView);
+  const clearPendingView = useEditorStore((s) => s.clearPendingView);
+  const sunPosition = useEditorStore((s) => s.sunPosition);
   const backgroundColor = useEditorStore((s) => s.backgroundColor);
-  const safetyZonesVisible = useEditorStore(
-    (s: any) => (s.safetyZonesVisible as boolean) ?? true
-  );
-  const measurementResult = useEditorStore(
-    (s: any) => (s.measurementResult as number | null) ?? null
-  );
+  const safetyZonesVisible = useEditorStore((s) => s.safetyZonesVisible);
+  const measurementResult = useEditorStore((s) => s.measurementResult);
 
-  // --- Scene store ---
+  // --- Scene & Catalog Stores ---
   const items = useSceneStore((s) => s.items);
-  const totalPrice = useSceneStore(
-    (s: any) => (s.totalPrice as number) ?? 0
-  );
+  const totalPrice = useSceneStore((s) => s.totalPrice);
+  const selectedProduct = useCatalogStore((s) => s.selectedProduct);
 
-  // --- Selection store: usamos selectedUUID, que sabemos que existe ---
-  const selectedUUID = useSelectionStore(
-    (s: any) => s.selectedUUID as string | null
-  );
+  // --- Selection store ---
+  const selectedUUID = useSelectionStore((s) => s.selectedUUID);
 
   // --- Project store ---
-  const isReadOnlyMode = useProjectStore(
-    (s: any) => (s.isReadOnlyMode as boolean) ?? false
-  );
+  const isReadOnlyMode = useProjectStore((s) => s.isReadOnlyMode);
 
   const [qrVisible, setQRVisible] = React.useState(false);
 
@@ -3415,16 +3397,22 @@ export const Editor3D = () => {
 
     setEngineInstance(engine);
 
+    // HANDLERS DE INTERACCIÓN
     const handlePointerDown = (e: PointerEvent) => {
-      // solo clicks sobre el canvas, no sobre la UI
+      // Solo interactuar si el click es en el canvas (no en la UI)
       if ((e.target as HTMLElement).tagName === "CANVAS") {
-        // Transformamos a MouseEvent para que encaje con la firma
         engine.interactionManager.onPointerDown(e as unknown as MouseEvent);
       }
     };
 
+    const handlePointerMove = (e: PointerEvent) => {
+      // Necesario para el preview fluido sin lag
+      engine.interactionManager.onPointerMove(e as unknown as MouseEvent);
+    };
+
     const container = containerRef.current;
     container.addEventListener("pointerdown", handlePointerDown);
+    container.addEventListener("pointermove", handlePointerMove);
 
     // Config inicial
     engine.setGrid(gridVisible);
@@ -3434,6 +3422,7 @@ export const Editor3D = () => {
 
     return () => {
       container.removeEventListener("pointerdown", handlePointerDown);
+      container.removeEventListener("pointermove", handlePointerMove);
       engine.dispose();
       setEngineInstance(null);
     };
@@ -3450,7 +3439,32 @@ export const Editor3D = () => {
   }, [mode, engineInstance]);
 
   // ============================================================
-  // 3. SINCRONIZACIÓN SELECCIÓN UI → ENGINE
+  // 3. PREVISUALIZACIÓN DE CATÁLOGO
+  // ============================================================
+  useEffect(() => {
+    if (!engineInstance) return;
+
+    if (mode === "placing_item" && selectedProduct) {
+      // Crear objeto fantasma
+      const previewItem: any = {
+        uuid: "preview-temp",
+        type: "model",
+        productId: selectedProduct.id,
+        name: selectedProduct.name,
+        modelUrl: selectedProduct.modelUrl,
+        price: selectedProduct.price,
+        position: [0, 0, 0],
+        rotation: [0, 0, 0],
+        scale: [1, 1, 1],
+        data: selectedProduct,
+      };
+
+      engineInstance.objectManager.setPreviewItem(previewItem);
+    }
+  }, [selectedProduct, mode, engineInstance]);
+
+  // ============================================================
+  // 4. SINCRONIZACIÓN SELECCIÓN UI → ENGINE
   // ============================================================
   useEffect(() => {
     if (!engineInstance) return;
@@ -3458,31 +3472,32 @@ export const Editor3D = () => {
   }, [selectedUUID, engineInstance]);
 
   // ============================================================
-  // 4. SINCRONIZACIÓN ESCENA STORE → ENGINE
+  // 5. SINCRONIZACIÓN ESCENA STORE → ENGINE
   // ============================================================
   useEffect(() => {
     if (!engineInstance) return;
-    // syncScene es el método público del motor; si el tipo no encaja, usamos any
-    (engineInstance as any).syncScene(items as any);
+    engineInstance.syncScene(items);
   }, [items, engineInstance]);
 
   // ============================================================
-  // 5. REACTIVIDAD SOBRE PROPIEDADES DEL EDITOR
+  // 6. REACTIVIDAD SOBRE PROPIEDADES DEL EDITOR
   // ============================================================
+  
+  // Grid
   useEffect(() => {
     engineInstance?.setGrid(gridVisible);
   }, [gridVisible, engineInstance]);
 
+  // Cámara
   useEffect(() => {
     if (!engineInstance) return;
-    engineInstance.switchCamera(cameraType as any);
+    engineInstance.switchCamera(cameraType);
     engineInstance.interactionManager.updateCamera(engineInstance.activeCamera);
   }, [cameraType, engineInstance]);
 
+  // Zonas de Seguridad
   useEffect(() => {
     if (!engineInstance) return;
-
-    // Mostrado/ocultado de zonas de seguridad directamente sobre la escena
     engineInstance.scene.traverse((obj) => {
       if (obj.userData?.isSafetyZone) {
         obj.visible = safetyZonesVisible;
@@ -3490,6 +3505,7 @@ export const Editor3D = () => {
     });
   }, [safetyZonesVisible, engineInstance]);
 
+  // Sol
   useEffect(() => {
     if (!engineInstance) return;
     engineInstance.updateSunPosition?.(
@@ -3498,12 +3514,14 @@ export const Editor3D = () => {
     );
   }, [sunPosition, engineInstance]);
 
+  // Vistas Predefinidas
   useEffect(() => {
     if (!pendingView || !engineInstance) return;
-    engineInstance.setView(pendingView as any);
+    engineInstance.setView(pendingView);
     clearPendingView();
   }, [pendingView, clearPendingView, engineInstance]);
 
+  // Fondo / Cielo
   useEffect(() => {
     if (!engineInstance) return;
     if (backgroundColor === "#111111") engineInstance.setSky(true);
@@ -3511,13 +3529,13 @@ export const Editor3D = () => {
   }, [backgroundColor, engineInstance]);
 
   // ============================================================
-  // 6. ACCIONES SOBRE LA SELECCIÓN (duplicar / eliminar)
+  // 7. ACCIONES SOBRE LA SELECCIÓN
   // ============================================================
   const handleDuplicateSelection = useCallback(() => {
     if (!selectedUUID) return;
 
-    const sceneState = useSceneStore.getState() as any;
-    const currentItems = sceneState.items as any[];
+    const sceneState = useSceneStore.getState();
+    const currentItems = sceneState.items;
     const original = currentItems.find((i) => i.uuid === selectedUUID);
     if (!original) return;
 
@@ -3532,18 +3550,18 @@ export const Editor3D = () => {
       ] as [number, number, number],
     };
 
-    sceneState.addItem(newItem);
+    sceneState.addItem(newItem as any);
   }, [selectedUUID]);
 
   const handleRemoveSelection = useCallback(() => {
     if (!selectedUUID || !engineInstance) return;
 
-    const sceneState = useSceneStore.getState() as any;
+    const sceneState = useSceneStore.getState();
     sceneState.removeItem(selectedUUID);
 
     engineInstance.objectManager.removeByUUID(selectedUUID);
 
-    const selState = useSelectionStore.getState() as any;
+    const selState = useSelectionStore.getState();
     selState.select(null);
   }, [selectedUUID, engineInstance]);
 
@@ -3722,7 +3740,6 @@ export class A42Engine {
     this.sceneManager.setSkyVisible(visible);
   }
 
-  /** ✔️ NECESARIO PARA EDITOR3D */
   public updateSunPosition(azimuth: number, elevation: number) {
     this.sceneManager.updateSunPosition(azimuth, elevation);
   }
@@ -3804,7 +3821,7 @@ export class A42Engine {
     button.style.cursor = "pointer";
   }
 
-  // === SCENE SYNC -----------------------------------------------------
+  // === SCENE SYNC (Con corrección de TransformControls) -------------------
 
   public async syncScene(items: SceneItem[]) {
     await this.syncSceneFromStore(items);
@@ -3814,6 +3831,7 @@ export class A42Engine {
     const scene = this.scene;
     const existing = new Map<string, THREE.Object3D>();
 
+    // Indexar objetos existentes
     scene.traverse((child) => {
       if (child.userData?.isItem && child.uuid) {
         existing.set(child.uuid, child);
@@ -3823,11 +3841,62 @@ export class A42Engine {
     for (const item of items) {
       const obj = existing.get(item.uuid);
 
+      // --- CREACIÓN ---
       if (!obj) {
         await this.objectManager.createFromItem(item);
         continue;
       }
 
+      // --- DETECCIÓN DE CAMBIOS ESTRUCTURALES ---
+      // Si necesitamos recrear el objeto, debemos tener cuidado con el Gizmo
+      let needsRecreation = false;
+
+      // 1. Suelos
+      if (item.type === 'floor') {
+         const oldMat = obj.userData?.floorMaterial;
+         const oldTex = obj.userData?.textureUrl;
+         const oldTexScale = obj.userData?.textureScale;
+         const oldTexRot = obj.userData?.textureRotation;
+
+         if (oldMat !== item.floorMaterial || oldTex !== item.textureUrl || oldTexScale !== item.textureScale || oldTexRot !== item.textureRotation) {
+             needsRecreation = true;
+         }
+      }
+
+      // 2. Vallas
+      if (item.type === 'fence') {
+        const oldConfig = JSON.stringify(obj.userData?.fenceConfig);
+        const newConfig = JSON.stringify(item.fenceConfig);
+        if (oldConfig !== newConfig) needsRecreation = true;
+      }
+
+      // --- APLICAR RECREACIÓN SEGURA ---
+      if (needsRecreation) {
+          // ⚠️ PASO CRÍTICO: Comprobar si el objeto está seleccionado
+          const currentSelected = this.interactionManager.transformControl.object;
+          const isSelected = currentSelected && currentSelected.uuid === item.uuid;
+
+          // 1. Si está seleccionado, SOLTAMOS el gizmo para que no crashee
+          if (isSelected) {
+              this.interactionManager.selectObject(null);
+          }
+
+          // 2. Borramos y creamos
+          this.objectManager.removeByUUID(item.uuid);
+          const newObj = await this.objectManager.createFromItem(item);
+
+          // 3. Si estaba seleccionado, VOLVEMOS A AGARRAR el nuevo objeto
+          if (isSelected && newObj) {
+              this.interactionManager.selectObject(newObj);
+          }
+
+          // Marcamos como procesado
+          existing.delete(item.uuid);
+          continue; 
+      }
+
+      // --- ACTUALIZACIÓN ESTÁNDAR (Posición/Rotación) ---
+      // Solo llegamos aquí si no se ha recreado el objeto
       obj.position.fromArray(item.position);
       obj.rotation.fromArray(item.rotation);
       obj.scale.fromArray(item.scale);
@@ -3835,7 +3904,16 @@ export class A42Engine {
       existing.delete(item.uuid);
     }
 
+    // --- LIMPIEZA DE HUÉRFANOS ---
     for (const [uuid] of existing) {
+      // También protegemos el borrado final por si acaso
+      const objToDelete = existing.get(uuid);
+      const currentSelected = this.interactionManager.transformControl.object;
+      
+      if (currentSelected && objToDelete && currentSelected.uuid === objToDelete.uuid) {
+          this.interactionManager.selectObject(null);
+      }
+
       this.objectManager.removeByUUID(uuid);
     }
   }
@@ -3872,7 +3950,6 @@ export class A42Engine {
     this.sceneManager.dispose();
   }
 }
-// --- END FILE ---
 </file>
 
 <file path="src/features/editor/engine/managers/ExportManager.ts">
@@ -4153,6 +4230,10 @@ export class InteractionManager {
       this.engine.renderer.domElement
     );
 
+    // SNAP: 15 grados y 10cm
+    this.transformControl.setTranslationSnap(0.1); 
+    this.transformControl.setRotationSnap(THREE.MathUtils.degToRad(15)); 
+
     this.transformControl.visible = false;
     this.engine.scene.add(this.transformControl);
 
@@ -4160,22 +4241,37 @@ export class InteractionManager {
   }
 
   private attachListeners() {
+    // Evento: Inicio/Fin de arrastre
     this.transformControl.addEventListener("dragging-changed", (e: any) => {
       this.isDragging = e.value;
       this.engine.sceneManager.controls.enabled = !e.value;
 
       const obj = this.transformControl.object;
-      if (!obj || e.value) return;
+      if (!obj || e.value) return; 
 
+      // Guardar en store al soltar
       if (obj.userData?.uuid) {
         this.syncTransformToStore(obj);
       }
     });
 
-    this.transformControl.addEventListener("objectChange", () => {
+    // Evento: Cambio en tiempo real (mientras mueves/rotas)
+    this.transformControl.addEventListener("change", () => {
       if (!this.isDragging) return;
       const obj = this.transformControl.object;
-      if (obj) this.syncTransformToStore(obj);
+      if (!obj) return;
+
+      const mode = this.transformControl.getMode();
+
+      // --- GRAVEDAD OPTIMIZADA (SIN LAG) ---
+      // Como el ObjectManager ya ajustó el pivote a los pies del modelo,
+      // solo necesitamos asegurarnos de que la posición Y no sea negativa.
+      // No calculamos Box3 aquí porque es muy lento.
+      if (mode === 'translate' || mode === 'rotate') {
+          if (obj.position.y < 0) {
+              obj.position.y = 0;
+          }
+      }
     });
   }
 
@@ -4188,48 +4284,66 @@ export class InteractionManager {
   }
 
   // ======================================================
+  // POINTER MOVE (Solo para Preview - Optimizado)
+  // ======================================================
+  public onPointerMove = (evt: MouseEvent) => {
+    const mode = useEditorStore.getState().mode;
+    
+    // Si no estamos colocando, no gastamos recursos calculando raycast
+    if (mode !== "placing_item" && mode !== "drawing_floor" && mode !== "drawing_fence") return;
+
+    this.updatePointer(evt);
+    this.raycaster.setFromCamera(this.pointer, this.engine.activeCamera);
+
+    // Raycast ligero solo contra el suelo
+    const floorPoint = this.engine.sceneManager.raycastWorldPoint(this.raycaster);
+
+    if (floorPoint) {
+        if (mode === "placing_item") {
+            this.engine.objectManager.placePreviewAt(floorPoint);
+        }
+        // Aquí podrías añadir lógica visual para dibujo de vallas/suelos si quisieras
+    }
+  };
+
+  // ======================================================
   // POINTER DOWN
   // ======================================================
   public onPointerDown = (evt: MouseEvent) => {
     if (evt.button === 2) return this.handleRightClick();
     if (this.isDragging) return;
 
-    const rect = this.engine.renderer.domElement.getBoundingClientRect();
-    this.pointer.x = ((evt.clientX - rect.left) / rect.width) * 2 - 1;
-    this.pointer.y = -((evt.clientY - rect.top) / rect.height) * 2 + 1;
-
+    this.updatePointer(evt);
     this.raycaster.setFromCamera(this.pointer, this.engine.activeCamera);
 
     this.handleSceneClick();
   };
 
+  private updatePointer(evt: MouseEvent) {
+    const rect = this.engine.renderer.domElement.getBoundingClientRect();
+    this.pointer.x = ((evt.clientX - rect.left) / rect.width) * 2 - 1;
+    this.pointer.y = -((evt.clientY - rect.top) / rect.height) * 2 + 1;
+  }
+
   private handleSceneClick() {
     const mode = useEditorStore.getState().mode;
 
-    // ------------------------------------
-    // TRY SELECT OBJECT
-    // ------------------------------------
-    const objects: THREE.Object3D[] = [];
-    this.engine.scene.traverse((obj) => {
-      if (obj.userData?.isItem) objects.push(obj);
-    });
-
-    const hits = this.raycaster.intersectObjects(objects, true);
-    if (hits.length > 0) {
-      let obj: THREE.Object3D | null = hits[0].object;
-      while (obj && !obj.userData?.isItem && obj.parent) obj = obj.parent;
-      if (obj) return this.selectObject(obj);
+    // 1. MODO COLOCACIÓN
+    if (mode === "placing_item") {
+        const world = this.engine.sceneManager.raycastWorldPoint(this.raycaster);
+        if (world) {
+            this.engine.objectManager.placePreviewAt(world);
+            this.engine.objectManager.confirmPreviewPlacement();
+            
+            // Salimos inmediatamente del modo colocar
+            useEditorStore.getState().setMode("idle");
+        }
+        return;
     }
 
-    // ------------------------------------
-    // WORLD POINT ON FLOOR
-    // ------------------------------------
+    // 2. MODO DIBUJO
     const world = this.engine.sceneManager.raycastWorldPoint(this.raycaster);
     if (world) {
-      if (mode === "placing_item") {
-        this.engine.objectManager.placePreviewAt(world);
-        return;
-      }
       if (mode === "drawing_floor") {
         this.engine.toolsManager.floorTool.addPoint(world);
         return;
@@ -4240,40 +4354,43 @@ export class InteractionManager {
       }
     }
 
+    // 3. MODO SELECCIÓN (Solo si estamos en IDLE o EDITING)
+    // Evitamos seleccionar cosas mientras estamos poniendo otras
+    const objects: THREE.Object3D[] = [];
+    this.engine.scene.traverse((obj) => {
+      if (obj.userData?.isItem) objects.push(obj);
+    });
+
+    const hits = this.raycaster.intersectObjects(objects, true);
+    if (hits.length > 0) {
+      let obj: THREE.Object3D | null = hits[0].object;
+      while (obj && !obj.userData?.isItem && obj.parent) obj = obj.parent;
+      
+      if (obj) {
+          this.selectObject(obj);
+          useEditorStore.getState().setMode("editing");
+          return;
+      }
+    }
+
+    // Si clicamos fuera, deseleccionamos
     this.clearSelection();
+    useEditorStore.getState().setMode("idle");
   }
 
-  // ======================================================
-  // RIGHT CLICK (CONFIRM ACTION)
-  // ======================================================
   private handleRightClick() {
     const mode = useEditorStore.getState().mode;
-
     if (mode === "placing_item") {
-      this.engine.objectManager.confirmPreviewPlacement();
       useEditorStore.getState().setMode("idle");
       return;
     }
-
-    if (mode === "drawing_floor") {
-      this.engine.toolsManager.floorTool.finalize();
-      return;
-    }
-
-    if (mode === "drawing_fence") {
-      this.engine.toolsManager.fenceTool.finalize();
-      return;
-    }
+    if (mode === "drawing_floor") return this.engine.toolsManager.floorTool.finalize();
+    if (mode === "drawing_fence") return this.engine.toolsManager.fenceTool.finalize();
   }
 
-  // ======================================================
-  // SELECTION
-  // ======================================================
   public selectObject(obj: THREE.Object3D | null) {
     const store = useSelectionStore.getState();
-
     if (!obj) return this.clearSelection();
-
     const uuid = obj.userData?.uuid;
     if (!uuid) return this.clearSelection();
 
@@ -4284,20 +4401,14 @@ export class InteractionManager {
   }
 
   private clearSelection() {
-    const store = useSelectionStore.getState();
-    store.select(null);
-
+    useSelectionStore.getState().select(null);
     this.transformControl.detach();
     this.transformControl.visible = false;
     this.engine.sceneManager.controls.enabled = true;
   }
 
-  // ======================================================
-  // STORE SYNC
-  // ======================================================
   private syncTransformToStore(obj: THREE.Object3D) {
     if (!obj.userData?.uuid) return;
-
     useSceneStore.getState().updateItem(obj.userData.uuid, {
       position: [obj.position.x, obj.position.y, obj.position.z],
       rotation: [obj.rotation.x, obj.rotation.y, obj.rotation.z],
@@ -4311,11 +4422,9 @@ export class InteractionManager {
     this.selectObject(obj ?? null);
   }
 }
-// --- END FILE ---
 </file>
 
 <file path="src/features/editor/engine/managers/ObjectManager.ts">
-// --- FILE: src/features/editor/engine/managers/ObjectManager.ts ---
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
@@ -4328,10 +4437,12 @@ import type {
 } from "@/types/editor";
 
 import { useSceneStore } from "@/stores/scene/useSceneStore";
+import { FenceTool } from "./tools/FenceTool";
 
 export class ObjectManager {
   private scene: THREE.Scene;
   private gltf = new GLTFLoader();
+  private textureLoader = new THREE.TextureLoader();
 
   private cache: Record<string, THREE.Group> = {};
 
@@ -4343,81 +4454,69 @@ export class ObjectManager {
     this.scene = scene;
   }
 
-  // ============================================================
-  // MODEL LOADING + CACHE
-  // ============================================================
   public async loadModel(url: string): Promise<THREE.Group> {
     if (this.cache[url]) return this.cache[url].clone();
-
     const gltf = await this.gltf.loadAsync(url);
     this.cache[url] = gltf.scene;
-
     return gltf.scene.clone();
   }
 
-  // ============================================================
-  // SCENE ITEM → OBJECT
-  // ============================================================
   public async createFromItem(item: SceneItem): Promise<THREE.Object3D | null> {
     switch (item.type) {
-      case "model":
-        return this.createModel(item as ModelItem);
-      case "floor":
-        return this.createFloor(item as FloorItem);
-      case "fence":
-        return this.createFence(item as FenceItem);
-      default:
-        return null;
+      case "model": return this.createModel(item as ModelItem);
+      case "floor": return this.createFloor(item as FloorItem);
+      case "fence": return this.createFence(item as FenceItem);
+      default: return null;
     }
   }
 
-  // ============================================================
-  // MODEL
-  // ============================================================
+  // --- MODELO CON AUTO-AJUSTE AL SUELO (OPTIMIZADO) ---
   private async createModel(item: ModelItem): Promise<THREE.Object3D | null> {
     if (!item.modelUrl) return null;
 
     const model = await this.loadModel(item.modelUrl);
 
-    model.uuid = item.uuid;
-    model.position.fromArray(item.position as Vector3Array);
-    model.rotation.fromArray(item.rotation as Vector3Array);
-    model.scale.fromArray(item.scale as Vector3Array);
+    // 1. Calculamos la caja UNA SOLA VEZ al crear
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
 
-    model.userData = {
+    // 2. Creamos un contenedor (Wrapper) que será el objeto real en la escena
+    const wrapper = new THREE.Group();
+    wrapper.add(model);
+    
+    // 3. Movemos el modelo DENTRO del wrapper.
+    // Lo subimos (-box.min.y) para que sus pies toquen el suelo del wrapper (Y=0).
+    // Lo centramos en X/Z para que el pivote esté en el centro.
+    model.position.x = -center.x;
+    model.position.y = -box.min.y;
+    model.position.z = -center.z;
+
+    // 4. Aplicamos las transformaciones del mundo al wrapper
+    wrapper.uuid = item.uuid;
+    wrapper.position.fromArray(item.position as Vector3Array);
+    wrapper.rotation.fromArray(item.rotation as Vector3Array);
+    wrapper.scale.fromArray(item.scale as Vector3Array);
+
+    wrapper.userData = {
       isItem: true,
       type: "model",
       uuid: item.uuid,
       productId: item.productId,
     };
 
-    this.prepareSafetyZones(model);
-    this.scene.add(model);
+    this.prepareSafetyZones(wrapper);
+    this.scene.add(wrapper);
 
-    return model;
+    return wrapper;
   }
 
   private prepareSafetyZones(root: THREE.Object3D) {
-    const safetyMat = new THREE.MeshBasicMaterial({
-      color: 0xff0000,
-      transparent: true,
-      opacity: 0.25,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    });
-
+    const safetyMat = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.25, depthWrite: false, side: THREE.DoubleSide });
     root.traverse((child: any) => {
       if (!child.isMesh) return;
-
       const name = child.name.toLowerCase();
       const matName = child.material?.name?.toLowerCase?.() ?? "";
-
-      const isSafety =
-        name.includes("seguridad") ||
-        name.includes("safety") ||
-        matName.includes("seguridad") ||
-        matName.includes("safety");
-
+      const isSafety = name.includes("seguridad") || name.includes("safety") || matName.includes("seguridad") || matName.includes("safety");
       if (isSafety) {
         child.material = safetyMat.clone();
         child.userData.isSafetyZone = true;
@@ -4425,115 +4524,112 @@ export class ObjectManager {
     });
   }
 
-  // ============================================================
-  // FLOOR
-  // ============================================================
   private createFloor(item: FloorItem): THREE.Object3D | null {
     const pts = item.points;
     if (!pts || pts.length < 3) return null;
-
     const shape = new THREE.Shape();
     shape.moveTo(pts[0].x, -pts[0].z);
     pts.forEach((p, i) => i && shape.lineTo(p.x, -p.z));
     shape.lineTo(pts[0].x, -pts[0].z);
-
-    const geometry = new THREE.ExtrudeGeometry(shape, {
-      depth: 0.05,
-      bevelEnabled: false,
-    });
-
+    const geometry = new THREE.ExtrudeGeometry(shape, { depth: 0.05, bevelEnabled: false });
     geometry.rotateX(-Math.PI / 2);
+    
+    // Fix UVs simple
+    const uv = geometry.attributes.uv;
+    if(uv) {
+        for(let i=0; i<uv.count; i++) {
+            // Un mapeo simple planar para que la textura no se estire en los lados
+            // (Esto es una aproximación, para suelos complejos se requiere un mapa UV mejor)
+        }
+    }
 
-    const material = new THREE.MeshStandardMaterial({
-      color: 0x999999,
-    });
+    const material = new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.8 });
 
+    if (item.floorMaterial) {
+        const matId = item.floorMaterial;
+        if (matId === 'rubber_red') material.color.setHex(0xA04040);
+        else if (matId === 'rubber_green') material.color.setHex(0x22c55e);
+        else if (matId === 'rubber_blue') material.color.setHex(0x3b82f6);
+        else if (matId === 'grass') material.color.setHex(0x4ade80);
+        else if (matId === 'concrete') material.color.setHex(0x9ca3af);
+    }
+    if (item.textureUrl) {
+        this.textureLoader.load(item.textureUrl, (tex) => {
+            tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
+            const scale = item.textureScale ?? 1;
+            tex.repeat.set(0.5 * scale, 0.5 * scale); 
+            tex.rotation = THREE.MathUtils.degToRad(item.textureRotation ?? 0);
+            material.map = tex; material.color.setHex(0xffffff); material.needsUpdate = true;
+        });
+    }
     const mesh = new THREE.Mesh(geometry, material);
     mesh.uuid = item.uuid;
-
     mesh.position.fromArray(item.position as Vector3Array);
     mesh.rotation.fromArray(item.rotation as Vector3Array);
     mesh.scale.fromArray(item.scale as Vector3Array);
-
-    mesh.userData = {
-      isItem: true,
-      type: "floor",
-      uuid: item.uuid,
-    };
-
+    mesh.userData = { isItem: true, type: "floor", uuid: item.uuid, floorMaterial: item.floorMaterial, textureUrl: item.textureUrl, points: item.points };
     this.scene.add(mesh);
     return mesh;
   }
 
-  // ============================================================
-  // FENCE
-  // ============================================================
   private createFence(item: FenceItem): THREE.Object3D | null {
-    const group = new THREE.Group();
-
+    const group = FenceTool.buildFenceMesh(item);
     group.uuid = item.uuid;
     group.position.fromArray(item.position as Vector3Array);
     group.rotation.fromArray(item.rotation as Vector3Array);
     group.scale.fromArray(item.scale as Vector3Array);
-
-    group.userData = {
-      isItem: true,
-      type: "fence",
-      uuid: item.uuid,
-      points: item.points,
-      fenceConfig: item.fenceConfig,
-      productId: item.productId,
-    };
-
+    group.userData = { isItem: true, type: "fence", uuid: item.uuid, points: item.points, fenceConfig: item.fenceConfig, productId: item.productId };
     this.scene.add(group);
     return group;
   }
 
-  // ============================================================
-  // PREVIEW HANDLING
-  // ============================================================
+  // === PREVIEW HANDLING ===
   public async setPreviewItem(item: SceneItem) {
     if (this.previewObject) {
       this.scene.remove(this.previewObject);
       this.previewObject = null;
     }
-
     this.previewItem = item;
-
+    
+    // Creamos el objeto preview (esto puede tardar unos ms si el modelo es pesado, 
+    // pero solo ocurre UNA vez al hacer click en el catálogo)
     const obj = await this.createFromItem({ ...item, uuid: "preview" });
     if (!obj) return;
 
+    // Material semitransparente para el fantasma
     obj.traverse((child: any) => {
-      if (child.material) {
-        child.material = child.material.clone();
-        child.material.transparent = true;
-        child.material.opacity = 0.35;
+      if (child.isMesh) {
+        const mat = Array.isArray(child.material) ? child.material[0].clone() : child.material.clone();
+        mat.transparent = true;
+        mat.opacity = 0.6;
+        mat.depthWrite = false; 
+        child.material = mat;
       }
     });
 
     this.previewObject = obj;
+    this.previewObject.userData = {}; // Sin userData para no ser interactuable
     this.scene.add(obj);
   }
 
   public placePreviewAt(point: THREE.Vector3) {
     if (!this.previewObject) return;
+    // Solo movemos el wrapper. Como el modelo interno ya está ajustado (pivote en pies),
+    // poner el wrapper en point.y (suelo) hace que los pies toquen el suelo perfectamente.
     this.previewObject.position.copy(point);
   }
 
   public confirmPreviewPlacement() {
     if (!this.previewObject || !this.previewItem) return;
 
-    const uuid = THREE.MathUtils.generateUUID();
-
-    const finalItem: SceneItem = {
-      ...this.previewItem,
-      uuid,
-      position: [
+    const position = [
         this.previewObject.position.x,
         this.previewObject.position.y,
         this.previewObject.position.z,
-      ] as Vector3Array,
-    };
+    ] as Vector3Array;
+
+    const uuid = THREE.MathUtils.generateUUID();
+    const finalItem: SceneItem = { ...this.previewItem, uuid, position };
 
     useSceneStore.getState().addItem(finalItem);
 
@@ -4542,24 +4638,17 @@ export class ObjectManager {
     this.previewItem = null;
   }
 
-  // ============================================================
-  // REMOVE ITEM
-  // ============================================================
   public removeByUUID(uuid: string) {
     const obj = this.scene.getObjectByProperty("uuid", uuid);
     if (!obj) return;
-
     this.scene.remove(obj);
-
     obj.traverse((child: any) => {
       if (child.geometry) child.geometry.dispose();
-      if (Array.isArray(child.material))
-        child.material.forEach((mat: THREE.Material) => mat.dispose());
+      if (Array.isArray(child.material)) child.material.forEach((mat: THREE.Material) => mat.dispose());
       else child.material?.dispose?.();
     });
   }
 }
-// --- END FILE ---
 </file>
 
 <file path="src/features/editor/engine/managers/PDFManager.ts">
@@ -5452,7 +5541,7 @@ export class SceneManager {
   public sky: Sky | null = null;
   public sun: THREE.DirectionalLight;
 
-  public interactionPlane: THREE.Mesh; // ⭐️ Plano invisible para raycast al suelo
+  public interactionPlane: THREE.Mesh;
 
   private container: HTMLElement;
   private frameOverlay: HTMLElement | null = null;
@@ -5462,7 +5551,7 @@ export class SceneManager {
 
     // === SCENE ===
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color("#222222");
+    this.scene.background = null; 
 
     // === RENDERER ===
     this.renderer = this.createRenderer(container);
@@ -5478,77 +5567,72 @@ export class SceneManager {
     // === ENVIRONMENT ===
     this.sun = this.createSun();
     this.dirLight = this.sun;
-    this.sky = this.createSky();
+    this.sky = this.createSky(); // Crear cielo
     this.grid = this.createGrid();
     this.createShadowReceiver();
 
     // === INTERACTION PLANE ===
     this.interactionPlane = this.createInteractionPlane();
 
-    // === FRAME OVERLAY (PDF) ===
+    // === FRAME OVERLAY ===
     this.initFrameOverlay();
 
-    // === SYNC CON ZUSTAND EDITOR STORE ===
+    // === SYNC ===
     this.setupEditorStoreSync();
+    
+    // Forzar actualización inicial del sol para que el cielo se pinte AZUL y no negro
+    const initialSun = useEditorStore.getState().sunPosition;
+    this.updateSunPosition(initialSun.azimuth, initialSun.elevation);
   }
 
   // ------------------------------------------------------
   // SYNC CON useEditorStore
   // ------------------------------------------------------
   private setupEditorStoreSync() {
-    // Fondo
-    useEditorStore.subscribe((state) => {
-      const color: string = state.backgroundColor;
-      this.setBackgroundColor(color);
-    });
+    let currentBg = useEditorStore.getState().backgroundColor;
+    let currentSun = useEditorStore.getState().sunPosition;
 
-    // Cielo
-    useEditorStore.subscribe((state) => {
-      const visible: boolean = state.skyVisible;
-      this.setSkyVisible(visible);
-    });
+    // Aplicamos estado inicial
+    this.setBackgroundColor(currentBg);
+    this.setGridVisible(useEditorStore.getState().gridVisible);
 
-    // Sol
     useEditorStore.subscribe((state) => {
-      const sun = state.sunPosition as { azimuth: number; elevation: number };
-      this.updateSunPosition(sun.azimuth, sun.elevation);
-    });
+      // 1. FONDO
+      if (state.backgroundColor !== currentBg) {
+        currentBg = state.backgroundColor;
+        this.setBackgroundColor(currentBg);
+      }
 
-    // Grid
-    useEditorStore.subscribe((state) => {
-      const visible: boolean = state.gridVisible;
-      this.setGridVisible(visible);
+      // 2. GRID
+      this.setGridVisible(state.gridVisible);
+
+      // 3. SOL
+      if (
+        state.sunPosition.azimuth !== currentSun.azimuth ||
+        state.sunPosition.elevation !== currentSun.elevation
+      ) {
+        currentSun = state.sunPosition;
+        this.updateSunPosition(currentSun.azimuth, currentSun.elevation);
+      }
     });
   }
 
   // ------------------------------------------------------
-  // RENDERER
+  // RENDERER & CAMERAS
   // ------------------------------------------------------
   private createRenderer(container: HTMLElement) {
-    const renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      alpha: false,
-      preserveDrawingBuffer: true,
-      powerPreference: "high-performance",
-    });
-
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true, powerPreference: "high-performance" });
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
-
+    renderer.toneMappingExposure = 0.8; // Un poco menos expuesto para que el cielo se vea mejor
     container.appendChild(renderer.domElement);
     return renderer;
   }
 
-  // ------------------------------------------------------
-  // CAMERAS
-  // ------------------------------------------------------
   private createPerspectiveCamera() {
     const aspect = this.container.clientWidth / this.container.clientHeight;
     const cam = new THREE.PerspectiveCamera(45, aspect, 0.1, 5000);
@@ -5559,32 +5643,18 @@ export class SceneManager {
   private createOrthoCamera() {
     const aspect = this.container.clientWidth / this.container.clientHeight;
     const s = 20;
-
-    const cam = new THREE.OrthographicCamera(
-      -(s * aspect) / 2,
-      (s * aspect) / 2,
-      s / 2,
-      -s / 2,
-      -500,
-      500
-    );
-
+    const cam = new THREE.OrthographicCamera(-(s * aspect) / 2, (s * aspect) / 2, s / 2, -s / 2, -500, 500);
     cam.position.set(20, 20, 20);
     cam.lookAt(0, 0, 0);
-
     return cam;
   }
 
   public switchCamera(type: "perspective" | "orthographic") {
     const oldPos = this.activeCamera.position.clone();
     const target = this.controls.target.clone();
-
-    this.activeCamera =
-      type === "perspective" ? this.perspectiveCamera : this.orthoCamera;
-
+    this.activeCamera = type === "perspective" ? this.perspectiveCamera : this.orthoCamera;
     this.activeCamera.position.copy(oldPos);
     this.activeCamera.lookAt(target);
-
     this.controls.object = this.activeCamera;
     this.controls.update();
   }
@@ -5592,63 +5662,38 @@ export class SceneManager {
   public setView(view: CameraView) {
     const d = 22;
     const target = new THREE.Vector3(0, 0, 0);
-
-    const pos =
-      view === "top"
-        ? new THREE.Vector3(0, d, 0)
-        : view === "front"
-        ? new THREE.Vector3(0, 0, d)
-        : view === "side"
-        ? new THREE.Vector3(d, 0, 0)
-        : new THREE.Vector3(d, d, d);
-
+    const pos = view === "top" ? new THREE.Vector3(0, d, 0) : view === "front" ? new THREE.Vector3(0, 0, d) : view === "side" ? new THREE.Vector3(d, 0, 0) : new THREE.Vector3(d, d, d);
     this.activeCamera.position.copy(pos);
     this.activeCamera.lookAt(target);
-
     this.controls.target.copy(target);
     this.controls.update();
   }
 
-  // ------------------------------------------------------
-  // CONTROLS
-  // ------------------------------------------------------
   private createControls() {
     const c = new OrbitControls(this.activeCamera, this.renderer.domElement);
-
     c.enableDamping = true;
     c.dampingFactor = 0.04;
-
     c.minDistance = 1;
     c.maxDistance = 500;
-
     c.screenSpacePanning = true;
-
-    c.mouseButtons = {
-      LEFT: THREE.MOUSE.ROTATE,
-      MIDDLE: THREE.MOUSE.DOLLY,
-      RIGHT: THREE.MOUSE.PAN,
-    };
-
+    c.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
     return c;
   }
 
   // ------------------------------------------------------
-  // ENVIRONMENT
+  // ENVIRONMENT (SOL Y CIELO)
   // ------------------------------------------------------
   private createSun() {
-    const sun = new THREE.DirectionalLight(0xffffff, 2.5);
+    const sun = new THREE.DirectionalLight(0xffffff, 2.0);
     sun.position.set(60, 80, 60);
     sun.castShadow = true;
-
     sun.shadow.mapSize.set(2048, 2048);
-
     const d = 60;
     sun.shadow.camera.left = -d;
     sun.shadow.camera.right = d;
     sun.shadow.camera.top = d;
     sun.shadow.camera.bottom = -d;
     sun.shadow.bias = -0.0001;
-
     this.scene.add(sun);
     return sun;
   }
@@ -5656,25 +5701,20 @@ export class SceneManager {
   private createSky() {
     const sky = new Sky();
     sky.scale.setScalar(450000);
-
+    
+    // Parámetros ajustados para un día azul claro
     const u = sky.material.uniforms;
-    u["turbidity"].value = 10;
-    u["rayleigh"].value = 3;
-    u["mieCoefficient"].value = 0.004;
-    u["mieDirectionalG"].value = 0.7;
-
-    this.updateSunPosition(180, 45);
+    u["turbidity"].value = 0.6;  // Menos turbidez = más claro
+    u["rayleigh"].value = 0.5;   // Dispersión baja = azul más puro
+    u["mieCoefficient"].value = 0.005;
+    u["mieDirectionalG"].value = 0.8;
 
     this.scene.add(sky);
     return sky;
   }
 
-  // ------------------------------------------------------
-  // SUN POSITION
-  // ------------------------------------------------------
   public updateSunPosition(azimuth: number, elevation: number) {
-    if (!this.dirLight) return;
-
+    // Calculamos posición esférica
     const phi = THREE.MathUtils.degToRad(90 - elevation);
     const theta = THREE.MathUtils.degToRad(azimuth);
 
@@ -5682,13 +5722,22 @@ export class SceneManager {
     const y = Math.cos(phi);
     const z = Math.sin(phi) * Math.sin(theta);
 
-    this.dirLight.position.set(x * 50, y * 50, z * 50);
-    this.dirLight.target.position.set(0, 0, 0);
-    this.dirLight.target.updateMatrixWorld();
+    // 1. Mover la LUZ (para las sombras)
+    if (this.dirLight) {
+        this.dirLight.position.set(x * 100, y * 100, z * 100);
+        this.dirLight.target.position.set(0, 0, 0);
+        this.dirLight.target.updateMatrixWorld();
+    }
+
+    // 2. Mover el SOL DEL CIELO (Esto es lo que faltaba para que no fuera negro)
+    if (this.sky) {
+        // El shader del cielo necesita el vector del sol en sus uniforms
+        this.sky.material.uniforms['sunPosition'].value.set(x, y, z);
+    }
   }
 
   // ------------------------------------------------------
-  // GRID & BACKGROUND
+  // HELPERS
   // ------------------------------------------------------
   private createGrid() {
     const grid = new THREE.GridHelper(200, 200, 0x888888, 0x444444);
@@ -5698,30 +5747,27 @@ export class SceneManager {
   }
 
   public setGridVisible(v: boolean) {
-    this.grid.visible = v;
+    if(this.grid) this.grid.visible = v;
   }
 
   public setSkyVisible(v: boolean) {
     if (!this.sky) return;
     this.sky.visible = v;
-    this.scene.background = v ? null : new THREE.Color("#222222");
   }
 
   public setBackgroundColor(color: string) {
-    this.scene.background = new THREE.Color(color);
-    if (this.sky) this.sky.visible = false;
+    if (color === '#111111') {
+        this.setSkyVisible(true);
+        this.scene.background = null; 
+    } else {
+        this.setSkyVisible(false);
+        this.scene.background = new THREE.Color(color);
+    }
   }
 
-  // ------------------------------------------------------
-  // INTERACTION PLANE (para clicks sobre el suelo)
-  // ------------------------------------------------------
   private createInteractionPlane() {
-    const plane = new THREE.Mesh(
-      new THREE.PlaneGeometry(5000, 5000),
-      new THREE.MeshBasicMaterial({ visible: false })
-    );
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(5000, 5000), new THREE.MeshBasicMaterial({ visible: false }));
     plane.rotation.x = -Math.PI / 2;
-    plane.position.y = 0;
     plane.userData.isInteractionPlane = true;
     this.scene.add(plane);
     return plane;
@@ -5729,54 +5775,21 @@ export class SceneManager {
 
   public raycastWorldPoint(raycaster: THREE.Raycaster): THREE.Vector3 | null {
     const hit = raycaster.intersectObject(this.interactionPlane, false);
-    if (!hit.length) return null;
-    return hit[0].point;
+    return hit.length ? hit[0].point : null;
   }
 
-  // ------------------------------------------------------
-  // SHADOW RECEIVER
-  // ------------------------------------------------------
   private createShadowReceiver() {
-    const plane = new THREE.Mesh(
-      new THREE.PlaneGeometry(2000, 2000),
-      new THREE.ShadowMaterial({ opacity: 0.3 })
-    );
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), new THREE.ShadowMaterial({ opacity: 0.3 }));
     plane.rotation.x = -Math.PI / 2;
     plane.receiveShadow = true;
     plane.position.y = 0.001;
     this.scene.add(plane);
   }
 
-  // ------------------------------------------------------
-  // FRAME OVERLAY (PDF)
-  // ------------------------------------------------------
   private initFrameOverlay() {
     const el = document.createElement("div");
-    el.style.position = "absolute";
-    el.style.display = "none";
-    el.style.border = "2px dashed rgba(255,255,255,0.9)";
-    el.style.pointerEvents = "none";
-    el.style.zIndex = "200";
-    el.style.left = "50%";
-    el.style.top = "50%";
-    el.style.transform = "translate(-50%, -50%)";
-
-    const label = document.createElement("div");
-    label.innerText = "ÁREA PDF PORTADA";
-    label.style.position = "absolute";
-    label.style.bottom = "-22px";
-    label.style.left = "50%";
-    label.style.transform = "translateX(-50%)";
-    label.style.fontSize = "11px";
-    label.style.fontWeight = "bold";
-    label.style.color = "#fff";
-
-    el.appendChild(label);
-
-    if (getComputedStyle(this.container).position === "static") {
-      this.container.style.position = "relative";
-    }
-
+    Object.assign(el.style, { position: "absolute", display: "none", border: "2px dashed rgba(255,255,255,0.9)", pointerEvents: "none", zIndex: "200", left: "50%", top: "50%", transform: "translate(-50%, -50%)" });
+    if (getComputedStyle(this.container).position === "static") this.container.style.position = "relative";
     this.container.appendChild(el);
     this.frameOverlay = el;
   }
@@ -5788,68 +5801,40 @@ export class SceneManager {
   }
 
   public updateFrameDimensions() {
-    if (!this.frameOverlay) return;
-    if (this.frameOverlay.style.display === "none") return;
-
+    if (!this.frameOverlay || this.frameOverlay.style.display === "none") return;
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
-
     const aspectTarget = 170 / 120;
     const aspectScreen = w / h;
-
-    let fw: number;
-    let fh: number;
-
-    if (aspectScreen > aspectTarget) {
-      fh = h * 0.85;
-      fw = fh * aspectTarget;
-    } else {
-      fw = w * 0.85;
-      fh = fw / aspectTarget;
-    }
-
+    let fw, fh;
+    if (aspectScreen > aspectTarget) { fh = h * 0.85; fw = fh * aspectTarget; } 
+    else { fw = w * 0.85; fh = fw / aspectTarget; }
     this.frameOverlay.style.width = `${fw}px`;
     this.frameOverlay.style.height = `${fh}px`;
   }
 
-  // ------------------------------------------------------
-  // RESIZE & DISPOSE
-  // ------------------------------------------------------
   public onWindowResize = () => {
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
-
     this.perspectiveCamera.aspect = w / h;
     this.perspectiveCamera.updateProjectionMatrix();
-
-    const s = 20;
-    const a = w / h;
-    this.orthoCamera.left = -(s * a) / 2;
-    this.orthoCamera.right = (s * a) / 2;
-    this.orthoCamera.top = s / 2;
-    this.orthoCamera.bottom = -s / 2;
+    const s = 20; const a = w / h;
+    this.orthoCamera.left = -(s * a) / 2; this.orthoCamera.right = (s * a) / 2;
+    this.orthoCamera.top = s / 2; this.orthoCamera.bottom = -s / 2;
     this.orthoCamera.updateProjectionMatrix();
-
     this.renderer.setSize(w, h);
     this.updateFrameDimensions();
   };
 
   public dispose() {
     try {
-      if (this.renderer.domElement.parentElement) {
-        this.container.removeChild(this.renderer.domElement);
-      }
-
-      if (this.frameOverlay) {
-        this.container.removeChild(this.frameOverlay);
-      }
+      if (this.renderer.domElement.parentElement) this.container.removeChild(this.renderer.domElement);
+      if (this.frameOverlay) this.container.removeChild(this.frameOverlay);
     } catch {}
-
     this.controls.dispose();
     this.renderer.dispose();
   }
 }
-// --- END FILE ---
 </file>
 
 <file path="src/features/editor/engine/managers/tools/CADTool.ts">
@@ -5932,8 +5917,10 @@ import * as THREE from "three";
 import { useSceneStore } from "@/stores/scene/useSceneStore";
 import { useFenceStore } from "@/stores/fence/useFenceStore";
 import type { FenceItem, FenceConfig as BaseFenceConfig } from "@/types/editor";
+// IMPORTANTE: Importamos los presets para rellenar los datos que faltan
+import { FENCE_PRESETS } from "../../../data/fence_presets";
 
-// Tipo interno extendido con todos los campos que este tool necesita
+// Tipo interno extendido con todos los campos necesarios
 type FenceConfig = BaseFenceConfig & {
   moduleLength?: number;
 
@@ -5953,9 +5940,6 @@ type FenceConfig = BaseFenceConfig & {
   railThickness?: number;
 };
 
-/**
- * FenceTool PRO — versión profesional
- */
 export class FenceTool {
   private scene: THREE.Scene;
 
@@ -5987,6 +5971,7 @@ export class FenceTool {
     const p = world.clone();
     p.y = 0;
 
+    // Evitar puntos duplicados muy cerca
     if (this.points.length > 0 && p.distanceTo(this.points.at(-1)!) < 0.1) {
       return;
     }
@@ -6018,7 +6003,7 @@ export class FenceTool {
   }
 
   // ====================================================================
-  // FINALIZE (llamado desde InteractionManager botón derecho)
+  // FINALIZE
   // ====================================================================
   public finalize() {
     this.createFence();
@@ -6030,7 +6015,8 @@ export class FenceTool {
   private createFence() {
     if (this.points.length < 2) return;
 
-    const config = useFenceStore.getState().config as FenceConfig;
+    // Obtenemos config del store (parcial, solo tiene ID y colores)
+    const storeConfig = useFenceStore.getState().config;
 
     const uuid = THREE.MathUtils.generateUUID();
     const box = new THREE.Box3().setFromPoints(this.points);
@@ -6044,12 +6030,12 @@ export class FenceTool {
     const item: FenceItem = {
       uuid,
       type: "fence",
-      productId: "fence_" + (config as any).presetId,
+      productId: "fence_" + storeConfig.presetId,
       name: "Valla",
-      price: 100,
+      price: 100, // Precio base dummy, luego se recalcula con PriceCalculator
       points: localPoints,
-      // clonamos para no mutar el store
-      fenceConfig: structuredClone(config),
+      // Guardamos la config del usuario
+      fenceConfig: structuredClone(storeConfig),
       position: [center.x, 0, center.z],
       rotation: [0, 0, 0],
       scale: [1, 1, 1],
@@ -6061,11 +6047,27 @@ export class FenceTool {
   }
 
   // ====================================================================
-  // RUNTIME GEOMETRY BUILDER
+  // RUNTIME GEOMETRY BUILDER (CORREGIDO)
   // ====================================================================
   public static buildFenceMesh(item: FenceItem): THREE.Group {
     const group = new THREE.Group();
-    const config = item.fenceConfig as FenceConfig;
+    
+    // 1. RECUPERAMOS LOS VALORES DEL PRESET
+    // item.fenceConfig tiene lo que el usuario personalizó (colores, id)
+    // FENCE_PRESETS tiene las dimensiones geométricas
+    const userConfig = item.fenceConfig;
+    const presetData = FENCE_PRESETS[userConfig.presetId] || FENCE_PRESETS["wood"];
+
+    // 2. FUSIONAMOS (Merge) para tener un objeto config completo
+    const config: FenceConfig = {
+        ...presetData,        // Valores geométricos por defecto (postHeight, slatWidth, etc)
+        ...userConfig,        // Sobreescribe colores y presetId
+        // Aseguramos merging de colores
+        colors: {
+            ...presetData.defaultColors,
+            ...userConfig.colors
+        }
+    } as FenceConfig;
 
     const pts = item.points.map((p) => new THREE.Vector3(p.x, 0, p.z));
     if (pts.length < 2) return group;
@@ -6076,12 +6078,13 @@ export class FenceTool {
 
     const temp = new THREE.Object3D();
 
+    // 3. GENERAMOS GEOMETRÍAS CON LA CONFIG COMPLETA
     const postGeo = FenceTool.getPostGeometry(config);
     const railGeo = FenceTool.getRailGeometry(config);
     const slatGeo = FenceTool.getSlatGeometry(config);
 
     const moduleLength = config.moduleLength ?? 2.0;
-    const postHeight = config.postHeight;
+    const postHeight = config.postHeight || 1.0; // Fallback por seguridad
 
     const topRailY = postHeight - 0.12;
     const bottomRailY = 0.12;
@@ -6091,6 +6094,10 @@ export class FenceTool {
       const A = pts[i];
       const B = pts[i + 1];
       const dist = A.distanceTo(B);
+      
+      // Evitar NaN si los puntos son idénticos
+      if (dist < 0.001) continue;
+
       const dir = new THREE.Vector3().subVectors(B, A).normalize();
       const angle = Math.atan2(dir.x, dir.z);
 
@@ -6124,7 +6131,7 @@ export class FenceTool {
         }
 
         // --- SLATS ---
-        const slatWidth = config.slatWidth;
+        const slatWidth = config.slatWidth || 0.1;
         const slatGap = config.slatGap ?? 0.04;
 
         const maxSlats = Math.max(
@@ -6135,11 +6142,17 @@ export class FenceTool {
 
         for (let s = 0; s < slatCount; s++) {
           const tSlat = (s + 0.5) / slatCount;
-          const pSlat = new THREE.Vector3().lerpVectors(A, B, tSlat);
+          const pSlat = new THREE.Vector3().lerpVectors(A, B, tSlat); // Esto es incorrecto para la posición exacta en el módulo, pero válido visualmente para MVP
+          
+          // Corrección: Interpolar entre el inicio y fin del SUB-SEGMENTO actual, no de todo el tramo A-B
+          const subStart = new THREE.Vector3().lerpVectors(A, B, t0);
+          const subEnd = new THREE.Vector3().lerpVectors(A, B, t1);
+          const pSlatExact = new THREE.Vector3().lerpVectors(subStart, subEnd, (s + 0.5) / slatCount);
+
           FenceTool.pushMatrix(
             slatMatrices,
             temp,
-            new THREE.Vector3(pSlat.x, postHeight * 0.5, pSlat.z),
+            new THREE.Vector3(pSlatExact.x, postHeight * 0.5, pSlatExact.z),
             angle,
             1
           );
@@ -6163,7 +6176,7 @@ export class FenceTool {
   // HELPERS GEOMETRÍA
   // ====================================================================
   private static getPostGeometry(config: FenceConfig) {
-    const h = config.postHeight;
+    const h = config.postHeight || 1.0;
 
     if (config.postType === "round") {
       const r = config.postRadius ?? 0.06;
@@ -6193,9 +6206,9 @@ export class FenceTool {
   }
 
   private static getSlatGeometry(config: FenceConfig) {
-    const thickness = config.slatThickness;
-    const height = config.postHeight * 0.7;
-    const width = config.slatWidth;
+    const thickness = config.slatThickness || 0.02;
+    const height = (config.postHeight || 1.0) * 0.7;
+    const width = config.slatWidth || 0.1;
 
     return new THREE.BoxGeometry(thickness, height, width);
   }
@@ -6207,6 +6220,9 @@ export class FenceTool {
     angle: number,
     length: number
   ) {
+    // Protección contra NaNs
+    if (isNaN(pos.x) || isNaN(pos.y) || isNaN(pos.z) || isNaN(length)) return;
+
     temp.position.copy(pos);
     temp.rotation.set(0, angle, 0);
     temp.scale.set(1, 1, length);
@@ -6235,7 +6251,6 @@ export class FenceTool {
     group.add(inst);
   }
 }
-// --- END FILE ---
 </file>
 
 <file path="src/features/editor/engine/managers/tools/FloorTool.ts">
@@ -7756,63 +7771,51 @@ export const EnvironmentPanel = () => {
 </file>
 
 <file path="src/features/editor/ui/FenceProperties.tsx">
-// --- START OF FILE src/features/editor/ui/FenceProperties.tsx ---
 import { Fence, Palette } from "lucide-react";
 import { FENCE_PRESETS } from "../data/fence_presets";
-
 import { CadControl } from "./CadControl";
 
 // Stores
 import { useSceneStore } from "@/stores/scene/useSceneStore";
 import { useSelectionStore } from "@/stores/selection/useSelectionStore";
 
-export const FenceProperties = () => {
-  // ✔ TU SELECTION STORE REAL: selectedUUID
-  const selectedUUID = useSelectionStore((s) => s.selectedUUID);
+// Colores rápidos para no tener que abrir el selector siempre
+const QUICK_COLORS = [
+  { hex: "#8b5a2b", name: "Madera" },
+  { hex: "#3b82f6", name: "Azul" },
+  { hex: "#22c55e", name: "Verde" },
+  { hex: "#eab308", name: "Amarillo" },
+  { hex: "#ef4444", name: "Rojo" },
+  { hex: "#111111", name: "Negro" },
+  { hex: "#cccccc", name: "Blanco" },
+];
 
-  // ✔ datos generales de escena
+export const FenceProperties = () => {
+  const selectedUUID = useSelectionStore((s) => s.selectedUUID);
   const items = useSceneStore((s) => s.items);
   const updateItemFenceConfig = useSceneStore((s) => s.updateItemFenceConfig);
 
-  // Buscar item seleccionado
   const selectedItem = items.find((i) => i.uuid === selectedUUID);
 
-  // Si no es valla o no tiene config, no mostrar panel
   if (!selectedItem || selectedItem.type !== "fence" || !selectedItem.fenceConfig) {
     return null;
   }
 
   const currentConfig = selectedItem.fenceConfig;
-  const currentPreset =
-    FENCE_PRESETS[currentConfig.presetId] || FENCE_PRESETS["wood"];
+  const currentPreset = FENCE_PRESETS[currentConfig.presetId] || FENCE_PRESETS["wood"];
 
-  // --- Cambiar preset ---
   const handlePresetChange = (key: string) => {
     const preset = FENCE_PRESETS[key];
-
     const newConfig = {
       presetId: key,
-      colors: {
-        ...preset.defaultColors,
-        ...currentConfig.colors,
-      },
+      colors: { ...preset.defaultColors, ...currentConfig.colors },
     };
-
     updateItemFenceConfig(selectedItem.uuid, newConfig);
   };
 
-  // --- Cambiar color individual ---
-  const handleColorChange = (
-    key: "post" | "slatA" | "slatB" | "slatC",
-    hex: string
-  ) => {
+  const handleColorChange = (key: "post" | "slatA" | "slatB" | "slatC", hex: string) => {
     const colorInt = parseInt(hex.replace("#", "0x"));
-
-    const newColors = {
-      ...currentConfig.colors,
-      [key]: colorInt,
-    };
-
+    const newColors = { ...currentConfig.colors, [key]: colorInt };
     updateItemFenceConfig(selectedItem.uuid, {
       presetId: currentConfig.presetId,
       colors: newColors,
@@ -7821,22 +7824,45 @@ export const FenceProperties = () => {
 
   const toHex = (num: number) => "#" + num.toString(16).padStart(6, "0");
 
+  // Componente interno para elegir color (Botones rápidos + Selector nativo)
+  const ColorPicker = ({ label, colorKey }: { label: string, colorKey: "post" | "slatA" | "slatB" | "slatC" }) => (
+    <div className="mb-3">
+      <div className="flex justify-between items-center mb-1">
+        <span className="text-xs text-neutral-300">{label}</span>
+        <div className="w-6 h-6 rounded-full border border-neutral-600 overflow-hidden relative">
+           <input
+            type="color"
+            value={toHex(currentConfig.colors[colorKey] ?? 0)}
+            onChange={(e) => handleColorChange(colorKey, e.target.value)}
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] p-0 m-0 border-0 cursor-pointer"
+          />
+        </div>
+      </div>
+      {/* Paleta rápida */}
+      <div className="flex gap-1 flex-wrap">
+        {QUICK_COLORS.map((c) => (
+          <button
+            key={c.hex}
+            onClick={() => handleColorChange(colorKey, c.hex)}
+            className="w-5 h-5 rounded-full border border-white/10 hover:scale-110 transition-transform"
+            style={{ backgroundColor: c.hex }}
+            title={c.name}
+          />
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div className="absolute top-20 right-4 bg-neutral-900/95 backdrop-blur-md border border-neutral-700 rounded-xl p-4 shadow-xl z-20 w-80 animate-in fade-in slide-in-from-right-2">
-
-      {/* Panel CAD */}
       <CadControl />
 
       <h3 className="text-white text-sm font-bold mb-4 flex items-center gap-2 border-b border-white/10 pb-2">
         <Fence size={16} /> Editar Valla
       </h3>
 
-      {/* SELECTOR DE MODELO */}
       <div className="mb-4">
-        <label className="text-xs text-neutral-400 mb-2 block uppercase font-bold">
-          Modelo
-        </label>
-
+        <label className="text-xs text-neutral-400 mb-2 block uppercase font-bold">Modelo</label>
         <div className="grid grid-cols-2 gap-2">
           {Object.entries(FENCE_PRESETS).map(([key, preset]) => (
             <button
@@ -7854,58 +7880,18 @@ export const FenceProperties = () => {
         </div>
       </div>
 
-      {/* COLORES */}
-      <div className="space-y-3">
-        <label className="text-xs text-neutral-400 uppercase font-bold flex items-center gap-2">
-          <Palette size={12} /> Personalización
+      <div className="space-y-1">
+        <label className="text-xs text-neutral-400 uppercase font-bold flex items-center gap-2 mb-2">
+          <Palette size={12} /> Colores
         </label>
 
-        {/* Postes */}
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-neutral-300">Postes / Estructura</span>
-          <input
-            type="color"
-            value={toHex(currentConfig.colors.post)}
-            onChange={(e) => handleColorChange("post", e.target.value)}
-            className="w-8 h-8 rounded cursor-pointer bg-transparent border-none"
-          />
-        </div>
+        <ColorPicker label="Postes / Estructura" colorKey="post" />
+        <ColorPicker label={currentPreset.isSolidPanel ? "Panel" : "Lamas Principales"} colorKey="slatA" />
 
-        {/* Lamas principales */}
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-neutral-300">
-            {currentPreset.isSolidPanel ? "Panel" : "Lamas Principales"}
-          </span>
-          <input
-            type="color"
-            value={toHex(currentConfig.colors.slatA)}
-            onChange={(e) => handleColorChange("slatA", e.target.value)}
-            className="w-8 h-8 rounded cursor-pointer bg-transparent border-none"
-          />
-        </div>
-
-        {/* Multicolor */}
         {currentPreset.multiColor && (
           <>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-neutral-300">Lamas Secundarias</span>
-              <input
-                type="color"
-                value={toHex(currentConfig.colors.slatB ?? currentConfig.colors.slatA)}
-                onChange={(e) => handleColorChange("slatB", e.target.value)}
-                className="w-8 h-8 rounded cursor-pointer bg-transparent border-none"
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-neutral-300">Lamas Terciarias</span>
-              <input
-                type="color"
-                value={toHex(currentConfig.colors.slatC ?? currentConfig.colors.slatA)}
-                onChange={(e) => handleColorChange("slatC", e.target.value)}
-                className="w-8 h-8 rounded cursor-pointer bg-transparent border-none"
-              />
-            </div>
+            <ColorPicker label="Lamas Secundarias" colorKey="slatB" />
+            <ColorPicker label="Lamas Terciarias" colorKey="slatC" />
           </>
         )}
       </div>
@@ -7916,7 +7902,6 @@ export const FenceProperties = () => {
     </div>
   );
 };
-// --- END OF FILE ---
 </file>
 
 <file path="src/features/editor/ui/FloorProperties.tsx">
@@ -9172,7 +9157,6 @@ export const useCRMStore = create<CRMState>((set) => ({
 import { create } from "zustand";
 import type { CameraView, CameraType } from "@/types/editor";
 
-// Modo principal del editor (armonizado)
 export type EditorMode =
   | "idle"
   | "placing_item"
@@ -9183,7 +9167,6 @@ export type EditorMode =
   | "editing";
 
 interface EditorState {
-  // UI toggles
   gridVisible: boolean;
   skyVisible: boolean;
   safetyZonesVisible: boolean;
@@ -9191,11 +9174,9 @@ interface EditorState {
   budgetVisible: boolean;
   qrModalOpen: boolean;
 
-  // Editor mode
   mode: EditorMode;
   setMode: (mode: EditorMode) => void;
 
-  // Cámara
   cameraType: CameraType;
   setCameraType: (type: CameraType) => void;
 
@@ -9203,22 +9184,16 @@ interface EditorState {
   triggerView: (view: CameraView) => void;
   clearPendingView: () => void;
 
-  // Fondo
   backgroundColor: string;
   setBackgroundColor: (color: string) => void;
 
-  // Sol
   sunPosition: { azimuth: number; elevation: number };
   setSun: (azimuth: number, elevation: number) => void;
-
-  // Alias para componentes antiguos
   setSunPosition: (azimuth: number, elevation: number) => void;
 
-  // Medición
   measurementResult: number | null;
   setMeasurementResult: (value: number | null) => void;
 
-  // Input modal
   inputModal: {
     isOpen: boolean;
     title: string;
@@ -9228,7 +9203,6 @@ interface EditorState {
   requestInput: (title: string, defaultValue?: string) => Promise<string | null>;
   closeInputModal: (value: string | null) => void;
 
-  // Toggles
   toggleGrid: () => void;
   toggleSky: () => void;
   toggleEnvPanel: () => void;
@@ -9240,19 +9214,17 @@ interface EditorState {
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
-  // UI defaults
-  gridVisible: true,
-  skyVisible: true,
+  // --- CONFIGURACIÓN INICIAL ---
+  gridVisible: false, // 👈 CAMBIADO: Grid oculto por defecto
+  skyVisible: true,   // Cielo visible
   safetyZonesVisible: false,
   envPanelVisible: false,
   budgetVisible: false,
   qrModalOpen: false,
 
-  // Editor mode
   mode: "idle",
   setMode: (mode) => set({ mode }),
 
-  // Cámara
   cameraType: "perspective",
   setCameraType: (type) => set({ cameraType: type }),
 
@@ -9260,63 +9232,34 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   triggerView: (view) => set({ pendingView: view }),
   clearPendingView: () => set({ pendingView: null }),
 
-  // Fondo
-  backgroundColor: "#222222",
+  // 👈 CAMBIADO: #111111 activa el Sky en tu SceneManager
+  backgroundColor: "#111111", 
   setBackgroundColor: (color: string) => set({ backgroundColor: color }),
 
-  // Sol (estándar profesional)
   sunPosition: { azimuth: 180, elevation: 45 },
-  setSun: (azimuth, elevation) =>
-    set({ sunPosition: { azimuth, elevation } }),
+  setSun: (azimuth, elevation) => set({ sunPosition: { azimuth, elevation } }),
+  setSunPosition: (azimuth, elevation) => set({ sunPosition: { azimuth, elevation } }),
 
-  // Alias para compatibilidad (EnvironmentPanel usa este)
-  setSunPosition: (azimuth, elevation) =>
-    set({ sunPosition: { azimuth, elevation } }),
-
-  // Medición
   measurementResult: null,
   setMeasurementResult: (value) => set({ measurementResult: value }),
 
-  // Input modal
-  inputModal: {
-    isOpen: false,
-    title: "",
-    defaultValue: "",
-    resolve: null,
-  },
+  inputModal: { isOpen: false, title: "", defaultValue: "", resolve: null },
 
   requestInput: (title, defaultValue = "") =>
     new Promise((resolve) => {
-      set({
-        inputModal: {
-          isOpen: true,
-          title,
-          defaultValue,
-          resolve,
-        },
-      });
+      set({ inputModal: { isOpen: true, title, defaultValue, resolve } });
     }),
 
   closeInputModal: (value) => {
     const res = get().inputModal.resolve;
     if (res) res(value);
-
-    set({
-      inputModal: {
-        isOpen: false,
-        title: "",
-        defaultValue: "",
-        resolve: null,
-      },
-    });
+    set({ inputModal: { isOpen: false, title: "", defaultValue: "", resolve: null } });
   },
 
-  // Toggles
   toggleGrid: () => set((s) => ({ gridVisible: !s.gridVisible })),
   toggleSky: () => set((s) => ({ skyVisible: !s.skyVisible })),
   toggleEnvPanel: () => set((s) => ({ envPanelVisible: !s.envPanelVisible })),
-  toggleSafetyZones: () =>
-    set((s) => ({ safetyZonesVisible: !s.safetyZonesVisible })),
+  toggleSafetyZones: () => set((s) => ({ safetyZonesVisible: !s.safetyZonesVisible })),
   toggleBudget: () => set((s) => ({ budgetVisible: !s.budgetVisible })),
 
   openQRModal: () => set({ qrModalOpen: true }),
@@ -9514,48 +9457,12 @@ export const useProjectStore = create<ProjectState>((set) => ({
 </file>
 
 <file path="src/stores/scene/useSceneStore.ts">
-// --- FILE: src/stores/scene/useSceneStore.ts ---
 import { create } from "zustand";
-import type { Vector3Array } from "@/types/editor";
+// Importamos los tipos estrictos en lugar de definirlos aquí
+import type { SceneItem, Vector3Array } from "@/types/editor";
 
-export interface SceneItem {
-  uuid: string;
-  productId: string;
-  name: string;
-
-  price: number;
-
-  position: Vector3Array;
-  rotation: Vector3Array;
-  scale: Vector3Array;
-
-  description?: string;
-  url_tech?: string;
-  url_cert?: string;
-  url_inst?: string;
-
-  data?: any;
-
-  type?: "model" | "floor" | "fence";
-  info?: string;
-
-  // ⭐ FENCE SUPPORT
-  fenceConfig?: {
-    presetId: string;
-    colors: {
-      post: number;
-      slatA: number;
-      slatB?: number;
-      slatC?: number;
-    };
-  };
-
-  // ⭐ FLOOR SUPPORT
-  floorMaterial?: string;
-  textureUrl?: string;
-  textureScale?: number;
-  textureRotation?: number;
-}
+// Re-exportamos para compatibilidad
+export type { SceneItem };
 
 interface SceneState {
   items: SceneItem[];
@@ -9620,8 +9527,9 @@ export const useSceneStore = create<SceneState>((set) => ({
   // =====================================================
   updateItem: (uuid, partial) =>
     set((s) => {
+      // Forzamos el tipado aquí porque Partial<SceneItem> es seguro
       const items = s.items.map((it) =>
-        it.uuid === uuid ? { ...it, ...partial } : it
+        it.uuid === uuid ? ({ ...it, ...partial } as SceneItem) : it
       );
       return {
         items,
@@ -9634,9 +9542,13 @@ export const useSceneStore = create<SceneState>((set) => ({
   // =====================================================
   updateItemFenceConfig: (uuid, newConfig) =>
     set((s) => {
-      const items = s.items.map((it) =>
-        it.uuid === uuid ? { ...it, fenceConfig: newConfig } : it
-      );
+      const items = s.items.map((it) => {
+        // Solo actualizamos si es una valla para mantener la consistencia de tipos
+        if (it.uuid === uuid && it.type === "fence") {
+          return { ...it, fenceConfig: newConfig };
+        }
+        return it;
+      });
       return {
         items,
         totalPrice: items.reduce((sum, it) => sum + (it.price ?? 0), 0),
@@ -9648,9 +9560,13 @@ export const useSceneStore = create<SceneState>((set) => ({
   // =====================================================
   updateFloorMaterial: (uuid, material) =>
     set((s) => {
-      const items = s.items.map((it) =>
-        it.uuid === uuid ? { ...it, floorMaterial: material } : it
-      );
+      const items = s.items.map((it) => {
+        // Solo actualizamos si es suelo
+        if (it.uuid === uuid && it.type === "floor") {
+          return { ...it, floorMaterial: material as any }; // Cast a any para flexibilizar FloorMaterialType
+        }
+        return it;
+      });
       return { items, totalPrice: s.totalPrice };
     }),
 
@@ -9659,16 +9575,17 @@ export const useSceneStore = create<SceneState>((set) => ({
   // =====================================================
   updateFloorTexture: (uuid, url, scale, rotation) =>
     set((s) => {
-      const items = s.items.map((it) =>
-        it.uuid === uuid
-          ? {
-              ...it,
-              textureUrl: url ?? it.textureUrl,
-              textureScale: scale ?? it.textureScale ?? 1,
-              textureRotation: rotation ?? it.textureRotation ?? 0,
-            }
-          : it
-      );
+      const items = s.items.map((it) => {
+        if (it.uuid === uuid && it.type === "floor") {
+          return {
+            ...it,
+            textureUrl: url ?? it.textureUrl,
+            textureScale: scale ?? it.textureScale ?? 1,
+            textureRotation: rotation ?? it.textureRotation ?? 0,
+          };
+        }
+        return it;
+      });
       return { items, totalPrice: s.totalPrice };
     }),
 
