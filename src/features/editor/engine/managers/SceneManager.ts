@@ -19,7 +19,7 @@ export class SceneManager {
   public sky: Sky | null = null;
   public sun: THREE.DirectionalLight;
 
-  public interactionPlane: THREE.Mesh;   // ⭐️ ← NECESARIO PARA RAYCAST AL SUELO
+  public interactionPlane: THREE.Mesh; // ⭐️ Plano invisible para raycast al suelo
 
   private container: HTMLElement;
   private frameOverlay: HTMLElement | null = null;
@@ -52,36 +52,40 @@ export class SceneManager {
     // === INTERACTION PLANE ===
     this.interactionPlane = this.createInteractionPlane();
 
-    // === UI FRAME (PDF) ===
+    // === FRAME OVERLAY (PDF) ===
     this.initFrameOverlay();
 
-    // === SYNC WITH EDITOR STORE ===
+    // === SYNC CON ZUSTAND EDITOR STORE ===
     this.setupEditorStoreSync();
   }
 
   // ------------------------------------------------------
-  // BACKGROUND / SKY SYNC WITH UI
+  // SYNC CON useEditorStore
   // ------------------------------------------------------
   private setupEditorStoreSync() {
-    useEditorStore.subscribe(
-      (s) => s.backgroundColor,
-      (color) => this.setBackgroundColor(color)
-    );
+    // Fondo
+    useEditorStore.subscribe((state) => {
+      const color: string = state.backgroundColor;
+      this.setBackgroundColor(color);
+    });
 
-    useEditorStore.subscribe(
-      (s) => s.skyVisible,
-      (visible) => this.setSkyVisible(visible)
-    );
+    // Cielo
+    useEditorStore.subscribe((state) => {
+      const visible: boolean = state.skyVisible;
+      this.setSkyVisible(visible);
+    });
 
-    useEditorStore.subscribe(
-      (s) => s.sunPosition,
-      (sun) => this.updateSunPosition(sun.azimuth, sun.elevation)
-    );
+    // Sol
+    useEditorStore.subscribe((state) => {
+      const sun = state.sunPosition as { azimuth: number; elevation: number };
+      this.updateSunPosition(sun.azimuth, sun.elevation);
+    });
 
-    useEditorStore.subscribe(
-      (s) => s.gridVisible,
-      (visible) => this.setGridVisible(visible)
-    );
+    // Grid
+    useEditorStore.subscribe((state) => {
+      const visible: boolean = state.gridVisible;
+      this.setGridVisible(visible);
+    });
   }
 
   // ------------------------------------------------------
@@ -360,7 +364,8 @@ export class SceneManager {
     const aspectTarget = 170 / 120;
     const aspectScreen = w / h;
 
-    let fw, fh;
+    let fw: number;
+    let fh: number;
 
     if (aspectScreen > aspectTarget) {
       fh = h * 0.85;

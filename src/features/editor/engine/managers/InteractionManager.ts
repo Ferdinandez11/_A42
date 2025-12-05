@@ -14,51 +14,60 @@ export class InteractionManager {
 
   public transformControl: TransformControls;
   private isDragging = false;
-  private dragStart = new THREE.Vector3();
 
   constructor(engine: A42Engine) {
     this.engine = engine;
 
-    // TransformControls
     this.transformControl = new TransformControls(
       this.engine.activeCamera,
       this.engine.renderer.domElement
     );
+
     this.transformControl.visible = false;
     this.engine.scene.add(this.transformControl);
 
-    this.attachTransformControlListeners();
+    this.attachListeners();
   }
 
   // ======================================================
-  // TRANSFORM CONTROLS LISTENERS
+  // TRANSFORM CONTROL LISTENERS
   // ======================================================
-  private attachTransformControlListeners() {
+  private attachListeners() {
     this.transformControl.addEventListener("dragging-changed", (e: any) => {
       this.isDragging = e.value;
       this.engine.sceneManager.controls.enabled = !e.value;
 
       const obj = this.transformControl.object;
-      if (!obj) return;
+      if (!obj || e.value) return;
 
-      if (e.value) {
-        this.dragStart.copy(obj.position);
-      } else {
-        if (obj.userData?.uuid) {
-          this.syncTransformToStore(obj);
-        }
+      if (obj.userData?.uuid) {
+        this.syncTransformToStore(obj);
       }
     });
 
     this.transformControl.addEventListener("objectChange", () => {
+      if (!this.isDragging) return;
       const obj = this.transformControl.object;
-      if (!obj || !this.isDragging) return;
-      this.syncTransformToStore(obj);
+      if (obj) this.syncTransformToStore(obj);
     });
   }
 
   // ======================================================
-  // POINTER EVENTS
+  // CAMERA UPDATE  ⭐ Necesario para A42Engine
+  // ======================================================
+  public updateCamera(camera: THREE.Camera) {
+    this.transformControl.camera = camera;
+  }
+
+  // ======================================================
+  // SET GIZMO MODE  ⭐ Necesario para A42Engine
+  // ======================================================
+  public setGizmoMode(mode: "translate" | "rotate" | "scale") {
+    this.transformControl.setMode(mode);
+  }
+
+  // ======================================================
+  // POINTER DOWN
   // ======================================================
   public onPointerDown = (evt: MouseEvent) => {
     if (this.isDragging) return;
@@ -73,98 +82,73 @@ export class InteractionManager {
   };
 
   private handleSceneClick() {
-    const clickMode = useEditorStore.getState().mode;
+    const mode = useEditorStore.getState().mode;
 
-    // -------------------------------------------------
-    // 1) Check if hit object (SELECTION)
-    // -------------------------------------------------
-    const items: THREE.Object3D[] = [];
+    // 1) SELECT OBJECT
+    const objects: THREE.Object3D[] = [];
     this.engine.scene.traverse((obj) => {
-      if (obj.userData?.isItem) items.push(obj);
+      if (obj.userData?.isItem) objects.push(obj);
     });
 
-    const hits = this.raycaster.intersectObjects(items, true);
-
+    const hits = this.raycaster.intersectObjects(objects, true);
     if (hits.length > 0) {
-      let target: THREE.Object3D | null = hits[0].object;
-      while (target && !target.userData?.isItem && target.parent) {
-        target = target.parent;
-      }
-
-      if (target?.userData?.uuid) {
-        this.selectObject(target);
+      let obj: THREE.Object3D | null = hits[0].object;
+      while (obj && !obj.userData?.isItem && obj.parent) obj = obj.parent;
+      if (obj) {
+        this.selectObject(obj);
         return;
       }
     }
 
-    // -------------------------------------------------
-    // 2) If not clicked object → try FLOOR POINT
-    // -------------------------------------------------
+    // 2) CLICK ON GROUND
     const world = this.engine.sceneManager.raycastWorldPoint(this.raycaster);
-
     if (world) {
-      if (clickMode === "placing_item") {
-        this.engine.objectManager.placePreviewAt(world);
+      if (mode === "placing_item") {
+        this.engine.objectManager.placePreviewAt?.(world);
         return;
       }
 
-      if (clickMode === "drawing_floor") {
-        this.engine.toolsManager.floorTool.onClick(world);
+      if (mode === "drawing_floor") {
+        this.engine.toolsManager.floorTool.addPoint(world);
         return;
       }
 
-      if (clickMode === "drawing_fence") {
-        this.engine.toolsManager.fenceTool.onClick(world);
+      if (mode === "drawing_fence") {
+        this.engine.toolsManager.fenceTool.addPoint(world);
         return;
       }
     }
 
-    // -------------------------------------------------
-    // 3) Clear selection
-    // -------------------------------------------------
+    // 3) CLEAR SELECTION
     this.clearSelection();
-  }
-
-  // ======================================================
-  // CAMERA & GIZMO
-  // ======================================================
-  public updateCamera(camera: THREE.Camera) {
-    this.transformControl.camera = camera;
-  }
-
-  public setGizmoMode(mode: "translate" | "rotate" | "scale") {
-    this.transformControl.setMode(mode);
   }
 
   // ======================================================
   // SELECTION
   // ======================================================
-  public selectObject(object: THREE.Object3D | null) {
-    const selectionStore = useSelectionStore.getState();
+  public selectObject(obj: THREE.Object3D | null) {
+    const store = useSelectionStore.getState();
 
-    if (!object) {
-      selectionStore.select(null);
-      this.transformControl.detach();
-      this.transformControl.visible = false;
-      this.engine.sceneManager.controls.enabled = true;
+    if (!obj) {
+      this.clearSelection();
       return;
     }
 
-    const uuid = object.userData?.uuid;
+    const uuid = obj.userData?.uuid;
     if (!uuid) {
       this.clearSelection();
       return;
     }
 
-    selectionStore.select(uuid);
-    this.transformControl.attach(object);
+    store.select(uuid);
+    this.transformControl.attach(obj);
     this.transformControl.visible = true;
     this.engine.sceneManager.controls.enabled = false;
   }
 
   private clearSelection() {
-    const selectionStore = useSelectionStore.getState();
-    selectionStore.select(null);
+    const store = useSelectionStore.getState();
+    store.select(null);
 
     this.transformControl.detach();
     this.transformControl.visible = false;
@@ -172,13 +156,12 @@ export class InteractionManager {
   }
 
   // ======================================================
-  // SYNC TO STORE
+  // SYNC TRANSFORM TO STORE
   // ======================================================
   private syncTransformToStore(obj: THREE.Object3D) {
-    const sceneStore = useSceneStore.getState();
     if (!obj.userData?.uuid) return;
 
-    sceneStore.updateItem(obj.userData.uuid, {
+    useSceneStore.getState().updateItem(obj.userData.uuid, {
       position: [obj.position.x, obj.position.y, obj.position.z],
       rotation: [obj.rotation.x, obj.rotation.y, obj.rotation.z],
       scale: [obj.scale.x, obj.scale.y, obj.scale.z],
@@ -186,21 +169,12 @@ export class InteractionManager {
   }
 
   // ======================================================
-  // SELECT ITEM BY UUID
+  // SELECT BY UUID
   // ======================================================
   public selectItemByUUID(uuid: string | null) {
-    if (!uuid) {
-      this.clearSelection();
-      return;
-    }
-
+    if (!uuid) return this.clearSelection();
     const obj = this.engine.scene.getObjectByProperty("uuid", uuid);
-    if (!obj) {
-      this.clearSelection();
-      return;
-    }
-
-    this.selectObject(obj);
+    this.selectObject(obj ?? null);
   }
 }
 // --- END FILE ---
