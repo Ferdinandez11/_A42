@@ -33,12 +33,7 @@ export class A42Engine {
     this.sceneManager = new SceneManager(container);
     this.objectManager = new ObjectManager(this.sceneManager.scene);
 
-    // ⚠️ ToolsManager necesita scene + objectManager
-    this.toolsManager = new ToolsManager(
-      this.sceneManager.scene,
-      this.objectManager
-    );
-
+    this.toolsManager = new ToolsManager(this.sceneManager.scene, this.objectManager);
     this.interactionManager = new InteractionManager(this);
     this.walkManager = new WalkManager(this);
     this.recorderManager = new RecorderManager(this);
@@ -63,7 +58,8 @@ export class A42Engine {
     return this.sceneManager.renderer;
   }
 
-  // === PUBLIC API ===
+  // --- PUBLIC API -----------------------------------------------------
+
   public onPointerDown = (event: MouseEvent) => {
     this.interactionManager.onPointerDown(event);
   };
@@ -89,24 +85,29 @@ export class A42Engine {
     this.sceneManager.setSkyVisible(visible);
   }
 
+  /** ✔️ NECESARIO PARA EDITOR3D */
+  public updateSunPosition(azimuth: number, elevation: number) {
+    this.sceneManager.updateSunPosition(azimuth, elevation);
+  }
+
   public setGizmoMode(mode: "translate" | "rotate" | "scale") {
     this.interactionManager.setGizmoMode(mode);
   }
 
   public clearTools() {
     this.toolsManager.clearTools();
-    // requiere que selectObject sea public y acepte null
     this.interactionManager.selectObject(null);
   }
 
-  // === KEYBOARD ===
+  // === KEYBOARD HANDLING ---------------------------------------------
+
   private onKeyDown = (e: KeyboardEvent) => {
     if (this.walkManager.isEnabled) return;
 
     const selection = useSelectionStore.getState();
     const sceneStore = useSceneStore.getState();
 
-    // === DELETE SELECTION ===
+    // DELETE ITEM
     if (e.key === "Delete" || e.key === "Backspace") {
       const uuid = selection.selectedUUID;
       if (!uuid) return;
@@ -126,12 +127,14 @@ export class A42Engine {
     else if (e.key === "e") tc.setMode("scale");
   };
 
-  // === WINDOW RESIZE ===
+  // === RESIZE ---------------------------------------------------------
+
   private onWindowResize = () => {
     this.sceneManager.onWindowResize();
   };
 
-  // === AR INITIALIZATION ===
+  // === AR INIT --------------------------------------------------------
+
   private async initAR() {
     if (!("xr" in navigator)) return;
 
@@ -150,7 +153,6 @@ export class A42Engine {
       domOverlay: { root: document.body },
     });
 
-    // Style AR button
     button.style.position = "fixed";
     button.style.bottom = "20px";
     button.style.right = "20px";
@@ -165,34 +167,30 @@ export class A42Engine {
     button.style.cursor = "pointer";
   }
 
-  // === SCENE SYNC (STORE → ENGINE) ===
-  public async syncScene(storeItems: SceneItem[]) {
-    await this.syncSceneFromStore(storeItems);
+  // === SCENE SYNC -----------------------------------------------------
+
+  public async syncScene(items: SceneItem[]) {
+    await this.syncSceneFromStore(items);
   }
 
-  // Motor interno de sincronización
   private async syncSceneFromStore(items: SceneItem[]) {
     const scene = this.scene;
     const existing = new Map<string, THREE.Object3D>();
 
-    // 1) Indexar objetos actuales
     scene.traverse((child) => {
       if (child.userData?.isItem && child.uuid) {
         existing.set(child.uuid, child);
       }
     });
 
-    // 2) Actualizar o crear
     for (const item of items) {
       const obj = existing.get(item.uuid);
 
       if (!obj) {
-        // No existe → creamos uno nuevo
         await this.objectManager.createFromItem(item);
         continue;
       }
 
-      // Sí existe → actualizamos transform
       obj.position.fromArray(item.position);
       obj.rotation.fromArray(item.rotation);
       obj.scale.fromArray(item.scale);
@@ -200,19 +198,20 @@ export class A42Engine {
       existing.delete(item.uuid);
     }
 
-    // 3) Eliminar los que ya no están en el store
     for (const [uuid] of existing) {
       this.objectManager.removeByUUID(uuid);
     }
   }
 
-  // === ENGINE INIT ===
+  // === ENGINE INIT ----------------------------------------------------
+
   public init() {
     this.initAR();
     this.renderer.setAnimationLoop(this.render);
   }
 
-  // === RENDER LOOP ===
+  // === RENDER LOOP ----------------------------------------------------
+
   private render = () => {
     const delta = this.clock.getDelta();
 
@@ -226,7 +225,8 @@ export class A42Engine {
     this.renderer.render(this.scene, this.activeCamera);
   };
 
-  // === DISPOSE ===
+  // === DISPOSE --------------------------------------------------------
+
   public dispose() {
     this.renderer.setAnimationLoop(null);
     window.removeEventListener("resize", this.onWindowResize);

@@ -14,7 +14,8 @@ export class SceneManager {
   public controls: OrbitControls;
 
   public grid: THREE.GridHelper;
-  public sky: Sky;
+  public dirLight: THREE.DirectionalLight | null = null;
+  public sky: Sky | null = null;
   public sun: THREE.DirectionalLight;
 
   private container: HTMLElement;
@@ -40,11 +41,12 @@ export class SceneManager {
 
     // === ENVIRONMENT ===
     this.sun = this.createSun();
+    this.dirLight = this.sun; // <--- AHORA updateSunPosition funciona
     this.sky = this.createSky();
     this.grid = this.createGrid();
     this.createShadowReceiver();
 
-    // === PDF FRAME ===
+    // === FRAME OVERLAY ===
     this.initFrameOverlay();
   }
 
@@ -95,6 +97,7 @@ export class SceneManager {
       -500,
       500
     );
+
     cam.position.set(20, 20, 20);
     cam.lookAt(0, 0, 0);
 
@@ -105,7 +108,8 @@ export class SceneManager {
     const oldPos = this.activeCamera.position.clone();
     const target = this.controls.target.clone();
 
-    this.activeCamera = type === "perspective" ? this.perspectiveCamera : this.orthoCamera;
+    this.activeCamera =
+      type === "perspective" ? this.perspectiveCamera : this.orthoCamera;
 
     this.activeCamera.position.copy(oldPos);
     this.activeCamera.lookAt(target);
@@ -119,10 +123,13 @@ export class SceneManager {
     const target = new THREE.Vector3(0, 0, 0);
 
     const pos =
-      view === "top" ? new THREE.Vector3(0, d, 0) :
-      view === "front" ? new THREE.Vector3(0, 0, d) :
-      view === "side" ? new THREE.Vector3(d, 0, 0) :
-      new THREE.Vector3(d, d, d);
+      view === "top"
+        ? new THREE.Vector3(0, d, 0)
+        : view === "front"
+        ? new THREE.Vector3(0, 0, d)
+        : view === "side"
+        ? new THREE.Vector3(d, 0, 0)
+        : new THREE.Vector3(d, d, d);
 
     this.activeCamera.position.copy(pos);
     this.activeCamera.lookAt(target);
@@ -191,15 +198,22 @@ export class SceneManager {
     return sky;
   }
 
+  // ------------------------------------------------------
+  // SUN POSITION (FIXED)
+  // ------------------------------------------------------
   public updateSunPosition(azimuth: number, elevation: number) {
+    if (!this.dirLight) return;
+
     const phi = THREE.MathUtils.degToRad(90 - elevation);
     const theta = THREE.MathUtils.degToRad(azimuth);
 
-    const pos = new THREE.Vector3();
-    pos.setFromSphericalCoords(1, phi, theta);
+    const x = Math.sin(phi) * Math.cos(theta);
+    const y = Math.cos(phi);
+    const z = Math.sin(phi) * Math.sin(theta);
 
-    this.sky.material.uniforms["sunPosition"].value.copy(pos);
-    this.sun.position.copy(pos.multiplyScalar(120));
+    this.dirLight.position.set(x * 50, y * 50, z * 50);
+    this.dirLight.target.position.set(0, 0, 0);
+    this.dirLight.target.updateMatrixWorld();
   }
 
   private createGrid() {
@@ -214,13 +228,14 @@ export class SceneManager {
   }
 
   public setSkyVisible(v: boolean) {
+    if (!this.sky) return;
     this.sky.visible = v;
     this.scene.background = v ? null : new THREE.Color("#222222");
   }
 
   public setBackgroundColor(color: string) {
     this.scene.background = new THREE.Color(color);
-    this.sky.visible = false;
+    if (this.sky) this.sky.visible = false;
   }
 
   private createShadowReceiver() {
@@ -275,7 +290,8 @@ export class SceneManager {
   }
 
   public updateFrameDimensions() {
-    if (!this.frameOverlay || this.frameOverlay.style.display === "none") return;
+    if (!this.frameOverlay) return;
+    if (this.frameOverlay.style.display === "none") return;
 
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
@@ -304,11 +320,9 @@ export class SceneManager {
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
 
-    // Perspective
     this.perspectiveCamera.aspect = w / h;
     this.perspectiveCamera.updateProjectionMatrix();
 
-    // Ortho
     const s = 20;
     const a = w / h;
     this.orthoCamera.left = -(s * a) / 2;
@@ -323,8 +337,13 @@ export class SceneManager {
 
   public dispose() {
     try {
-      this.container.removeChild(this.renderer.domElement);
-      if (this.frameOverlay) this.container.removeChild(this.frameOverlay);
+      if (this.renderer.domElement.parentElement) {
+        this.container.removeChild(this.renderer.domElement);
+      }
+
+      if (this.frameOverlay) {
+        this.container.removeChild(this.frameOverlay);
+      }
     } catch {}
 
     this.controls.dispose();

@@ -155,5 +155,21 @@ export class InteractionManager {
       scale: [obj.scale.x, obj.scale.y, obj.scale.z],
     });
   }
+
+  public selectItemByUUID(uuid: string | null) {
+    if (!uuid) {
+      this.clearSelection();
+      return;
+    }
+
+    const obj = this.engine.scene.getObjectByProperty("uuid", uuid);
+    if (!obj) {
+      this.clearSelection();
+      return;
+    }
+
+    this.selectObject(obj);
+  }
+
 }
 // --- END FILE ---

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { A42Engine } from "./engine/A42Engine";
 import { EngineContext } from "./context/EngineContext";
 
@@ -30,111 +30,198 @@ export const Editor3D = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [engineInstance, setEngineInstance] = useState<A42Engine | null>(null);
 
-  const {
-    mode,
-    gridVisible,
-    cameraType,
-    pendingView,
-    clearPendingView,
-    sunPosition,
-    backgroundColor,
-    safetyZonesVisible,
-    measurementResult, // 👈 1. AÑADE ESTO AQUÍ
-  } = useEditorStore();
+  // --- Editor store (usamos 'any' para evitar choques de tipos) ---
+  const mode = useEditorStore((s: any) => s.mode as string);
+  const gridVisible = useEditorStore((s) => s.gridVisible);
+  const cameraType = useEditorStore((s: any) => s.cameraType as string);
+  const pendingView = useEditorStore(
+    (s: any) => s.pendingView as any | null
+  );
+  const clearPendingView = useEditorStore(
+    (s: any) => s.clearPendingView as () => void
+  );
+  const sunPosition = useEditorStore(
+    (s: any) =>
+      (s.sunPosition as { azimuth: number; elevation: number }) ?? {
+        azimuth: 0,
+        elevation: 45,
+      }
+  );
+  const backgroundColor = useEditorStore((s) => s.backgroundColor);
+  const safetyZonesVisible = useEditorStore(
+    (s: any) => (s.safetyZonesVisible as boolean) ?? true
+  );
+  const measurementResult = useEditorStore(
+    (s: any) => (s.measurementResult as number | null) ?? null
+  );
 
-  const { items, totalPrice } = useSceneStore();
-  const { selectedItemId, duplicateSelection, removeSelection } = useSelectionStore();
-  const { isReadOnlyMode } = useProjectStore();
+  // --- Scene store ---
+  const items = useSceneStore((s) => s.items);
+  const totalPrice = useSceneStore(
+    (s: any) => (s.totalPrice as number) ?? 0
+  );
+
+  // --- Selection store: usamos selectedUUID, que sabemos que existe ---
+  const selectedUUID = useSelectionStore(
+    (s: any) => s.selectedUUID as string | null
+  );
+
+  // --- Project store ---
+  const isReadOnlyMode = useProjectStore(
+    (s: any) => (s.isReadOnlyMode as boolean) ?? false
+  );
 
   const [qrVisible, setQRVisible] = React.useState(false);
 
-  // 1. INICIALIZACIÓN Y EVENTOS DOM
+  // ============================================================
+  // 1. INICIALIZACIÓN DEL MOTOR
+  // ============================================================
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // Instanciar motor
     const engine = new A42Engine(containerRef.current);
     engine.init();
 
-    // Guardar en estado
     setEngineInstance(engine);
 
-    // 🔥 FIX: Añadir listener directo al DOM para evitar problemas de bubbling en React
     const handlePointerDown = (e: PointerEvent) => {
-      // Solo procesar si el click es en el canvas (evitar UI)
+      // solo clicks sobre el canvas, no sobre la UI
       if ((e.target as HTMLElement).tagName === "CANVAS") {
-        engine.interactionManager.onPointerDown(e);
+        // Transformamos a MouseEvent para que encaje con la firma
+        engine.interactionManager.onPointerDown(e as unknown as MouseEvent);
       }
     };
 
     const container = containerRef.current;
     container.addEventListener("pointerdown", handlePointerDown);
 
-    // Configuración inicial
-    engine.setGridVisible(gridVisible);
-    engine.updateSunPosition(sunPosition.azimuth, sunPosition.elevation);
-    if (backgroundColor === "#111111") engine.setSkyVisible(true);
-    else engine.setBackgroundColor(backgroundColor);
+    // Config inicial
+    engine.setGrid(gridVisible);
+    engine.updateSunPosition?.(sunPosition.azimuth, sunPosition.elevation);
+    if (backgroundColor === "#111111") engine.setSky(true);
+    else engine.setBackground(backgroundColor);
 
     return () => {
       container.removeEventListener("pointerdown", handlePointerDown);
       engine.dispose();
       setEngineInstance(null);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ============================================================
   // 2. LIMPIEZA DE HERRAMIENTAS AL CAMBIAR MODO
+  // ============================================================
   useEffect(() => {
     if (engineInstance) {
       engineInstance.clearTools();
     }
   }, [mode, engineInstance]);
 
-  // 3. SINCRONIZACIÓN DE ESTADO
+  // ============================================================
+  // 3. SINCRONIZACIÓN SELECCIÓN UI → ENGINE
+  // ============================================================
   useEffect(() => {
-    if (engineInstance) {
-      engineInstance.interactionManager.selectItemByUUID(selectedItemId);
-    }
-  }, [selectedItemId, engineInstance]);
+    if (!engineInstance) return;
+    engineInstance.interactionManager.selectItemByUUID(selectedUUID);
+  }, [selectedUUID, engineInstance]);
 
+  // ============================================================
+  // 4. SINCRONIZACIÓN ESCENA STORE → ENGINE
+  // ============================================================
   useEffect(() => {
-    engineInstance?.syncSceneFromStore(items);
+    if (!engineInstance) return;
+    // syncScene es el método público del motor; si el tipo no encaja, usamos any
+    (engineInstance as any).syncScene(items as any);
   }, [items, engineInstance]);
 
+  // ============================================================
+  // 5. REACTIVIDAD SOBRE PROPIEDADES DEL EDITOR
+  // ============================================================
   useEffect(() => {
-    engineInstance?.setGridVisible(gridVisible);
+    engineInstance?.setGrid(gridVisible);
   }, [gridVisible, engineInstance]);
 
   useEffect(() => {
     if (!engineInstance) return;
-    engineInstance.switchCamera(cameraType);
+    engineInstance.switchCamera(cameraType as any);
     engineInstance.interactionManager.updateCamera(engineInstance.activeCamera);
   }, [cameraType, engineInstance]);
 
   useEffect(() => {
-    engineInstance?.updateSafetyZones(safetyZonesVisible);
+    if (!engineInstance) return;
+
+    // Mostrado/ocultado de zonas de seguridad directamente sobre la escena
+    engineInstance.scene.traverse((obj) => {
+      if (obj.userData?.isSafetyZone) {
+        obj.visible = safetyZonesVisible;
+      }
+    });
   }, [safetyZonesVisible, engineInstance]);
 
   useEffect(() => {
-    engineInstance?.updateSunPosition(sunPosition.azimuth, sunPosition.elevation);
+    if (!engineInstance) return;
+    engineInstance.updateSunPosition?.(
+      sunPosition.azimuth,
+      sunPosition.elevation
+    );
   }, [sunPosition, engineInstance]);
 
   useEffect(() => {
     if (!pendingView || !engineInstance) return;
-    engineInstance.setView(pendingView);
+    engineInstance.setView(pendingView as any);
     clearPendingView();
   }, [pendingView, clearPendingView, engineInstance]);
 
   useEffect(() => {
     if (!engineInstance) return;
-    if (backgroundColor === "#111111") engineInstance.setSkyVisible(true);
-    else engineInstance.setBackgroundColor(backgroundColor);
+    if (backgroundColor === "#111111") engineInstance.setSky(true);
+    else engineInstance.setBackground(backgroundColor);
   }, [backgroundColor, engineInstance]);
 
+  // ============================================================
+  // 6. ACCIONES SOBRE LA SELECCIÓN (duplicar / eliminar)
+  // ============================================================
+  const handleDuplicateSelection = useCallback(() => {
+    if (!selectedUUID) return;
+
+    const sceneState = useSceneStore.getState() as any;
+    const currentItems = sceneState.items as any[];
+    const original = currentItems.find((i) => i.uuid === selectedUUID);
+    if (!original) return;
+
+    const newUuid = crypto.randomUUID();
+    const newItem = {
+      ...original,
+      uuid: newUuid,
+      position: [
+        original.position[0] + 1,
+        original.position[1],
+        original.position[2],
+      ] as [number, number, number],
+    };
+
+    sceneState.addItem(newItem);
+  }, [selectedUUID]);
+
+  const handleRemoveSelection = useCallback(() => {
+    if (!selectedUUID || !engineInstance) return;
+
+    const sceneState = useSceneStore.getState() as any;
+    sceneState.removeItem(selectedUUID);
+
+    engineInstance.objectManager.removeByUUID(selectedUUID);
+
+    const selState = useSelectionStore.getState() as any;
+    selState.select(null);
+  }, [selectedUUID, engineInstance]);
+
+  // ============================================================
+  // RENDER
+  // ============================================================
   return (
     <EngineContext.Provider value={{ engine: engineInstance }}>
       <div className="w-screen h-screen relative bg-neutral-900 overflow-hidden">
-        
         {/* Contenedor del Motor 3D */}
         <div
           ref={containerRef}
@@ -148,13 +235,14 @@ export const Editor3D = () => {
         <FloorProperties />
         <FenceProperties />
 
-        {/* 🔥 FIX: Asegurar que el Catálogo esté por encima de todo */}
-        {mode === 'catalog' && (
+        {/* Catálogo por encima de todo */}
+        {mode === "catalog" && (
           <div className="absolute inset-0 z-40">
             <Catalog />
           </div>
         )}
 
+        {/* Botón QR */}
         <button
           onClick={() => setQRVisible(true)}
           className="absolute top-6 right-6 z-20 bg-neutral-800/90 hover:bg-neutral-700 text-white p-3 rounded-full border border-neutral-600 shadow-lg"
@@ -162,6 +250,7 @@ export const Editor3D = () => {
           <QrCode size={20} />
         </button>
 
+        {/* Total presupuesto */}
         {!isReadOnlyMode && (
           <div className="absolute bottom-6 left-6 z-20">
             <button className="bg-neutral-800/90 px-4 py-3 rounded-full border border-neutral-600 text-white flex gap-3 items-center">
@@ -171,7 +260,8 @@ export const Editor3D = () => {
           </div>
         )}
 
-        {selectedItemId && mode === "editing" && (
+        {/* Mini toolbar de gizmo + acciones sobre selección */}
+        {selectedUUID && mode === "editing" && (
           <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex gap-2 glass-panel p-2 rounded-xl z-30">
             <button onClick={() => engineInstance?.setGizmoMode("translate")}>
               <Move size={16} />
@@ -182,15 +272,16 @@ export const Editor3D = () => {
             <button onClick={() => engineInstance?.setGizmoMode("scale")}>
               <Scaling size={16} />
             </button>
-            <button onClick={duplicateSelection}>
+            <button onClick={handleDuplicateSelection}>
               <Copy size={16} />
             </button>
-            <button onClick={removeSelection}>
+            <button onClick={handleRemoveSelection}>
               <Trash2 size={16} />
             </button>
           </div>
         )}
 
+        {/* HUD de medición */}
         {mode === "measuring" && (
           <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-black/80 px-6 py-3 text-white rounded-full border border-white/20 backdrop-blur-md font-mono pointer-events-none">
             {measurementResult !== null
