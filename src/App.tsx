@@ -8,6 +8,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 import { supabase } from "./lib/supabase";
+import type { User } from "@supabase/supabase-js";
 
 // --- IMPORTS ---
 import { Editor3D } from "./features/editor/Editor3D";
@@ -21,36 +22,23 @@ import { AdminOrderDetailPage } from "./features/crm/pages/AdminOrderDetailPage"
 import { AdminClientDetailPage } from "./features/crm/pages/AdminClientDetailPage";
 import { AdminCalendarPage } from "./features/crm/pages/AdminCalendarPage";
 
-// --- ESTILOS ---
-const badgeStyle: React.CSSProperties = {
-  backgroundColor: "#333",
-  color: "white",
-  padding: "8px 16px",
-  borderRadius: "20px",
-  textDecoration: "none",
-  fontSize: "14px",
-  fontWeight: "bold",
-  display: "flex",
-  alignItems: "center",
-  gap: "8px",
-  boxShadow: "0 4px 6px rgba(0,0,0,0.3)",
-  border: "1px solid #444",
-  cursor: "pointer",
-  transition: "all 0.2s ease",
-};
+// --- TYPES ---
+type UserRole = "admin" | "employee" | "client";
 
-const navLinkStyle: React.CSSProperties = {
-  color: "#aaa",
-  textDecoration: "none",
-  padding: "8px 12px",
-  borderRadius: "6px",
-  transition: "color 0.2s",
-  fontSize: "14px",
-  display: "block",
-};
+interface ExtendedUser extends User {
+  role?: UserRole;
+}
+
+interface Profile {
+  role: UserRole;
+  is_approved: boolean;
+}
+
+type AuthStep = "selection" | "form";
+type TargetRole = "client" | "employee";
 
 // --- LOGOUT ---
-const performLogout = async () => {
+const performLogout = async (): Promise<void> => {
   await supabase.auth.signOut();
   useAuthStore.getState().setUser(null);
   useAuthStore.getState().setSession(null);
@@ -60,89 +48,59 @@ const performLogout = async () => {
 
 // ------------------------------------------------------------------------------------
 // EMPLOYEE LAYOUT
-const EmployeeLayout = () => (
-  <div
-    style={{
-      display: "flex",
-      height: "100vh",
-      fontFamily: "sans-serif",
-      background: "#121212",
-      color: "#e0e0e0",
-    }}
-  >
-    <aside
-      style={{
-        width: "240px",
-        background: "#1e1e1e",
-        borderRight: "1px solid #333",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
-      <div style={{ padding: "20px", borderBottom: "1px solid #333" }}>
-        <h3 style={{ margin: 0, color: "#fff" }}>Intranet 🏢</h3>
-        <small style={{ color: "#666" }}>Modo Empleado</small>
+const EmployeeLayout: React.FC = () => (
+  <div className="flex h-screen font-sans bg-zinc-950 text-zinc-200">
+    <aside className="w-60 bg-zinc-900 border-r border-zinc-800 flex flex-col">
+      <div className="p-5 border-b border-zinc-800">
+        <h3 className="m-0 text-white text-lg font-semibold">Intranet 🏢</h3>
+        <small className="text-zinc-600">Modo Empleado</small>
       </div>
 
-      <nav
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          padding: "15px",
-          gap: "5px",
-        }}
-      >
+      <nav className="flex flex-col p-4 gap-1">
         <Link
           to="/admin/crm"
-          style={{ ...navLinkStyle, color: "#fff", background: "#2a2a2a" }}
+          className="text-white bg-zinc-800 no-underline py-2 px-3 rounded-md transition-colors text-sm block hover:bg-zinc-700"
         >
           👥 CRM (Listado)
         </Link>
-        <Link to="/admin/calendar" style={navLinkStyle}>
+        <Link
+          to="/admin/calendar"
+          className="text-zinc-400 no-underline py-2 px-3 rounded-md transition-colors text-sm block hover:text-white hover:bg-zinc-800"
+        >
           📅 Calendario Entregas
         </Link>
-        <Link to="/admin/erp" style={navLinkStyle}>
+        <Link
+          to="/admin/erp"
+          className="text-zinc-400 no-underline py-2 px-3 rounded-md transition-colors text-sm block hover:text-white hover:bg-zinc-800"
+        >
           🏭 ERP (Fábrica)
         </Link>
-        <Link to="/admin/purchases" style={navLinkStyle}>
+        <Link
+          to="/admin/purchases"
+          className="text-zinc-400 no-underline py-2 px-3 rounded-md transition-colors text-sm block hover:text-white hover:bg-zinc-800"
+        >
           🛒 Compras
         </Link>
       </nav>
 
-      <div
-        style={{
-          marginTop: "auto",
-          padding: "20px",
-          borderTop: "1px solid #333",
-          display: "flex",
-          flexDirection: "column",
-          gap: "10px",
-        }}
-      >
+      <div className="mt-auto p-5 border-t border-zinc-800 flex flex-col gap-2.5">
         <button
           onClick={performLogout}
-          style={{
-            background: "transparent",
-            border: "none",
-            color: "#e74c3c",
-            cursor: "pointer",
-            textAlign: "left",
-            padding: 0,
-          }}
+          className="bg-transparent border-none text-red-500 cursor-pointer text-left p-0 hover:text-red-400"
         >
           Cerrar Sesión
         </button>
 
         <Link
           to="/"
-          style={{ color: "#666", textDecoration: "none", fontSize: "13px" }}
+          className="text-zinc-600 no-underline text-xs hover:text-zinc-500"
         >
           ← Volver al Visor 3D
         </Link>
       </div>
     </aside>
 
-    <main style={{ flex: 1, overflow: "auto" }}>
+    <main className="flex-1 overflow-auto">
       <Outlet />
     </main>
   </div>
@@ -150,71 +108,46 @@ const EmployeeLayout = () => (
 
 // ------------------------------------------------------------------------------------
 // CLIENT PORTAL LAYOUT
-const ClientPortalLayout = () => (
-  <div
-    style={{
-      height: "100vh",
-      display: "flex",
-      flexDirection: "column",
-      background: "#121212",
-      color: "#e0e0e0",
-      fontFamily: "sans-serif",
-      overflow: "hidden",
-    }}
-  >
-    <header
-      style={{
-        background: "#1e1e1e",
-        borderBottom: "1px solid #333",
-        padding: "15px 40px",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        flexShrink: 0,
-      }}
-    >
-      <h3 style={{ margin: 0, color: "#fff" }}>Portal del Cliente 👋</h3>
+const ClientPortalLayout: React.FC = () => (
+  <div className="h-screen flex flex-col bg-zinc-950 text-zinc-200 font-sans overflow-hidden">
+    <header className="bg-zinc-900 border-b border-zinc-800 py-4 px-10 flex justify-between items-center flex-shrink-0">
+      <h3 className="m-0 text-white text-lg font-semibold">
+        Portal del Cliente 👋
+      </h3>
 
-      <nav style={{ display: "flex", gap: "20px", alignItems: "center" }}>
-        <Link to="/portal?tab=projects" style={{ color: "#fff" }}>
+      <nav className="flex gap-5 items-center">
+        <Link to="/portal?tab=projects" className="text-white hover:text-zinc-300">
           Mis Proyectos
         </Link>
-        <Link to="/portal?tab=budgets" style={{ color: "#bbb" }}>
+        <Link to="/portal?tab=budgets" className="text-zinc-400 hover:text-white">
           Mis Presupuestos
         </Link>
-        <Link to="/portal?tab=orders" style={{ color: "#bbb" }}>
+        <Link to="/portal?tab=orders" className="text-zinc-400 hover:text-white">
           Mis Pedidos
         </Link>
-        <Link to="/portal/profile" style={{ color: "#bbb" }}>
+        <Link to="/portal/profile" className="text-zinc-400 hover:text-white">
           Mi Perfil 👤
         </Link>
 
         <Link
           to="/"
-          style={{ ...badgeStyle, fontSize: "12px", padding: "6px 12px" }}
+          className="bg-zinc-800 text-white py-1.5 px-3 rounded-full no-underline text-xs font-bold flex items-center gap-2 shadow-lg border border-zinc-700 hover:bg-zinc-700 transition-all"
         >
           + Nuevo Proyecto 3D
         </Link>
 
         <button
           onClick={performLogout}
-          style={{ background: "none", border: "none", color: "#666" }}
+          className="bg-transparent border-none text-zinc-600 cursor-pointer hover:text-zinc-500"
         >
           Salir
         </button>
       </nav>
     </header>
 
-    <main style={{ flex: 1, overflowY: "auto", padding: "40px" }}>
-      <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
-        <div
-          style={{
-            background: "#1e1e1e",
-            padding: "30px",
-            borderRadius: "12px",
-            border: "1px solid #333",
-          }}
-        >
+    <main className="flex-1 overflow-y-auto p-10">
+      <div className="max-w-6xl mx-auto">
+        <div className="bg-zinc-900 p-8 rounded-xl border border-zinc-800">
           <Outlet />
         </div>
       </div>
@@ -223,29 +156,27 @@ const ClientPortalLayout = () => (
 );
 
 // ------------------------------------------------------------------------------------
-// LOGIN PAGE (como la tenías)
-const LoginPage = () => {
+// LOGIN PAGE
+const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { setUser, setSession } = useAuthStore();
 
-  const [step, setStep] = React.useState<"selection" | "form">("selection");
-  const [targetRole, setTargetRole] = React.useState<"client" | "employee">(
-    "client"
-  );
-  const [isRegistering, setIsRegistering] = React.useState(false);
+  const [step, setStep] = React.useState<AuthStep>("selection");
+  const [targetRole, setTargetRole] = React.useState<TargetRole>("client");
+  const [isRegistering, setIsRegistering] = React.useState<boolean>(false);
 
-  const [email, setEmail] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [loading, setLoading] = React.useState(false);
-  const [errorMsg, setErrorMsg] = React.useState("");
+  const [email, setEmail] = React.useState<string>("");
+  const [password, setPassword] = React.useState<string>("");
+  const [loading, setLoading] = React.useState<boolean>(false);
+  const [errorMsg, setErrorMsg] = React.useState<string>("");
 
-  const selectRole = (role: "client" | "employee") => {
+  const selectRole = (role: TargetRole): void => {
     setTargetRole(role);
     setStep("form");
     setErrorMsg("");
   };
 
-  const checkUserStatus = async (userId: string) => {
+  const checkUserStatus = async (userId: string): Promise<void> => {
     const { data: profile } = await supabase
       .from("profiles")
       .select("role, is_approved")
@@ -253,12 +184,14 @@ const LoginPage = () => {
       .single();
 
     if (profile) {
-      if (profile.role === "admin" || profile.role === "employee") {
+      const typedProfile = profile as Profile;
+      
+      if (typedProfile.role === "admin" || typedProfile.role === "employee") {
         navigate("/admin/crm");
         return;
       }
 
-      if (profile.is_approved) {
+      if (typedProfile.is_approved) {
         navigate("/portal");
       } else {
         await supabase.auth.signOut();
@@ -267,7 +200,7 @@ const LoginPage = () => {
     }
   };
 
-  const handleAuth = async (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg("");
@@ -289,7 +222,7 @@ const LoginPage = () => {
 
       if (!result.data.user) throw new Error("Error desconocido.");
 
-      setUser(result.data.user);
+      setUser(result.data.user as ExtendedUser);
       const session = (await supabase.auth.getSession()).data.session;
       setSession(session);
 
@@ -304,107 +237,42 @@ const LoginPage = () => {
   return (
     <>
       {step === "selection" ? (
-        // pantalla selección
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            alignItems: "center",
-            height: "100vh",
-            background: "#000",
-            color: "#fff",
-          }}
-        >
-          <div
-            style={{
-              padding: "3rem",
-              background: "#1e1e1e",
-              borderRadius: "16px",
-              border: "1px solid #333",
-              textAlign: "center",
-              minWidth: "350px",
-            }}
-          >
-            <h2 style={{ marginBottom: "10px" }}>Bienvenido</h2>
+        // Pantalla de selección
+        <div className="flex flex-col justify-center items-center h-screen bg-black text-white">
+          <div className="p-12 bg-zinc-900 rounded-2xl border border-zinc-800 text-center min-w-[350px]">
+            <h2 className="mb-2.5 text-2xl">Bienvenido</h2>
 
-            <div
-              style={{
-                display: "flex",
-                gap: "15px",
-                justifyContent: "center",
-                margin: "30px 0",
-              }}
-            >
+            <div className="flex gap-4 justify-center my-8">
               <button
                 onClick={() => selectRole("client")}
-                style={{
-                  ...badgeStyle,
-                  flexDirection: "column",
-                  padding: "20px",
-                  width: "140px",
-                  background: "#333",
-                }}
+                className="bg-zinc-800 text-white py-5 px-5 rounded-2xl no-underline text-sm font-bold flex flex-col items-center gap-2 shadow-lg border border-zinc-700 cursor-pointer transition-all w-36 hover:bg-zinc-700"
               >
-                <span style={{ fontSize: "30px" }}>👋</span>
+                <span className="text-3xl">👋</span>
                 <span>Soy Cliente</span>
               </button>
 
               <button
                 onClick={() => selectRole("employee")}
-                style={{
-                  ...badgeStyle,
-                  flexDirection: "column",
-                  padding: "20px",
-                  width: "140px",
-                  background: "#222",
-                  border: "1px solid #555",
-                }}
+                className="bg-zinc-900 text-white py-5 px-5 rounded-2xl no-underline text-sm font-bold flex flex-col items-center gap-2 shadow-lg border border-zinc-700 cursor-pointer transition-all w-36 hover:bg-zinc-800"
               >
-                <span style={{ fontSize: "30px" }}>🏢</span>
+                <span className="text-3xl">🏢</span>
                 <span>Soy Empleado</span>
               </button>
             </div>
 
             <button
               onClick={() => navigate("/")}
-              style={{
-                background: "transparent",
-                border: "none",
-                color: "#666",
-                cursor: "pointer",
-                textDecoration: "underline",
-              }}
+              className="bg-transparent border-none text-zinc-600 cursor-pointer underline hover:text-zinc-500"
             >
               Volver al Visor 3D
             </button>
           </div>
         </div>
       ) : (
-        // --- FORMULARIO ORIGINAL ----
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            alignItems: "center",
-            height: "100vh",
-            background: "#000",
-            color: "#fff",
-            fontFamily: "sans-serif",
-          }}
-        >
-          <div
-            style={{
-              padding: "3rem",
-              background: "#1e1e1e",
-              borderRadius: "16px",
-              border: "1px solid #333",
-              textAlign: "center",
-              minWidth: "350px",
-            }}
-          >
-            <h2 style={{ marginBottom: "5px" }}>
+        // Formulario de autenticación
+        <div className="flex flex-col justify-center items-center h-screen bg-black text-white font-sans">
+          <div className="p-12 bg-zinc-900 rounded-2xl border border-zinc-800 text-center min-w-[350px]">
+            <h2 className="mb-1.5 text-2xl">
               {targetRole === "employee"
                 ? "Acceso Empleados"
                 : isRegistering
@@ -414,39 +282,23 @@ const LoginPage = () => {
 
             {errorMsg && (
               <div
-                style={{
-                  background: errorMsg.includes("validación")
-                    ? "rgba(39, 174, 96, 0.2)"
-                    : "rgba(231, 76, 60, 0.2)",
-                  color: errorMsg.includes("validación")
-                    ? "#2ecc71"
-                    : "#e74c3c",
-                  padding: "10px",
-                  borderRadius: "6px",
-                  marginBottom: "15px",
-                  fontSize: "13px",
-                }}
+                className={`${
+                  errorMsg.includes("validación")
+                    ? "bg-green-500/20 text-green-400"
+                    : "bg-red-500/20 text-red-400"
+                } p-2.5 rounded-md mb-4 text-xs`}
               >
                 {errorMsg}
               </div>
             )}
 
-            <form
-              onSubmit={handleAuth}
-              style={{ display: "flex", flexDirection: "column", gap: "15px" }}
-            >
+            <form onSubmit={handleAuth} className="flex flex-col gap-4">
               <input
                 type="email"
                 placeholder="Email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                style={{
-                  padding: "12px",
-                  borderRadius: "6px",
-                  border: "1px solid #444",
-                  background: "#2a2a2a",
-                  color: "white",
-                }}
+                className="p-3 rounded-md border border-zinc-700 bg-zinc-800 text-white"
                 required
               />
               <input
@@ -454,28 +306,16 @@ const LoginPage = () => {
                 placeholder="Contraseña"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                style={{
-                  padding: "12px",
-                  borderRadius: "6px",
-                  border: "1px solid #444",
-                  background: "#2a2a2a",
-                  color: "white",
-                }}
+                className="p-3 rounded-md border border-zinc-700 bg-zinc-800 text-white"
                 required
               />
 
               <button
                 type="submit"
                 disabled={loading}
-                style={{
-                  ...badgeStyle,
-                  justifyContent: "center",
-                  backgroundColor:
-                    targetRole === "employee" ? "#e67e22" : "#3b82f6",
-                  border: "none",
-                  padding: "12px",
-                  marginTop: "10px",
-                }}
+                className={`${
+                  targetRole === "employee" ? "bg-orange-600" : "bg-blue-600"
+                } text-white py-3 px-4 rounded-2xl border-none font-bold flex items-center justify-center gap-2 shadow-lg cursor-pointer transition-all mt-2.5 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {loading
                   ? "Procesando..."
@@ -486,27 +326,14 @@ const LoginPage = () => {
             </form>
 
             {targetRole === "client" && (
-              <div
-                style={{
-                  marginTop: "15px",
-                  fontSize: "13px",
-                  color: "#888",
-                }}
-              >
+              <div className="mt-4 text-xs text-zinc-500">
                 {isRegistering ? "¿Ya tienes cuenta?" : "¿No tienes cuenta?"}{" "}
                 <button
                   onClick={() => {
                     setIsRegistering(!isRegistering);
                     setErrorMsg("");
                   }}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "#3b82f6",
-                    cursor: "pointer",
-                    fontWeight: "bold",
-                    textDecoration: "underline",
-                  }}
+                  className="bg-transparent border-none text-blue-500 cursor-pointer font-bold underline hover:text-blue-400"
                 >
                   {isRegistering ? "Inicia Sesión" : "Regístrate aquí"}
                 </button>
@@ -515,14 +342,7 @@ const LoginPage = () => {
 
             <button
               onClick={() => setStep("selection")}
-              style={{
-                marginTop: "20px",
-                background: "transparent",
-                border: "none",
-                color: "#666",
-                cursor: "pointer",
-                textDecoration: "underline",
-              }}
+              className="mt-5 bg-transparent border-none text-zinc-600 cursor-pointer underline hover:text-zinc-500"
             >
               ← Volver
             </button>
@@ -533,24 +353,19 @@ const LoginPage = () => {
   );
 };
 
-
+// ------------------------------------------------------------------------------------
 // VISOR 3D PAGE
-const ViewerPage = () => {
-  // Stores correctos (SIN useAppStore)
+const ViewerPage: React.FC = () => {
   const isReadOnlyMode = useProjectStore((s) => s.isReadOnlyMode);
-
   const loadProjectFromURL = useProjectStore((s) => s.loadProjectFromURL);
   const resetProject = useProjectStore((s) => s.resetProject);
-
-
-
 
   const { user, setUser } = useAuthStore();
   const navigate = useNavigate();
 
-  // cargar usuario
+  // Cargar usuario
   React.useEffect(() => {
-    const loadUser = async () => {
+    const loadUser = async (): Promise<void> => {
       const { data } = await supabase.auth.getUser();
       const authUser = data.user;
 
@@ -561,12 +376,17 @@ const ViewerPage = () => {
           .eq("id", authUser.id)
           .single();
 
-        setUser(profile ? { ...authUser, role: profile.role } : authUser);
+        setUser(
+          profile
+            ? ({ ...authUser, role: profile.role } as ExtendedUser)
+            : authUser
+        );
       }
     };
     loadUser();
   }, [setUser]);
 
+  // Cargar proyecto desde URL
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const projectId = params.get("project_id");
@@ -583,59 +403,35 @@ const ViewerPage = () => {
     user?.role === "admin" || user?.role === "employee";
 
   return (
-    <div
-      style={{
-        width: "100vw",
-        height: "100vh",
-        position: "relative",
-        overflow: "hidden",
-        background: "#000",
-      }}
-    >
-      <div
-        style={{
-          position: "absolute",
-          top: 20,
-          left: 20,
-          zIndex: 2000,
-          display: "flex",
-          flexDirection: "column",
-          gap: "10px",
-        }}
-      >
+    <div className="w-screen h-screen relative overflow-hidden bg-black">
+      <div className="absolute top-5 left-5 z-[2000] flex flex-col gap-2.5">
         {isAdminOrEmployee && (
           <button
             onClick={() => navigate("/admin/crm")}
-            style={{
-              background: "#e67e22",
-              color: "white",
-              padding: "10px 20px",
-              borderRadius: "8px",
-              border: "none",
-              cursor: "pointer",
-              fontWeight: "bold",
-            }}
+            className="bg-orange-600 text-white py-2.5 px-5 rounded-lg border-none cursor-pointer font-bold hover:bg-orange-700 transition-colors"
           >
             ⬅️ Volver al Panel
           </button>
         )}
 
         {!user && !isReadOnlyMode && (
-          <Link to="/login" style={badgeStyle}>
+          <Link
+            to="/login"
+            className="bg-zinc-800 text-white py-2 px-4 rounded-full no-underline text-sm font-bold flex items-center gap-2 shadow-lg border border-zinc-700 cursor-pointer transition-all hover:bg-zinc-700"
+          >
             👤 Acceso / Login
           </Link>
         )}
       </div>
 
       <Editor3D />
-
     </div>
   );
 };
 
 // ------------------------------------------------------------------------------------
 // APP ROOT
-function App() {
+const App: React.FC = () => {
   return (
     <BrowserRouter>
       <Routes>
@@ -658,6 +454,6 @@ function App() {
       </Routes>
     </BrowserRouter>
   );
-}
+};
 
 export default App;

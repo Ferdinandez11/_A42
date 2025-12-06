@@ -1,4 +1,3 @@
-// --- START OF FILE src/features/editor/engine/A42Engine.ts ---
 import * as THREE from "three";
 import { ARButton } from "three/examples/jsm/webxr/ARButton.js";
 
@@ -14,10 +13,11 @@ import { ExportManager } from "./managers/ExportManager";
 import { PDFManager } from "./managers/PDFManager";
 
 import { useEditorStore } from "@/stores/editor/useEditorStore";
-import { useSceneStore } from "@/stores/scene/useSceneStore"; // 🔥 NUEVO IMPORT
+import { useSceneStore } from "@/stores/scene/useSceneStore";
 import { useSelectionStore } from "@/stores/selection/useSelectionStore";
 
 export class A42Engine {
+  // Managers
   public sceneManager: SceneManager;
   public objectManager: ObjectManager;
   public toolsManager: ToolsManager;
@@ -27,15 +27,16 @@ export class A42Engine {
   public exportManager: ExportManager;
   public pdfManager: PDFManager;
 
+  // Internal state
   private clock: THREE.Clock;
   private savedBackground: THREE.Color | THREE.Texture | null = null;
-  private wasSkyVisible = true;
+  private wasSkyVisible: boolean = true;
   private transparentElements: HTMLElement[] = [];
 
   constructor(container: HTMLElement) {
     this.clock = new THREE.Clock();
 
-    // --- CORE MANAGERS ---
+    // Initialize core managers
     this.sceneManager = new SceneManager(container);
     this.sceneManager.renderer.xr.enabled = true;
 
@@ -47,56 +48,63 @@ export class A42Engine {
     this.exportManager = new ExportManager(this);
     this.pdfManager = new PDFManager(this);
 
-    // --- GLOBAL EVENTS ---
+    // Setup global event listeners
     window.addEventListener("resize", this.onWindowResize);
     window.addEventListener("keydown", this.onKeyDown);
-
-
   }
 
-  public get scene() {
+  // Getters
+  public get scene(): THREE.Scene {
     return this.sceneManager.scene;
   }
-  public get activeCamera() {
+
+  public get activeCamera(): THREE.Camera {
     return this.sceneManager.activeCamera;
   }
-  public get renderer() {
+
+  public get renderer(): THREE.WebGLRenderer {
     return this.sceneManager.renderer;
   }
 
-  // 🔥 CORRECCIÓN 1: Usar onPointerDown (el nombre nuevo)
-  public onMouseDown = (event: MouseEvent) => {
+  // Mouse interaction handler
+  public onMouseDown = (event: MouseEvent): void => {
     this.interactionManager.onPointerDown(event);
   };
 
-  public setBackgroundColor(color: string) {
+  // Scene configuration methods
+  public setBackgroundColor(color: string): void {
     this.sceneManager.setBackgroundColor(color);
   }
-  public setSkyVisible(visible: boolean) {
+
+  public setSkyVisible(visible: boolean): void {
     this.sceneManager.setSkyVisible(visible);
   }
-  public setGridVisible(v: boolean) {
-    this.sceneManager.setGridVisible(v);
+
+  public setGridVisible(visible: boolean): void {
+    this.sceneManager.setGridVisible(visible);
   }
-  public updateSunPosition(azimuth: number, elevation: number) {
+
+  public updateSunPosition(azimuth: number, elevation: number): void {
     this.sceneManager.updateSunPosition(azimuth, elevation);
   }
 
-  public togglePDFFraming(visible: boolean) {
+  public togglePDFFraming(visible: boolean): void {
     this.sceneManager.setFrameVisible(visible);
   }
 
-  public switchCamera(type: CameraType) {
+  // Camera methods
+  public switchCamera(type: CameraType): void {
     this.sceneManager.switchCamera(type);
     this.sceneManager.controls.object = this.sceneManager.activeCamera;
     this.interactionManager.updateCamera(this.sceneManager.activeCamera);
   }
 
-  public setView(view: CameraView) {
+  public setView(view: CameraView): void {
     this.sceneManager.setView(view);
   }
 
-  public clearTools() {
+  // Tools methods
+  public clearTools(): void {
     this.toolsManager.clearTools();
     if (this.interactionManager.transformControl) {
       this.interactionManager.transformControl.detach();
@@ -104,11 +112,12 @@ export class A42Engine {
     }
   }
 
-  public setGizmoMode(mode: "translate" | "rotate" | "scale") {
+  public setGizmoMode(mode: "translate" | "rotate" | "scale"): void {
     this.interactionManager.setGizmoMode(mode);
   }
 
-  public updateSafetyZones(visible: boolean) {
+  // Safety zones methods
+  public updateSafetyZones(visible: boolean): void {
     this.scene.traverse((obj) => {
       if (obj.userData?.isSafetyZone) {
         obj.visible = visible;
@@ -116,18 +125,20 @@ export class A42Engine {
     });
   }
 
-  public checkSafetyCollisions() {
+  public checkSafetyCollisions(): void {
     const { safetyZonesVisible } = useEditorStore.getState();
     if (!safetyZonesVisible) return;
 
     const zones: THREE.Mesh[] = [];
     const boxes: THREE.Box3[] = [];
 
+    // Collect all safety zones
     this.scene.traverse((obj) => {
       if (obj.userData?.isSafetyZone && obj.visible) {
         zones.push(obj as THREE.Mesh);
         boxes.push(new THREE.Box3().setFromObject(obj));
 
+        // Set default material
         (obj as THREE.Mesh).material = new THREE.MeshBasicMaterial({
           color: 0xff0000,
           transparent: true,
@@ -138,6 +149,7 @@ export class A42Engine {
       }
     });
 
+    // Check for intersections
     for (let i = 0; i < zones.length; i++) {
       for (let j = i + 1; j < zones.length; j++) {
         if (boxes[i].intersectsBox(boxes[j])) {
@@ -159,6 +171,7 @@ export class A42Engine {
     const { safetyZonesVisible } = useEditorStore.getState();
     if (!safetyZonesVisible) return false;
 
+    // Get target safety zones
     const targetZones: THREE.Box3[] = [];
     target.traverse((child) => {
       if (child.userData?.isSafetyZone) {
@@ -168,6 +181,7 @@ export class A42Engine {
 
     if (targetZones.length === 0) return false;
 
+    // Get other safety zones (excluding target's children)
     const otherZones: THREE.Box3[] = [];
     this.scene.traverse((obj) => {
       if (obj.userData?.isSafetyZone && obj.visible) {
@@ -186,6 +200,7 @@ export class A42Engine {
       }
     });
 
+    // Check for collisions
     for (const tBox of targetZones) {
       for (const oBox of otherZones) {
         if (tBox.intersectsBox(oBox)) {
@@ -197,10 +212,12 @@ export class A42Engine {
     return false;
   }
 
-  private async initAR() {
+  // AR initialization
+  private async initAR(): Promise<void> {
     if (!("xr" in navigator)) return;
+    
     try {
-      // @ts-ignore
+      // @ts-ignore - XR types may not be available
       const isSupported = await navigator.xr.isSessionSupported("immersive-ar");
       if (!isSupported) return;
     } catch {
@@ -213,6 +230,7 @@ export class A42Engine {
       domOverlay: { root: document.body },
     });
 
+    // Setup session start event
     this.renderer.xr.addEventListener("sessionstart", () => {
       this.savedBackground = this.scene.background;
       this.wasSkyVisible = this.sceneManager.sky
@@ -224,6 +242,7 @@ export class A42Engine {
       this.setGridVisible(false);
       this.renderer.setClearColor(0x000000, 0);
 
+      // Make elements transparent for AR
       this.transparentElements = [];
       let el: HTMLElement | null = this.renderer.domElement;
       while (el && el !== document.documentElement) {
@@ -240,6 +259,7 @@ export class A42Engine {
       );
     });
 
+    // Setup session end event
     this.renderer.xr.addEventListener("sessionend", () => {
       const { gridVisible } = useEditorStore.getState();
 
@@ -247,6 +267,7 @@ export class A42Engine {
       if (this.wasSkyVisible) this.setSkyVisible(true);
       this.setGridVisible(gridVisible);
 
+      // Restore element styles
       this.transparentElements.forEach((el) => {
         el.style.removeProperty("background");
         el.style.removeProperty("background-color");
@@ -255,6 +276,7 @@ export class A42Engine {
       document.documentElement.style.removeProperty("background");
     });
 
+    // Style AR button
     const arContainer = document.createElement("div");
     arContainer.style.position = "absolute";
     arContainer.style.bottom = "20px";
@@ -284,19 +306,23 @@ export class A42Engine {
     document.body.appendChild(arContainer);
   }
 
-  public async syncSceneFromStore(storeItems: SceneItem[]) {
+  // Scene synchronization
+  public async syncSceneFromStore(storeItems: SceneItem[]): Promise<void> {
     const sceneItemsMap = new Map<string, THREE.Object3D>();
+    
+    // Build map of existing scene items
     this.scene.children.forEach((child) => {
       if (child.userData?.isItem && child.uuid) {
         sceneItemsMap.set(child.uuid, child);
       }
     });
 
+    // Process store items
     for (const item of storeItems) {
       const sceneObj = sceneItemsMap.get(item.uuid);
 
       if (sceneObj) {
-        // FLOOR
+        // Handle floor updates
         if (item.type === "floor") {
           const hasChanged =
             JSON.stringify(sceneObj.userData.points) !==
@@ -314,7 +340,7 @@ export class A42Engine {
           }
         }
 
-        // FENCE
+        // Handle fence updates
         if (item.type === "fence") {
           const hasConfigChanged =
             JSON.stringify(sceneObj.userData.fenceConfig) !==
@@ -331,13 +357,13 @@ export class A42Engine {
           }
         }
 
-        // MODEL / TRANSFORM
+        // Update transform for existing objects
         sceneObj.position.fromArray(item.position);
         sceneObj.rotation.fromArray(item.rotation);
         sceneObj.scale.fromArray(item.scale);
         sceneItemsMap.delete(item.uuid);
       } else {
-        // CREATE NEW
+        // Create new objects
         if (item.type === "model" && item.modelUrl) {
           await this.objectManager.recreateModel(item);
         } else if (item.type === "floor" && item.points) {
@@ -348,6 +374,7 @@ export class A42Engine {
       }
     }
 
+    // Remove items that are no longer in store
     for (const [uuid, obj] of sceneItemsMap) {
       this.scene.remove(obj);
 
@@ -362,28 +389,35 @@ export class A42Engine {
     }
   }
 
-  private onKeyDown = (e: KeyboardEvent) => {
+  // Keyboard event handler
+  private onKeyDown = (e: KeyboardEvent): void => {
     if (this.walkManager.isEnabled) return;
 
     const editor = useEditorStore.getState();
     const selection = useSelectionStore.getState();
-    const scene = useSceneStore.getState(); // 🔥 USAR STORE DE DATOS
+    const scene = useSceneStore.getState();
 
     if (editor.mode !== "editing") return;
 
+    // Undo functionality
     if (e.key === "z" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
-      scene.undo(); // 🔥 Corregido: scene.undo()
+      scene.undo();
       return;
     }
 
     const tc = this.interactionManager.transformControl;
     if (!tc?.visible) return;
 
-    if (e.key === "t") tc.setMode("translate");
-    else if (e.key === "r") tc.setMode("rotate");
-    else if (e.key === "e") tc.setMode("scale");
-    else if (e.key === "Delete" || e.key === "Backspace") {
+    // Transform mode shortcuts
+    if (e.key === "t") {
+      tc.setMode("translate");
+    } else if (e.key === "r") {
+      tc.setMode("rotate");
+    } else if (e.key === "e") {
+      tc.setMode("scale");
+    } else if (e.key === "Delete" || e.key === "Backspace") {
+      // Delete selected object
       const obj = tc.object;
       if (obj && !obj.userData.isFloorMarker) {
         tc.detach();
@@ -391,7 +425,7 @@ export class A42Engine {
         this.scene.remove(obj);
         this.sceneManager.controls.enabled = true;
 
-        scene.removeItem(obj.uuid); // 🔥 Corregido: scene.removeItem()
+        scene.removeItem(obj.uuid);
         selection.selectItem(null);
         this.toolsManager.activeFloorId = null;
         this.toolsManager.clearFloorEditMarkers();
@@ -399,16 +433,19 @@ export class A42Engine {
     }
   };
 
-  private onWindowResize = () => {
+  // Window resize handler
+  private onWindowResize = (): void => {
     this.sceneManager.onWindowResize();
   };
 
-  public init() {
+  // Initialize engine
+  public init(): void {
     this.initAR();
     this.renderer.setAnimationLoop(this.render);
   }
 
-  private render = () => {
+  // Main render loop
+  private render = (): void => {
     const delta = this.clock.getDelta();
     this.walkManager.update(delta);
     this.recorderManager.update(delta);
@@ -421,11 +458,11 @@ export class A42Engine {
     this.sceneManager.renderer.render(this.scene, this.activeCamera);
   };
 
-  public dispose() {
+  // Cleanup
+  public dispose(): void {
     this.renderer.setAnimationLoop(null);
     window.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("resize", this.onWindowResize);
     this.sceneManager.dispose();
   }
 }
-// --- END OF FILE ---
