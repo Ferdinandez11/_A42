@@ -1,4 +1,3 @@
-// --- START OF FILE src/features/editor/engine/managers/PDFManager.ts ---
 import * as THREE from "three";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -7,33 +6,39 @@ import type { A42Engine } from "../A42Engine";
 import type { SceneItem } from "@/types/editor";
 
 import { useEditorStore } from "@/stores/editor/useEditorStore";
-import { useSceneStore } from "@/stores/scene/useSceneStore"; // 🔥 NUEVO IMPORT
+import { useSceneStore } from "@/stores/scene/useSceneStore";
 import { useUserStore } from "@/stores/user/useUserStore";
 import { PriceCalculator } from "@/utils/PriceCalculator";
 
+/**
+ * Manages PDF generation with technical views and budget
+ */
 export class PDFManager {
   private engine: A42Engine;
 
-  // Variables de restauración
-  private savedRendererSize = new THREE.Vector2();
-  private savedPixelRatio = 1;
-  private savedCameraPos = new THREE.Vector3();
-  private savedCameraRot = new THREE.Euler();
-  private savedControlsTarget = new THREE.Vector3();
+  // State restoration variables
+  private savedRendererSize: THREE.Vector2 = new THREE.Vector2();
+  private savedPixelRatio: number = 1;
+  private savedCameraPos: THREE.Vector3 = new THREE.Vector3();
+  private savedCameraRot: THREE.Euler = new THREE.Euler();
+  private savedControlsTarget: THREE.Vector3 = new THREE.Vector3();
   private savedBg: THREE.Color | THREE.Texture | null = null;
   private savedFog: THREE.FogBase | null = null;
-  private wasSkyVisible = false;
+  private wasSkyVisible: boolean = false;
 
   constructor(engine: A42Engine) {
     this.engine = engine;
   }
 
-  public async generatePDF() {
+  /**
+   * Generates a complete PDF with project views, budget, and technical sheets
+   */
+  public async generatePDF(): Promise<void> {
     const editor = useEditorStore.getState();
-    const scene = useSceneStore.getState(); // 🔥 Accedemos a la escena (Datos)
+    const scene = useSceneStore.getState();
     const { user } = useUserStore.getState();
 
-    const items = scene.items; // 🔥 items vienen de SceneStore
+    const items = scene.items;
 
     const projectName = await editor.requestInput(
       "Nombre del Proyecto:",
@@ -43,10 +48,10 @@ export class PDFManager {
 
     const doc = new jsPDF();
 
-    // 1. PREPARAR ESCENA
+    // Prepare scene
     this.saveSceneState();
 
-    // Apagar todo para la foto
+    // Disable everything for clean renders
     this.engine.sceneManager.controls.enabled = false;
     this.engine.scene.background = new THREE.Color(0xffffff);
     this.engine.scene.fog = null;
@@ -54,9 +59,7 @@ export class PDFManager {
     this.engine.setSkyVisible(false);
     this.hideHelpers(true);
 
-    // 2. FOTOS
-
-    // -- PORTADA --
+    // Generate cover image
     this.resizeRendererInternal(1600, 1200);
     this.engine.switchCamera("perspective");
     this.setVisibilityForAllItems(true);
@@ -64,7 +67,7 @@ export class PDFManager {
     this.engine.renderer.render(this.engine.scene, this.engine.activeCamera);
     const coverImg = this.takeShot("image/jpeg");
 
-    // -- VISTAS TÉCNICAS --
+    // Generate technical views
     this.engine.switchCamera("orthographic");
     this.setShadows(false);
     this.resizeRendererInternal(1200, 1200);
@@ -91,29 +94,30 @@ export class PDFManager {
       { name: "iso", pos: [100, 60, 100], up: [0, 1, 0] },
     ] as const;
 
-    for (const v of viewConfig) {
+    for (const view of viewConfig) {
       cam.position.set(
-        center.x + v.pos[0],
-        center.y + v.pos[1],
-        center.z + v.pos[2]
+        center.x + view.pos[0],
+        center.y + view.pos[1],
+        center.z + view.pos[2]
       );
-      cam.up.set(v.up[0], v.up[1], v.up[2]);
+      cam.up.set(view.up[0], view.up[1], view.up[2]);
       cam.lookAt(center);
       cam.updateProjectionMatrix();
       this.engine.renderer.render(this.engine.scene, cam);
-      views[v.name] = this.engine.renderer.domElement.toDataURL(
+      views[view.name] = this.engine.renderer.domElement.toDataURL(
         "image/jpeg",
         0.9
       );
     }
 
-    // -- ITEMS (únicos) --
+    // Generate unique item images
     const uniqueItemsMap = new Map<string, SceneItem>();
-    
-    // 🔥 CORRECCIÓN TS: Tipado explícito
     items.forEach((item: SceneItem) => {
-      const key = item.productId === "custom_upload" ? item.uuid : item.productId;
-      if (!uniqueItemsMap.has(key)) uniqueItemsMap.set(key, item);
+      const key =
+        item.productId === "custom_upload" ? item.uuid : item.productId;
+      if (!uniqueItemsMap.has(key)) {
+        uniqueItemsMap.set(key, item);
+      }
     });
 
     this.engine.switchCamera("perspective");
@@ -124,13 +128,17 @@ export class PDFManager {
       string,
       { img: string; width: number; height: number }
     > = {};
+
     for (const [key, item] of uniqueItemsMap) {
       this.setVisibilityForAllItems(false);
       this.setVisibilityForItem(item.uuid, true);
       const obj = this.engine.scene.getObjectByProperty("uuid", item.uuid);
       if (obj) {
         this.fitCameraToSingleObject(obj);
-        this.engine.renderer.render(this.engine.scene, this.engine.activeCamera);
+        this.engine.renderer.render(
+          this.engine.scene,
+          this.engine.activeCamera
+        );
         itemImages[key] = {
           img: this.engine.renderer.domElement.toDataURL("image/png"),
           width: 1024,
@@ -139,10 +147,10 @@ export class PDFManager {
       }
     }
 
-    // 3. RESTAURAR
+    // Restore scene state
     this.restoreSceneState();
 
-    // 4. GENERAR PDF
+    // Generate PDF document
     this.generatePDFDocument(
       doc,
       projectName,
@@ -155,11 +163,10 @@ export class PDFManager {
     );
   }
 
-  // --------------------------------------------------------------------------
-  // GESTIÓN DE ESTADO
-  // --------------------------------------------------------------------------
-
-  private saveSceneState() {
+  /**
+   * Saves current scene state for restoration
+   */
+  private saveSceneState(): void {
     this.engine.renderer.getSize(this.savedRendererSize);
     this.savedPixelRatio = this.engine.renderer.getPixelRatio();
     this.savedCameraPos.copy(this.engine.activeCamera.position);
@@ -170,7 +177,10 @@ export class PDFManager {
     this.wasSkyVisible = this.engine.sceneManager.sky?.visible ?? false;
   }
 
-  private restoreSceneState() {
+  /**
+   * Restores saved scene state
+   */
+  private restoreSceneState(): void {
     this.engine.renderer.setSize(
       this.savedRendererSize.x,
       this.savedRendererSize.y
@@ -200,61 +210,81 @@ export class PDFManager {
     }, 100);
   }
 
-  private resizeRendererInternal(w: number, h: number) {
-    this.engine.renderer.setSize(w, h);
+  /**
+   * Resizes renderer for PDF capture
+   */
+  private resizeRendererInternal(width: number, height: number): void {
+    this.engine.renderer.setSize(width, height);
     if (this.engine.activeCamera instanceof THREE.PerspectiveCamera) {
-      this.engine.activeCamera.aspect = w / h;
+      this.engine.activeCamera.aspect = width / height;
       this.engine.activeCamera.updateProjectionMatrix();
     }
   }
 
+  /**
+   * Takes a screenshot of the current render
+   */
   private takeShot(format: string): string {
     return this.engine.renderer.domElement.toDataURL(format, 0.9);
   }
 
-  // --------------------------------------------------------------------------
-  // UTILS CÁMARA & OBJETOS
-  // --------------------------------------------------------------------------
-  private fitCameraToSingleObject(obj: THREE.Object3D) {
+  /**
+   * Fits camera to a single object
+   */
+  private fitCameraToSingleObject(obj: THREE.Object3D): void {
     const box = this.getObjectBoundingBox(obj);
     if (box.isEmpty()) return;
     this.positionCameraFromBox(box, 1.2);
   }
 
-  private fitCameraToScene(margin = 1.2) {
+  /**
+   * Fits camera to entire scene
+   */
+  private fitCameraToScene(margin: number = 1.2): void {
     const box = this.getSceneBoundingBox();
     if (box.isEmpty()) return;
     this.positionCameraFromBox(box, margin);
   }
 
-  private positionCameraFromBox(box: THREE.Box3, margin: number) {
+  /**
+   * Positions camera based on bounding box
+   */
+  private positionCameraFromBox(box: THREE.Box3, margin: number): void {
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z);
+
     if (this.engine.activeCamera instanceof THREE.PerspectiveCamera) {
       const fov = (this.engine.activeCamera.fov * Math.PI) / 180;
       let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * margin;
       const aspect = this.engine.activeCamera.aspect;
       if (aspect < 1) cameraZ = cameraZ / aspect;
-      const dir = new THREE.Vector3(1, 0.5, 1).normalize();
-      const newPos = dir.multiplyScalar(cameraZ).add(center);
-      this.engine.activeCamera.position.copy(newPos);
+
+      const direction = new THREE.Vector3(1, 0.5, 1).normalize();
+      const newPosition = direction.multiplyScalar(cameraZ).add(center);
+      this.engine.activeCamera.position.copy(newPosition);
       this.engine.activeCamera.lookAt(center);
     }
   }
 
-  private setVisibilityForAllItems(visible: boolean) {
+  /**
+   * Sets visibility for all items
+   */
+  private setVisibilityForAllItems(visible: boolean): void {
     this.engine.scene.traverse((obj) => {
       if (obj.userData?.isItem) {
         obj.visible = visible;
-        obj.traverse((c) => {
-          if (c !== obj) c.visible = visible;
+        obj.traverse((child) => {
+          if (child !== obj) child.visible = visible;
         });
       }
     });
   }
 
-  private setVisibilityForItem(uuid: string, visible: boolean) {
+  /**
+   * Sets visibility for a specific item by UUID
+   */
+  private setVisibilityForItem(uuid: string, visible: boolean): void {
     const obj = this.engine.scene.getObjectByProperty("uuid", uuid);
     if (obj) {
       obj.visible = visible;
@@ -267,18 +297,26 @@ export class PDFManager {
     }
   }
 
+  /**
+   * Gets bounding box for a specific object
+   */
   private getObjectBoundingBox(obj: THREE.Object3D): THREE.Box3 {
     const box = new THREE.Box3();
     obj.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
-        if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+        if (!mesh.geometry.boundingBox) {
+          mesh.geometry.computeBoundingBox();
+        }
         box.expandByObject(mesh);
       }
     });
     return box;
   }
 
+  /**
+   * Gets bounding box for entire scene
+   */
   private getSceneBoundingBox(): THREE.Box3 {
     const box = new THREE.Box3();
     this.engine.scene.traverse((obj) => {
@@ -286,36 +324,44 @@ export class PDFManager {
         box.expandByObject(obj);
       }
     });
-    if (box.isEmpty())
+    if (box.isEmpty()) {
       box.setFromCenterAndSize(
         new THREE.Vector3(),
         new THREE.Vector3(5, 5, 5)
       );
+    }
     return box;
   }
 
-  private hideHelpers(hide: boolean) {
+  /**
+   * Hides or shows helper objects
+   */
+  private hideHelpers(hide: boolean): void {
     this.engine.scene.traverse((obj) => {
       const isGrid = obj instanceof THREE.GridHelper;
-      const isHelper = obj.type.includes("Helper") || obj.name.includes("Helper");
+      const isHelper =
+        obj.type.includes("Helper") || obj.name.includes("Helper");
       const isZone = obj.userData?.isSafetyZone;
       const isShadowPlane = obj.name === "ShadowPlane";
+
       if (isGrid || isHelper || isZone || isShadowPlane) {
         obj.visible = !hide;
       }
     });
   }
 
-  private setShadows(enabled: boolean) {
+  /**
+   * Enables or disables shadow casting
+   */
+  private setShadows(enabled: boolean): void {
     if (this.engine.sceneManager.dirLight) {
       this.engine.sceneManager.dirLight.castShadow = enabled;
     }
   }
 
-  // ========================================================================
-  // MAQUETACIÓN PDF
-  // ========================================================================
-
+  /**
+   * Generates the complete PDF document with all sections
+   */
   private generatePDFDocument(
     doc: jsPDF,
     projectName: string,
@@ -325,37 +371,45 @@ export class PDFManager {
     uniqueItemsMap: Map<string, SceneItem>,
     itemImages: Record<string, { img: string; width: number; height: number }>,
     user: any
-  ) {
-    const m = 15;
-    const w = doc.internal.pageSize.getWidth();
+  ): void {
+    const margin = 15;
+    const pageWidth = doc.internal.pageSize.getWidth();
 
-    // --- PORTADA ---
+    // Cover page
     this.addHeader(doc, projectName, "Dossier del Proyecto");
-    if (coverImg) this.drawImageProp(doc, coverImg, m, 50, w - 2 * m, 120);
+    if (coverImg) {
+      this.drawImageProp(doc, coverImg, margin, 50, pageWidth - 2 * margin, 120);
+    }
     this.addFooter(doc);
 
-    // --- VISTAS TÉCNICAS ---
+    // Technical views page
     doc.addPage();
     this.addHeader(doc, "Vistas Técnicas", "");
-    const gw = (w - 3 * m) / 2;
-    const gh = 80;
+    const gridWidth = (pageWidth - 3 * margin) / 2;
+    const gridHeight = 80;
     const yRow1 = 50;
-    const yRow2 = yRow1 + gh + 15;
+    const yRow2 = yRow1 + gridHeight + 15;
 
     doc.setFontSize(10);
-    doc.text("Alzado (Frontal)", m, yRow1 - 2);
-    if (views.front) this.drawImageProp(doc, views.front, m, yRow1, gw, gh);
-    doc.text("Perfil (Lateral)", m + gw + m, yRow1 - 2);
-    if (views.side)
-      this.drawImageProp(doc, views.side, m + gw + m, yRow1, gw, gh);
-    doc.text("Planta (Superior)", m, yRow2 - 2);
-    if (views.top) this.drawImageProp(doc, views.top, m, yRow2, gw, gh);
-    doc.text("Isométrica", m + gw + m, yRow2 - 2);
-    if (views.iso)
-      this.drawImageProp(doc, views.iso, m + gw + m, yRow2, gw, gh);
+    doc.text("Alzado (Frontal)", margin, yRow1 - 2);
+    if (views.front) {
+      this.drawImageProp(doc, views.front, margin, yRow1, gridWidth, gridHeight);
+    }
+    doc.text("Perfil (Lateral)", margin + gridWidth + margin, yRow1 - 2);
+    if (views.side) {
+      this.drawImageProp(doc, views.side, margin + gridWidth + margin, yRow1, gridWidth, gridHeight);
+    }
+    doc.text("Planta (Superior)", margin, yRow2 - 2);
+    if (views.top) {
+      this.drawImageProp(doc, views.top, margin, yRow2, gridWidth, gridHeight);
+    }
+    doc.text("Isométrica", margin + gridWidth + margin, yRow2 - 2);
+    if (views.iso) {
+      this.drawImageProp(doc, views.iso, margin + gridWidth + margin, yRow2, gridWidth, gridHeight);
+    }
     this.addFooter(doc);
 
-    // --- PRESUPUESTO (SOLO SI HAY USER) ---
+    // Budget page (only if user exists)
     if (user) {
       doc.addPage();
       this.addHeader(doc, "Estimación orientativa", "");
@@ -373,7 +427,8 @@ export class PDFManager {
           }),
         ];
       });
-      const iva = total * 0.21;
+      const vat = total * 0.21;
+
       autoTable(doc, {
         head: [["Concepto", "Ref", "Ud/Dim", "Precio"]],
         body: tableData,
@@ -394,7 +449,7 @@ export class PDFManager {
             "",
             "",
             "IVA 21%",
-            iva.toLocaleString("es-ES", {
+            vat.toLocaleString("es-ES", {
               style: "currency",
               currency: "EUR",
             }),
@@ -403,7 +458,7 @@ export class PDFManager {
             "",
             "",
             "TOTAL",
-            (total + iva).toLocaleString("es-ES", {
+            (total + vat).toLocaleString("es-ES", {
               style: "currency",
               currency: "EUR",
             }),
@@ -420,7 +475,7 @@ export class PDFManager {
       this.addFooter(doc);
     }
 
-    // --- FICHAS ---
+    // Technical sheets for each unique item
     for (const [key, item] of uniqueItemsMap) {
       doc.addPage();
       const anyItem = item as any;
@@ -432,30 +487,40 @@ export class PDFManager {
       );
 
       if (itemImages[key]) {
-        this.drawImageProp(doc, itemImages[key].img, m, 40, w - 2 * m, 100);
+        this.drawImageProp(
+          doc,
+          itemImages[key].img,
+          margin,
+          40,
+          pageWidth - 2 * margin,
+          100
+        );
       }
 
       const yStart = 150;
       doc.setFontSize(12);
       doc.setTextColor(0);
-      doc.text("Descripción:", m, yStart);
+      doc.text("Descripción:", margin, yStart);
       doc.setFontSize(10);
       doc.setTextColor(80);
 
-      const descRaw = this.findValueInItem(anyItem, [
+      const descriptionRaw = this.findValueInItem(anyItem, [
         "DESCRIPCION",
         "Descripcion",
         "Description",
         "description",
       ]);
-      const finalDesc = descRaw
-        ? descRaw
+      const finalDescription = descriptionRaw
+        ? descriptionRaw
         : "Elemento certificado para uso público conforme a normativa vigente.";
-      const splitDesc = doc.splitTextToSize(finalDesc, w - 2 * m);
-      doc.text(splitDesc, m, yStart + 7);
+      const splitDescription = doc.splitTextToSize(
+        finalDescription,
+        pageWidth - 2 * margin
+      );
+      doc.text(splitDescription, margin, yStart + 7);
 
-      // --- LINKS DINÁMICOS ---
-      let linkY = yStart + 20 + splitDesc.length * 5;
+      // Dynamic links
+      let linkY = yStart + 20 + splitDescription.length * 5;
       doc.setFont("helvetica", "bold");
 
       const urlTech = this.findValueInItem(anyItem, [
@@ -467,7 +532,7 @@ export class PDFManager {
         doc,
         "Ficha Técnica (PDF)",
         urlTech,
-        m,
+        margin,
         linkY
       );
 
@@ -480,7 +545,7 @@ export class PDFManager {
         doc,
         "Certificado de Conformidad",
         urlCert,
-        m,
+        margin,
         linkY
       );
 
@@ -493,7 +558,7 @@ export class PDFManager {
         doc,
         "Instrucciones de Montaje",
         urlInst,
-        m,
+        margin,
         linkY
       );
 
@@ -503,6 +568,9 @@ export class PDFManager {
     doc.save(`${projectName}_Levipark.pdf`);
   }
 
+  /**
+   * Renders a link line in the PDF
+   */
   private renderLinkLine(
     doc: jsPDF,
     label: string,
@@ -519,36 +587,50 @@ export class PDFManager {
     return 8;
   }
 
+  /**
+   * Finds a value in an item using multiple possible keys
+   */
   private findValueInItem(item: any, keys: string[]): string | undefined {
     const data = item.data || {};
-    for (const k of keys) {
-      if (data[k]) return data[k];
-      if (item[k]) return item[k];
+    for (const key of keys) {
+      if (data[key]) return data[key];
+      if (item[key]) return item[key];
     }
     return undefined;
   }
 
+  /**
+   * Draws an image proportionally within bounds
+   */
   private drawImageProp(
     doc: jsPDF,
     imgData: string,
     x: number,
     y: number,
-    w: number,
-    h: number
-  ) {
+    width: number,
+    height: number
+  ): void {
     const props = doc.getImageProperties(imgData);
-    const ratioBox = w / h;
+    const ratioBox = width / height;
     const ratioImg = props.width / props.height;
-    let newW = w;
-    let newH = h;
-    if (ratioImg > ratioBox) newH = w / ratioImg;
-    else newW = h * ratioImg;
-    const offsetX = x + (w - newW) / 2;
-    const offsetY = y + (h - newH) / 2;
-    doc.addImage(imgData, "JPEG", offsetX, offsetY, newW, newH);
+    let newWidth = width;
+    let newHeight = height;
+
+    if (ratioImg > ratioBox) {
+      newHeight = width / ratioImg;
+    } else {
+      newWidth = height * ratioImg;
+    }
+
+    const offsetX = x + (width - newWidth) / 2;
+    const offsetY = y + (height - newHeight) / 2;
+    doc.addImage(imgData, "JPEG", offsetX, offsetY, newWidth, newHeight);
   }
 
-  private addHeader(doc: jsPDF, title: string, subtitle: string) {
+  /**
+   * Adds a header to the PDF page
+   */
+  private addHeader(doc: jsPDF, title: string, subtitle: string): void {
     doc.setFontSize(22);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(40);
@@ -563,14 +645,20 @@ export class PDFManager {
     doc.line(20, 25, 190, 25);
   }
 
-  private addFooter(doc: jsPDF) {
-    const h = doc.internal.pageSize.getHeight();
+  /**
+   * Adds a footer to the PDF page
+   */
+  private addFooter(doc: jsPDF): void {
+    const pageHeight = doc.internal.pageSize.getHeight();
     doc.setFontSize(9);
     doc.setTextColor(150);
-    doc.text(`Generado: ${new Date().toLocaleDateString()}`, 20, h - 10);
-    doc.text("Levipark 21 - www.levipark21.es", 190, h - 10, {
+    doc.text(
+      `Generado: ${new Date().toLocaleDateString()}`,
+      20,
+      pageHeight - 10
+    );
+    doc.text("Levipark 21 - www.levipark21.es", 190, pageHeight - 10, {
       align: "right",
     });
   }
 }
-// --- END OF FILE src/features/editor/engine/managers/PDFManager.ts ---

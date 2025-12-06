@@ -1,9 +1,11 @@
-// --- START OF FILE src/features/editor/engine/managers/ExportManager.ts ---
 import * as THREE from "three";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import type { A42Engine } from "../A42Engine";
 import { useEditorStore } from "@/stores/editor/useEditorStore";
 
+/**
+ * Manages scene export functionality to various formats (GLB, DXF)
+ */
 export class ExportManager {
   private engine: A42Engine;
 
@@ -11,8 +13,10 @@ export class ExportManager {
     this.engine = engine;
   }
 
-  // --- 1. EXPORTAR A GLB ---
-  public async exportGLB() {
+  /**
+   * Exports the scene to GLB format (binary glTF)
+   */
+  public async exportGLB(): Promise<void> {
     const name = await useEditorStore
       .getState()
       .requestInput("Nombre del archivo 3D (.glb):", "proyecto-3d");
@@ -22,6 +26,7 @@ export class ExportManager {
     const exporter = new GLTFExporter();
     const exportableObjects: THREE.Object3D[] = [];
 
+    // Collect all exportable objects
     this.engine.scene.traverse((child) => {
       if (child.userData?.isItem) {
         exportableObjects.push(child);
@@ -33,6 +38,7 @@ export class ExportManager {
       return;
     }
 
+    // Create export group with clones to avoid modifying original scene
     const exportGroup = new THREE.Group();
     exportableObjects.forEach((obj) => exportGroup.add(obj.clone()));
 
@@ -52,8 +58,11 @@ export class ExportManager {
     );
   }
 
-  // --- 2. EXPORTAR A DXF ---
-  public async exportDXF() {
+  /**
+   * Exports the scene to DXF format (AutoCAD Drawing Exchange Format)
+   * Creates a 2D plan view from the top
+   */
+  public async exportDXF(): Promise<void> {
     const name = await useEditorStore
       .getState()
       .requestInput("Nombre del plano (.dxf):", "planta-cad");
@@ -63,23 +72,27 @@ export class ExportManager {
     let dxf = this.getDXFHeader();
     this.engine.scene.updateMatrixWorld(true);
 
+    // Process each item in the scene
     this.engine.scene.traverse((child) => {
       if (!child.userData.isItem) return;
 
+      // Handle floor polygons
       if (child.userData.type === "floor" && child.userData.points) {
         const points = child.userData.points;
         const worldPoints = points.map((p: any) => {
-          const vec = new THREE.Vector3(p.x, p.y, p.z);
-          vec.applyMatrix4(child.matrixWorld);
-          return vec;
+          const vector = new THREE.Vector3(p.x, p.y, p.z);
+          vector.applyMatrix4(child.matrixWorld);
+          return vector;
         });
 
+        // Draw floor boundary lines
         for (let i = 0; i < worldPoints.length; i++) {
           const p1 = worldPoints[i];
           const p2 = worldPoints[(i + 1) % worldPoints.length];
           dxf += this.line(p1.x, -p1.z, p2.x, -p2.z, "SUELOS", 4);
         }
       } else {
+        // Handle fences and furniture
         const layerName =
           child.userData.type === "fence" ? "VALLAS" : "MOBILIARIO";
         const layerColor = child.userData.type === "fence" ? 1 : 3;
@@ -90,6 +103,7 @@ export class ExportManager {
             const edges = new THREE.EdgesGeometry(geometry, 15);
             const positions = edges.attributes.position.array;
 
+            // Handle instanced meshes
             if ((mesh as THREE.InstancedMesh).isInstancedMesh) {
               const instanced = mesh as THREE.InstancedMesh;
               const instanceMatrix = new THREE.Matrix4();
@@ -101,7 +115,7 @@ export class ExportManager {
                   instanced.matrixWorld,
                   instanceMatrix
                 );
-                dxf += this.drawGeometryPoints(
+                dxf += this.drawGeometryEdges(
                   positions,
                   finalMatrix,
                   layerName,
@@ -109,7 +123,8 @@ export class ExportManager {
                 );
               }
             } else {
-              dxf += this.drawGeometryPoints(
+              // Handle regular meshes
+              dxf += this.drawGeometryEdges(
                 positions,
                 mesh.matrixWorld,
                 layerName,
@@ -127,13 +142,17 @@ export class ExportManager {
     this.downloadFile(blob, `${name}.dxf`);
   }
 
-  private drawGeometryPoints(
+  /**
+   * Draws geometry edges as DXF lines
+   */
+  private drawGeometryEdges(
     positions: ArrayLike<number>,
     matrix: THREE.Matrix4,
     layer: string,
     color: number
   ): string {
     let output = "";
+
     for (let i = 0; i < positions.length; i += 6) {
       const v1 = new THREE.Vector3(
         positions[i],
@@ -149,18 +168,30 @@ export class ExportManager {
       v1.applyMatrix4(matrix);
       v2.applyMatrix4(matrix);
 
+      // Use X and -Z for top-down view
       output += this.line(v1.x, -v1.z, v2.x, -v2.z, layer, color);
     }
+
     return output;
   }
 
-  private getDXFHeader() {
+  /**
+   * Generates DXF file header
+   */
+  private getDXFHeader(): string {
     return `0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1009\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n`;
   }
-  private getDXFFooter() {
+
+  /**
+   * Generates DXF file footer
+   */
+  private getDXFFooter(): string {
     return `0\nENDSEC\n0\nEOF`;
   }
 
+  /**
+   * Creates a DXF line entity
+   */
   private line(
     x1: number,
     y1: number,
@@ -168,24 +199,26 @@ export class ExportManager {
     y2: number,
     layer: string,
     color: number
-  ) {
+  ): string {
     return `0\nLINE\n8\n${layer}\n62\n${color}\n10\n${x1.toFixed(
       4
     )}\n20\n${y1.toFixed(4)}\n11\n${x2.toFixed(4)}\n21\n${y2.toFixed(4)}\n`;
   }
 
-  private downloadFile(blob: Blob, filename: string) {
+  /**
+   * Triggers file download in the browser
+   */
+  private downloadFile(blob: Blob, filename: string): void {
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
 
     setTimeout(() => {
-      document.body.removeChild(a);
+      document.body.removeChild(anchor);
       window.URL.revokeObjectURL(url);
     }, 100);
   }
 }
-// --- END OF FILE ---

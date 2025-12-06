@@ -1,21 +1,21 @@
-import { createContext, useContext } from 'react';
-import type { A42Engine } from '../engine/A42Engine';
+import { createContext, useContext } from "react";
+import type { A42Engine } from "../engine/A42Engine";
 
-// Definimos el tipo del contexto
+// Context type definition
 interface EngineContextType {
   engine: A42Engine | null;
 }
 
-// Creamos el contexto
+// Create context with default value
 export const EngineContext = createContext<EngineContextType>({
   engine: null,
 });
 
-// Hook personalizado para usar el motor fácilmente
-export const useEngine = () => {
+// Custom hook to access the engine
+export const useEngine = (): A42Engine | null => {
   const context = useContext(EngineContext);
   if (context === undefined) {
-    throw new Error('useEngine must be used within an EngineProvider');
+    throw new Error("useEngine must be used within an EngineProvider");
   }
   return context.engine;
 };
