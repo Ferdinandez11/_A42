@@ -1,49 +1,69 @@
-// --- FILE: src/stores/scene/useSceneStore.ts ---
 import { create } from "zustand";
-import type { SceneItem, FenceConfig, FloorMaterialType } from "@/types/editor";
+import type {
+  SceneItem,
+  FenceConfig,
+  FloorMaterialType,
+} from "@/types/editor";
 import { FENCE_PRESETS } from "@/features/editor/data/fence_presets";
 
+/**
+ * Scene store state
+ */
 interface SceneState {
-  // --- STATE ---
+  // State
   items: SceneItem[];
   totalPrice: number;
-  
-  // Config global temporal (para la próxima valla que dibujes)
+
+  // Global fence configuration (for next fence to draw)
   fenceConfig: FenceConfig;
 
   // History
   past: SceneItem[][];
   future: SceneItem[][];
 
-  // --- ACTIONS (CRUD) ---
+  // CRUD Actions
   addItem: (item: SceneItem) => void;
   removeItem: (uuid: string) => void;
-  
-  // Actualizaciones parciales
-  updateItemTransform: (uuid: string, pos: number[], rot: number[], scale: number[]) => void;
+
+  // Partial updates
+  updateItemTransform: (
+    uuid: string,
+    position: number[],
+    rotation: number[],
+    scale: number[]
+  ) => void;
   updateFloorMaterial: (uuid: string, material: FloorMaterialType) => void;
-  updateFloorTexture: (uuid: string, url: string | undefined, scale: number, rotation: number) => void;
+  updateFloorTexture: (
+    uuid: string,
+    url: string | undefined,
+    scale: number,
+    rotation: number
+  ) => void;
   updateFloorPoints: (uuid: string, points: { x: number; z: number }[]) => void;
   updateFencePoints: (uuid: string, points: { x: number; z: number }[]) => void;
-  
-  // Configuración de vallas
+
+  // Fence configuration
   setFenceConfig: (config: Partial<FenceConfig>) => void;
   updateItemFenceConfig: (uuid: string, config: Partial<FenceConfig>) => void;
 
-  // Gestión de escena
+  // Scene management
   resetScene: () => void;
-  setItems: (items: SceneItem[]) => void; // Útil para cargar proyectos
+  setItems: (items: SceneItem[]) => void;
 
-  // History Actions
+  // History actions
   saveSnapshot: () => void;
   undo: () => void;
   redo: () => void;
 }
 
+/**
+ * Zustand store for scene data management
+ * Manages scene items, pricing, fence configuration, and undo/redo history
+ */
 export const useSceneStore = create<SceneState>((set, get) => ({
   items: [],
   totalPrice: 0,
-  
+
   fenceConfig: {
     presetId: "wood",
     colors: FENCE_PRESETS["wood"].defaultColors,
@@ -52,126 +72,156 @@ export const useSceneStore = create<SceneState>((set, get) => ({
   past: [],
   future: [],
 
-  // --- INTERNAL HELPER ---
+  /**
+   * Saves current state snapshot for undo/redo
+   */
   saveSnapshot: () => {
     const snapshot = structuredClone(get().items);
     set((state) => ({
-      past: [...state.past.slice(-19), snapshot],
+      past: [...state.past.slice(-19), snapshot], // Keep last 20 states
       future: [],
     }));
   },
 
-  // --- ACTIONS ---
-  
+  /**
+   * Adds a new item to the scene
+   */
   addItem: (item) => {
     get().saveSnapshot();
-    set((s) => ({
-      items: [...s.items, item],
-      totalPrice: s.totalPrice + (item.price || 0),
+    set((state) => ({
+      items: [...state.items, item],
+      totalPrice: state.totalPrice + (item.price || 0),
     }));
   },
 
+  /**
+   * Removes an item from the scene by UUID
+   */
   removeItem: (uuid) => {
     get().saveSnapshot();
-    set((s) => {
-      const newItems = s.items.filter((i) => i.uuid !== uuid);
+    set((state) => {
+      const newItems = state.items.filter((item) => item.uuid !== uuid);
       return {
         items: newItems,
-        totalPrice: newItems.reduce((sum, i) => sum + i.price, 0),
+        totalPrice: newItems.reduce((sum, item) => sum + item.price, 0),
       };
     });
   },
 
-  updateItemTransform: (uuid, pos, rot, scale) =>
-    set((s) => ({
-      items: s.items.map((i) =>
-        i.uuid === uuid
+  /**
+   * Updates transform (position, rotation, scale) for an item
+   */
+  updateItemTransform: (uuid, position, rotation, scale) =>
+    set((state) => ({
+      items: state.items.map((item) =>
+        item.uuid === uuid
           ? {
-              ...i,
-              position: pos as [number, number, number],
-              rotation: rot as [number, number, number],
+              ...item,
+              position: position as [number, number, number],
+              rotation: rotation as [number, number, number],
               scale: scale as [number, number, number],
             }
-          : i
+          : item
       ),
     })),
 
+  /**
+   * Updates floor material
+   */
   updateFloorMaterial: (uuid, material) =>
-    set((s) => ({
-      items: s.items.map((i) =>
-        i.uuid === uuid && i.type === "floor"
-          ? { ...i, floorMaterial: material, textureUrl: undefined }
-          : i
+    set((state) => ({
+      items: state.items.map((item) =>
+        item.uuid === uuid && item.type === "floor"
+          ? { ...item, floorMaterial: material, textureUrl: undefined }
+          : item
       ),
     })),
 
+  /**
+   * Updates floor texture
+   */
   updateFloorTexture: (uuid, url, scale, rotation) =>
-    set((s) => ({
-      items: s.items.map((i) =>
-        i.uuid === uuid && i.type === "floor"
+    set((state) => ({
+      items: state.items.map((item) =>
+        item.uuid === uuid && item.type === "floor"
           ? {
-              ...i,
+              ...item,
               textureUrl: url,
               textureScale: scale,
               textureRotation: rotation,
               floorMaterial: undefined,
             }
-          : i
+          : item
       ),
     })),
 
+  /**
+   * Updates floor polygon points
+   */
   updateFloorPoints: (uuid, points) => {
-    // Nota: A veces no queremos snapshot en cada micro-movimiento, 
-    // pero para simplificar lo dejamos así o lo gestionamos desde el manager.
-    set((s) => ({
-      items: s.items.map((i) =>
-        i.uuid === uuid && i.type === "floor" ? { ...i, points } : i
+    set((state) => ({
+      items: state.items.map((item) =>
+        item.uuid === uuid && item.type === "floor" ? { ...item, points } : item
       ),
     }));
   },
 
+  /**
+   * Updates fence polyline points
+   */
   updateFencePoints: (uuid, points) => {
-    set((s) => ({
-      items: s.items.map((i) =>
-        i.uuid === uuid && i.type === "fence" ? { ...i, points } : i
+    set((state) => ({
+      items: state.items.map((item) =>
+        item.uuid === uuid && item.type === "fence" ? { ...item, points } : item
       ),
     }));
   },
 
+  /**
+   * Sets global fence configuration for new fences
+   */
   setFenceConfig: (config) =>
-    set((s) => ({
-      fenceConfig: { ...s.fenceConfig, ...config },
+    set((state) => ({
+      fenceConfig: { ...state.fenceConfig, ...config },
     })),
 
+  /**
+   * Updates fence configuration for a specific item
+   */
   updateItemFenceConfig: (uuid, config) => {
     get().saveSnapshot();
-    set((s) => ({
-      items: s.items.map((i) => {
-        if (i.uuid === uuid && i.type === "fence") {
+    set((state) => ({
+      items: state.items.map((item) => {
+        if (item.uuid === uuid && item.type === "fence") {
           return {
-            ...i,
-            fenceConfig: { ...i.fenceConfig, ...config },
+            ...item,
+            fenceConfig: { ...item.fenceConfig, ...config },
           };
         }
-        return i;
+        return item;
       }),
     }));
   },
 
-  // --- HISTORY ---
+  /**
+   * Undoes the last action
+   */
   undo: () => {
     const { past, items, future } = get();
     if (past.length === 0) return;
 
-    const prev = past[past.length - 1];
+    const previous = past[past.length - 1];
     set({
-      items: prev,
+      items: previous,
       past: past.slice(0, -1),
       future: [items, ...future],
-      totalPrice: prev.reduce((s, i) => s + i.price, 0),
+      totalPrice: previous.reduce((sum, item) => sum + item.price, 0),
     });
   },
 
+  /**
+   * Redoes the last undone action
+   */
   redo: () => {
     const { past, items, future } = get();
     if (future.length === 0) return;
@@ -181,10 +231,13 @@ export const useSceneStore = create<SceneState>((set, get) => ({
       items: next,
       past: [...past, items],
       future: future.slice(1),
-      totalPrice: next.reduce((s, i) => s + i.price, 0),
+      totalPrice: next.reduce((sum, item) => sum + item.price, 0),
     });
   },
 
+  /**
+   * Resets the entire scene
+   */
   resetScene: () =>
     set({
       items: [],
@@ -193,11 +246,14 @@ export const useSceneStore = create<SceneState>((set, get) => ({
       future: [],
     }),
 
-  setItems: (newItems) => 
+  /**
+   * Sets all items (useful for loading projects)
+   */
+  setItems: (newItems) =>
     set({
-        items: newItems,
-        totalPrice: newItems.reduce((s, i) => s + i.price, 0),
-        past: [],
-        future: []
-    })
+      items: newItems,
+      totalPrice: newItems.reduce((sum, item) => sum + item.price, 0),
+      past: [],
+      future: [],
+    }),
 }));

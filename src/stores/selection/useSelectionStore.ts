@@ -1,8 +1,11 @@
 import { create } from "zustand";
-import { useSceneStore } from "../scene/useSceneStore"; // 🔥
+import { useSceneStore } from "../scene/useSceneStore";
 import { useProjectStore } from "../project/useProjectStore";
 import type { SceneItem } from "@/types/editor";
 
+/**
+ * Selection store state
+ */
 interface SelectionState {
   selectedItemId: string | null;
   selectedVertices: number[];
@@ -11,23 +14,28 @@ interface SelectionState {
 
   selectItem: (uuid: string | null) => void;
   clearSelection: () => void;
-
   setSelectedVertices: (
     indices: number[],
     distance: number | null,
     angle: number | null
   ) => void;
-
   duplicateSelection: () => void;
   removeSelection: () => void;
 }
 
+/**
+ * Zustand store for selection management
+ * Manages item selection, vertex selection, and measurements
+ */
 export const useSelectionStore = create<SelectionState>((set, get) => ({
   selectedItemId: null,
   selectedVertices: [],
   measuredDistance: null,
   measuredAngle: null,
 
+  /**
+   * Selects an item by UUID
+   */
   selectItem: (uuid) =>
     set({
       selectedItemId: uuid,
@@ -36,6 +44,9 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
       measuredAngle: null,
     }),
 
+  /**
+   * Clears all selections
+   */
   clearSelection: () =>
     set({
       selectedItemId: null,
@@ -44,6 +55,9 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
       measuredAngle: null,
     }),
 
+  /**
+   * Sets selected vertices with measurements
+   */
   setSelectedVertices: (indices, distance, angle) =>
     set({
       selectedVertices: indices,
@@ -51,17 +65,19 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
       measuredAngle: angle,
     }),
 
+  /**
+   * Duplicates the currently selected item
+   */
   duplicateSelection: () => {
     const { isReadOnlyMode } = useProjectStore.getState();
     if (isReadOnlyMode) {
-      console.warn("🚫 No se puede duplicar en modo lectura.");
+      console.warn("🚫 Cannot duplicate in read-only mode.");
       return;
     }
 
     const selectedId = get().selectedItemId;
     if (!selectedId) return;
 
-    // 🔥 Usamos SceneStore para leer y escribir
     const scene = useSceneStore.getState();
     const item = scene.items.find((i: SceneItem) => i.uuid === selectedId);
     if (!item) return;
@@ -79,17 +95,20 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
     set({ selectedItemId: cloned.uuid });
   },
 
+  /**
+   * Removes the currently selected item
+   */
   removeSelection: () => {
     const { isReadOnlyMode } = useProjectStore.getState();
     if (isReadOnlyMode) {
-      console.warn("🚫 No se puede borrar en modo lectura.");
+      console.warn("🚫 Cannot delete in read-only mode.");
       return;
     }
 
     const selectedId = get().selectedItemId;
     if (!selectedId) return;
 
-    useSceneStore.getState().removeItem(selectedId); // 🔥
+    useSceneStore.getState().removeItem(selectedId);
 
     set({ selectedItemId: null });
   },

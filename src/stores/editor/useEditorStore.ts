@@ -1,8 +1,9 @@
-// --- FILE: src/stores/editor/useEditorStore.ts ---
 import { create } from "zustand";
 import type { EditorMode, CameraType, CameraView } from "@/types/editor";
 
-
+/**
+ * Input modal state
+ */
 interface InputModalState {
   isOpen: boolean;
   title: string;
@@ -10,26 +11,32 @@ interface InputModalState {
   resolve: ((value: string | null) => void) | null;
 }
 
+/**
+ * Editor store state
+ */
 interface EditorState {
-  // UI STATE
+  // UI State
   mode: EditorMode;
-  
   gridVisible: boolean;
   budgetVisible: boolean;
   envPanelVisible: boolean;
   safetyZonesVisible: boolean;
 
+  // Environment
   sunPosition: { azimuth: number; elevation: number };
   backgroundColor: string;
 
+  // Camera
   cameraType: CameraType;
   pendingView: CameraView | null;
 
+  // Measurements
   measurementResult: number | null;
 
+  // Input modal
   inputModal: InputModalState;
 
-  // ACTIONS (Solo UI y Modos)
+  // Actions (UI and modes only)
   setMode: (mode: EditorMode) => void;
 
   toggleGrid: () => void;
@@ -40,17 +47,25 @@ interface EditorState {
   setSunPosition: (azimuth: number, elevation: number) => void;
   setBackgroundColor: (color: string) => void;
 
-  setMeasurementResult: (dist: number | null) => void;
+  setMeasurementResult: (distance: number | null) => void;
 
   setCameraType: (type: CameraType) => void;
   triggerView: (view: CameraView) => void;
   clearPendingView: () => void;
 
-  requestInput: (title: string, defaultValue?: string) => Promise<string | null>;
+  requestInput: (
+    title: string,
+    defaultValue?: string
+  ) => Promise<string | null>;
   closeInputModal: (value: string | null) => void;
 }
 
+/**
+ * Zustand store for editor UI state
+ * Manages editor modes, visibility toggles, environment settings, and camera controls
+ */
 export const useEditorStore = create<EditorState>((set, get) => ({
+  // Initial state
   mode: "idle",
 
   gridVisible: false,
@@ -73,23 +88,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     resolve: null,
   },
 
+  // Actions
   setMode: (mode) => {
-    // Limpiamos herramientas del motor si cambiamos de modo
-     set({ mode });
+    set({ mode });
   },
 
-  toggleGrid: () => set((s) => ({ gridVisible: !s.gridVisible })),
-  toggleBudget: () => set((s) => ({ budgetVisible: !s.budgetVisible })),
-  toggleEnvPanel: () => set((s) => ({ envPanelVisible: !s.envPanelVisible })),
+  toggleGrid: () => set((state) => ({ gridVisible: !state.gridVisible })),
+  toggleBudget: () =>
+    set((state) => ({ budgetVisible: !state.budgetVisible })),
+  toggleEnvPanel: () =>
+    set((state) => ({ envPanelVisible: !state.envPanelVisible })),
   toggleSafetyZones: () =>
-    set((s) => ({ safetyZonesVisible: !s.safetyZonesVisible })),
+    set((state) => ({ safetyZonesVisible: !state.safetyZonesVisible })),
 
   setSunPosition: (azimuth, elevation) =>
     set({ sunPosition: { azimuth, elevation } }),
 
   setBackgroundColor: (color) => set({ backgroundColor: color }),
 
-  setMeasurementResult: (dist) => set({ measurementResult: dist }),
+  setMeasurementResult: (distance) => set({ measurementResult: distance }),
 
   setCameraType: (type) => set({ cameraType: type }),
   triggerView: (view) => set({ pendingView: view }),

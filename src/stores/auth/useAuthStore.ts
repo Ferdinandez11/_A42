@@ -1,26 +1,30 @@
-import { create } from 'zustand';
-import { supabase } from '@/lib/supabase';
+import { create } from "zustand";
+import type { Product } from "@/services/catalogService";
 
-interface AuthState {
-  user: any | null;
-  session: any | null;
-  loading: boolean;
+/**
+ * Catalog store state
+ */
+interface CatalogState {
+  isOpen: boolean;
+  selectedProduct: Product | null;
 
-  setUser: (user: any) => void;
-  setSession: (session: any) => void;
-  logout: () => Promise<void>;
+  openCatalog: () => void;
+  closeCatalog: () => void;
+  toggleCatalog: () => void;
+  selectProduct: (product: Product | null) => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  session: null,
-  loading: false,
+/**
+ * Zustand store for catalog UI state
+ * Manages catalog visibility and product selection
+ */
+export const useCatalogStore = create<CatalogState>((set) => ({
+  isOpen: false,
+  selectedProduct: null,
 
-  setUser: (user) => set({ user }),
-  setSession: (session) => set({ session }),
+  openCatalog: () => set({ isOpen: true }),
+  closeCatalog: () => set({ isOpen: false }),
+  toggleCatalog: () => set((state) => ({ isOpen: !state.isOpen })),
 
-  logout: async () => {
-    await supabase.auth.signOut();
-    set({ user: null, session: null });
-  },
+  selectProduct: (product) => set({ selectedProduct: product }),
 }));

@@ -1,12 +1,17 @@
-// --- FILE: src/stores/fence/useFenceStore.ts ---
 import { create } from "zustand";
 import type { FenceConfig } from "@/types/editor";
 
+/**
+ * Fence store state
+ */
 interface FenceState {
   config: FenceConfig;
   setConfig: (partial: Partial<FenceConfig>) => void;
 }
 
+/**
+ * Default fence configuration
+ */
 const DEFAULT_FENCE_CONFIG: FenceConfig = {
   presetId: "wood",
   colors: {
@@ -17,6 +22,10 @@ const DEFAULT_FENCE_CONFIG: FenceConfig = {
   },
 };
 
+/**
+ * Zustand store for fence configuration
+ * Manages fence preset selection and color customization
+ */
 export const useFenceStore = create<FenceState>((set) => ({
   config: DEFAULT_FENCE_CONFIG,
 

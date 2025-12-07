@@ -1,40 +1,44 @@
 import { create } from "zustand";
 import { supabase } from "@/lib/supabase";
+import type { User } from "@supabase/supabase-js";
 
 import type { SceneItem, FenceConfig } from "@/types/editor";
 import { useSceneStore } from "@/stores/scene/useSceneStore";
 import { useEditorStore } from "@/stores/editor/useEditorStore";
 
+/**
+ * Project store state
+ */
 interface ProjectState {
-  user: any | null;
-
+  user: User | null;
   currentProjectId: string | null;
   currentProjectName: string | null;
   isReadOnlyMode: boolean;
 
-  setUser: (user: any | null) => void;
-
+  setUser: (user: User | null) => void;
   setProjectInfo: (id: string | null, name: string | null) => void;
   resetProject: () => void;
-
   loadProjectFromURL: (projectId: string) => Promise<void>;
 }
 
+/**
+ * Zustand store for project management
+ * Manages project metadata, loading, and read-only state
+ */
 export const useProjectStore = create<ProjectState>((set) => ({
   user: null,
-
   currentProjectId: null,
   currentProjectName: null,
   isReadOnlyMode: false,
 
-  // -------------------------------------
-  // USER
-  // -------------------------------------
+  /**
+   * Sets the current user
+   */
   setUser: (user) => set({ user }),
 
-  // -------------------------------------
-  // SET PROJECT INFO (ID + NAME)
-  // -------------------------------------
+  /**
+   * Sets project information (ID and name)
+   */
   setProjectInfo: (id, name) =>
     set({
       currentProjectId: id,
@@ -42,11 +46,11 @@ export const useProjectStore = create<ProjectState>((set) => ({
       isReadOnlyMode: false,
     }),
 
-  // -------------------------------------
-  // RESET PROJECT (NUEVO PROYECTO)
-  // -------------------------------------
+  /**
+   * Resets the project to create a new one
+   */
   resetProject: () => {
-    useSceneStore.getState().resetScene(); // limpiamos escena
+    useSceneStore.getState().resetScene();
 
     set({
       currentProjectId: null,
@@ -55,9 +59,10 @@ export const useProjectStore = create<ProjectState>((set) => ({
     });
   },
 
-  // -------------------------------------
-  // LOAD PROJECT
-  // -------------------------------------
+  /**
+   * Loads a project from the database by ID
+   * @param projectId - The project ID to load
+   */
   loadProjectFromURL: async (projectId: string) => {
     const { data: project, error } = await supabase
       .from("projects")
@@ -66,43 +71,39 @@ export const useProjectStore = create<ProjectState>((set) => ({
       .single();
 
     if (error || !project) {
-      console.error("❌ Error al cargar proyecto:", error?.message);
+      console.error("❌ Error loading project:", error?.message);
       return;
     }
 
-    const scene = project.data || {};
+    const sceneData = project.data || {};
 
-    // Items
-    const items: SceneItem[] = Array.isArray(scene.items)
-      ? scene.items
+    // Extract items
+    const items: SceneItem[] = Array.isArray(sceneData.items)
+      ? sceneData.items
       : [];
 
-    // Fence config
-    const fence: FenceConfig =
-      scene.fenceConfig || {
-        presetId: "wood",
-        colors: { post: 0, slatA: 0 },
-      };
+    // Extract fence configuration
+    const fenceConfig: FenceConfig = sceneData.fenceConfig || {
+      presetId: "wood",
+      colors: { post: 0, slatA: 0 },
+    };
 
-    // Price calc
-    const totalPrice = items.reduce(
-      (sum, i) => sum + (i.price || 0),
-      0
-    );
+    // Calculate total price
+    const totalPrice = items.reduce((sum, item) => sum + (item.price || 0), 0);
 
-    // --- UPDATE SCENE STORE ---
+    // Update scene store
     useSceneStore.setState({
       items,
-      fenceConfig: fence,
+      fenceConfig,
       totalPrice,
     });
 
-    // --- UPDATE EDITOR STORE ---
+    // Update editor store
     useEditorStore.setState({
-      cameraType: scene.camera || "perspective",
+      cameraType: sceneData.camera || "perspective",
     });
 
-    // --- UPDATE PROJECT STORE ---
+    // Update project store
     set({
       currentProjectId: project.id,
       currentProjectName: project.name,
