@@ -1,57 +1,222 @@
-/* Efecto Cristal para los paneles */
-.glass-panel {
-  background: rgba(30, 30, 30, 0.7);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-  padding: 8px;
-  display: flex;
-  gap: 8px;
-  pointer-events: auto; /* Para que se pueda clicar aunque esté sobre el 3D */
+/* ============================================================================
+   EDITOR STYLES
+   Custom styles for the 3D editor interface
+   ========================================================================= */
+
+/* ============================================================================
+   CSS CUSTOM PROPERTIES
+   ========================================================================= */
+:root {
+  /* Glass Panel Colors */
+  --glass-bg: rgba(30, 30, 30, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-shadow: rgba(0, 0, 0, 0.3);
+  
+  /* Tool Button Colors */
+  --tool-btn-color: #aaaaaa;
+  --tool-btn-hover-bg: rgba(255, 255, 255, 0.1);
+  --tool-btn-hover-color: #ffffff;
+  --tool-btn-active-bg: #4a90e2; /* A42 Blue */
+  --tool-btn-active-color: #ffffff;
+  --tool-btn-active-shadow: rgba(74, 144, 226, 0.4);
+  
+  /* Tool Label Colors */
+  --tool-label-bg: #000000;
+  --tool-label-color: #ffffff;
+  
+  /* Dimensions */
+  --glass-blur: 10px;
+  --glass-radius: 12px;
+  --glass-padding: 8px;
+  --glass-gap: 8px;
+  --tool-btn-size: 44px;
+  --tool-btn-radius: 8px;
+  --tool-label-offset: -25px;
+  --tool-label-padding: 2px 6px;
+  --tool-label-radius: 4px;
+  --tool-label-font-size: 10px;
+  
+  /* Transitions */
+  --transition-fast: 0.2s;
+  --transition-timing: ease-in-out;
 }
 
-/* Botones de la barra */
+/* ============================================================================
+   GLASS PANEL
+   Glassmorphism effect for floating panels and toolbars
+   ========================================================================= */
+.glass-panel {
+  /* Background & Blur */
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  
+  /* Border & Shadow */
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
+  box-shadow: 0 4px 6px var(--glass-shadow);
+  
+  /* Layout */
+  padding: var(--glass-padding);
+  display: flex;
+  gap: var(--glass-gap);
+  
+  /* Interaction */
+  pointer-events: auto; /* Clickable even over 3D canvas */
+  
+  /* Performance */
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* ============================================================================
+   TOOL BUTTON
+   Interactive buttons for the editor toolbar
+   ========================================================================= */
 .tool-btn {
+  /* Reset */
   background: transparent;
   border: none;
-  color: #aaa;
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
-  cursor: pointer;
+  
+  /* Appearance */
+  color: var(--tool-btn-color);
+  border-radius: var(--tool-btn-radius);
+  
+  /* Layout */
+  width: var(--tool-btn-size);
+  height: var(--tool-btn-size);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  position: relative; /* For label positioning */
+  
+  /* Interaction */
+  cursor: pointer;
+  transition: all var(--transition-fast) var(--transition-timing);
+  
+  /* Accessibility */
+  outline-offset: 2px;
 }
 
+/* Hover State */
 .tool-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
+  background: var(--tool-btn-hover-bg);
+  color: var(--tool-btn-hover-color);
+  transform: translateY(-1px);
 }
 
+/* Active State */
 .tool-btn.active {
-  background: #4a90e2; /* Azul A42 */
-  color: white;
-  box-shadow: 0 0 10px rgba(74, 144, 226, 0.4);
+  background: var(--tool-btn-active-bg);
+  color: var(--tool-btn-active-color);
+  box-shadow: 0 0 10px var(--tool-btn-active-shadow);
 }
 
+/* Disabled State */
+.tool-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Focus State (Accessibility) */
+.tool-btn:focus-visible {
+  outline: 2px solid var(--tool-btn-active-bg);
+  outline-offset: 2px;
+}
+
+/* ============================================================================
+   TOOL LABEL
+   Tooltip that appears on hover
+   ========================================================================= */
 .tool-label {
+  /* Positioning */
   position: absolute;
-  bottom: -25px;
-  background: black;
-  color: white;
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 4px;
+  bottom: var(--tool-label-offset);
+  left: 50%;
+  transform: translateX(-50%);
+  
+  /* Appearance */
+  background: var(--tool-label-bg);
+  color: var(--tool-label-color);
+  font-size: var(--tool-label-font-size);
+  padding: var(--tool-label-padding);
+  border-radius: var(--tool-label-radius);
+  white-space: nowrap;
+  
+  /* Animation */
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.2s;
-  white-space: nowrap;
+  transition: opacity var(--transition-fast) var(--transition-timing);
+  
+  /* Arrow (optional enhancement) */
+  /* Uncomment to add arrow pointing up to button */
+  /*
+  &::before {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: var(--tool-label-bg);
+  }
+  */
 }
 
+/* Show label on hover */
 .tool-btn:hover .tool-label {
   opacity: 1;
+}
+
+/* Delay label appearance slightly */
+.tool-btn:hover .tool-label {
+  transition-delay: 0.3s;
+}
+
+/* ============================================================================
+   RESPONSIVE ADJUSTMENTS
+   ========================================================================= */
+@media (max-width: 768px) {
+  :root {
+    --tool-btn-size: 40px;
+    --glass-padding: 6px;
+    --glass-gap: 6px;
+  }
+  
+  /* Hide labels on mobile to save space */
+  .tool-label {
+    display: none;
+  }
+}
+
+/* ============================================================================
+   DARK MODE VARIANTS
+   Alternative colors for light mode (if needed)
+   ========================================================================= */
+@media (prefers-color-scheme: light) {
+  :root {
+    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(0, 0, 0, 0.1);
+    --tool-btn-color: #666666;
+    --tool-label-bg: #ffffff;
+    --tool-label-color: #000000;
+  }
+}
+
+/* ============================================================================
+   ANIMATION UTILITIES
+   ========================================================================= */
+@keyframes tool-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.tool-btn.loading {
+  animation: tool-pulse 1.5s ease-in-out infinite;
+  pointer-events: none;
 }

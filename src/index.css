@@ -1,42 +1,158 @@
-/* --- START OF FILE src/index.css --- */
+/* ============================================================================
+   TAILWIND IMPORTS
+   Note: @tailwind directives are processed by PostCSS/Tailwind
+   ========================================================================= */
+/* stylelint-disable-next-line at-rule-no-unknown */
 @tailwind base;
+/* stylelint-disable-next-line at-rule-no-unknown */
 @tailwind components;
+/* stylelint-disable-next-line at-rule-no-unknown */
 @tailwind utilities;
 
-/* Mantenemos nuestro fondo oscuro y el reset básico */
+/* ============================================================================
+   CSS CUSTOM PROPERTIES (Variables)
+   ========================================================================= */
 :root {
+  /* Color Scheme */
   color-scheme: dark;
-  background-color: #111;
-  color: white;
+  
+  /* Colors */
+  --color-bg-primary: #111111;
+  --color-text-primary: #ffffff;
+  
+  /* Scrollbar Colors */
+  --scrollbar-track: rgba(255, 255, 255, 0.05);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
+  --scrollbar-border: rgba(255, 255, 255, 0.05);
+  
+  /* Scrollbar Dimensions */
+  --scrollbar-width: 8px;
+  --scrollbar-radius: 10px;
+  --scrollbar-border-width: 2px;
 }
 
+/* ============================================================================
+   BASE STYLES
+   ========================================================================= */
 body {
   margin: 0;
+  padding: 0;
   overflow: hidden;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #root {
   width: 100vw;
   height: 100vh;
+  overflow: hidden;
 }
 
-/* Custom Scrollbar (para el catálogo) */
+/* ============================================================================
+   CUSTOM SCROLLBAR
+   Component: Used in catalog and other scrollable areas
+   ========================================================================= */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+/* Webkit browsers (Chrome, Safari, Edge) */
 .custom-scrollbar::-webkit-scrollbar {
-  width: 8px;
+  width: var(--scrollbar-width);
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 10px;
+  background: var(--scrollbar-track);
+  border-radius: var(--scrollbar-radius);
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.2);
-  border-radius: 10px;
-  border: 2px solid rgba(255, 255, 255, 0.05);
+  background-color: var(--scrollbar-thumb);
+  border-radius: var(--scrollbar-radius);
+  border: var(--scrollbar-border-width) solid var(--scrollbar-border);
+  transition: background-color 0.2s ease;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(255, 255, 255, 0.3);
+  background-color: var(--scrollbar-thumb-hover);
 }
-/* --- END OF FILE src/index.css --- */
+
+/* Firefox */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+/* ============================================================================
+   UTILITY CLASSES
+   ========================================================================= */
+
+/* Prevents text selection (useful for UI elements) */
+.no-select {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Smooth scrolling for containers */
+.smooth-scroll {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Hide scrollbar while keeping functionality */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ============================================================================
+   PERFORMANCE OPTIMIZATIONS
+   ========================================================================= */
+
+/* Hardware acceleration for smoother animations */
+.gpu-accelerated {
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+/* Optimize repaints for fixed/absolute positioned elements */
+.optimize-repaint {
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* ============================================================================
+   ACCESSIBILITY
+   ========================================================================= */
+
+/* Focus visible for keyboard navigation */
+.focus-visible:focus-visible {
+  outline: 2px solid var(--color-text-primary);
+  outline-offset: 2px;
+}
+
+/* Skip to content link (for screen readers) */
+.skip-to-content {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  padding: 8px;
+  text-decoration: none;
+  z-index: 100;
+}
+
+.skip-to-content:focus {
+  top: 0;
+}
