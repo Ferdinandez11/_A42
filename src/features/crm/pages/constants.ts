@@ -1,6 +1,6 @@
 // constants.ts
 import { PRICES } from '../../../utils/PriceCalculator';
-import { CatalogItem } from './types';
+import type { CatalogItem } from './types';
 
 export const CATALOG_ITEMS: CatalogItem[] = [
   { id: 'bench_01', name: 'Banco Clásico', type: 'model', price: 150 },

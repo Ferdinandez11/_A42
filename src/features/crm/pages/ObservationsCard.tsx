@@ -1,5 +1,5 @@
 // ObservationsCard.tsx
-import { Observation } from './types';
+import type { Observation } from './types';
 
 interface ObservationsCardProps {
   observations: Observation[];

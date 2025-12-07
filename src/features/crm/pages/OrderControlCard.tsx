@@ -1,14 +1,14 @@
 // OrderControlCard.tsx
-import { Order, OrderStatus } from './types';
+import type { OrderData, OrderStatus } from './types';
 import { STATUS_OPTIONS } from './constants';
 import { formatMoney } from './utils';
 
 interface OrderControlCardProps {
-  order: Order;
+  order: OrderData;
   newDate: string;
   calculatedBasePrice: number;
   isGeneratingPDF: boolean;
-  onOrderChange: (order: Order) => void;
+  onOrderChange: (order: OrderData) => void;
   onDateChange: (date: string) => void;
   onStatusChange: (status: OrderStatus) => void;
   onApplyDiscount: () => void;

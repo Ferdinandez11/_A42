@@ -1,12 +1,12 @@
 // types.ts
-export interface Order {
+export interface OrderData {
   id: string;
   order_ref: string;
   status: OrderStatus;
-  custom_name: string | null;
-  estimated_delivery_date: string | null;
+  custom_name?: string | null;
+  estimated_delivery_date?: string | null;
   total_price: number;
-  project_id: string | null;
+  project_id?: string | null;
   profiles?: {
     full_name: string;
     role: string;

@@ -1,5 +1,5 @@
 // AttachmentsCard.tsx
-import { Attachment } from './types';
+import type { Attachment } from './types';
 
 interface AttachmentsCardProps {
   attachments: Attachment[];

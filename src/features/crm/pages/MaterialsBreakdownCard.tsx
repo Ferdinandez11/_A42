@@ -1,12 +1,12 @@
 // MaterialsBreakdownCard.tsx
-import { Item3D, ManualItem } from './types';
+import type { Item3D, ManualItem } from './types';
 import { formatMoney } from './utils';
 
 interface MaterialsBreakdownCardProps {
   items3D: Item3D[];
   manualItems: ManualItem[];
   calculatedBasePrice: number;
-  projectId: string | null;
+  projectId?: string | null;
   onAddItem: () => void;
   onDeleteManualItem: (itemId: string) => void;
 }

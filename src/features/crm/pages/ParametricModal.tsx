@@ -1,5 +1,5 @@
 // ParametricModal.tsx
-import { CatalogItem } from './types';
+import type { CatalogItem } from './types';
 
 interface ParametricModalProps {
   isOpen: boolean;
