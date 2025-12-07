@@ -354,16 +354,19 @@ const LoginPage: React.FC = () => {
 };
 
 // ------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------
 // VISOR 3D PAGE
 const ViewerPage: React.FC = () => {
   const isReadOnlyMode = useProjectStore((s) => s.isReadOnlyMode);
   const loadProjectFromURL = useProjectStore((s) => s.loadProjectFromURL);
   const resetProject = useProjectStore((s) => s.resetProject);
+  const setProjectUser = useProjectStore((s) => s.setUser);
 
   const { user, setUser } = useAuthStore();
   const navigate = useNavigate();
 
-  // Cargar usuario
+  // 🚀 Cargar usuario y sincronizar DOS STORES:
+  // useAuthStore → useProjectStore
   React.useEffect(() => {
     const loadUser = async (): Promise<void> => {
       const { data } = await supabase.auth.getUser();
@@ -376,15 +379,19 @@ const ViewerPage: React.FC = () => {
           .eq("id", authUser.id)
           .single();
 
-        setUser(
+        const extended =
           profile
             ? ({ ...authUser, role: profile.role } as ExtendedUser)
-            : authUser
-        );
+            : authUser;
+
+        // Guardar en ambos stores
+        setUser(extended);          // Auth
+        setProjectUser(extended);   // Project  <-- 🔥 NECESARIO para toolbar y guardado
       }
     };
+
     loadUser();
-  }, [setUser]);
+  }, [setUser, setProjectUser]);
 
   // Cargar proyecto desde URL
   React.useEffect(() => {
@@ -428,6 +435,7 @@ const ViewerPage: React.FC = () => {
     </div>
   );
 };
+
 
 // ------------------------------------------------------------------------------------
 // APP ROOT
