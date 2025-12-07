@@ -196,9 +196,9 @@
    ========================================================================= */
 @media (prefers-color-scheme: light) {
   :root {
-    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-bg: rgba(85, 85, 85, 0.7);
     --glass-border: rgba(0, 0, 0, 0.1);
-    --tool-btn-color: #666666;
+    --tool-btn-color: #ffffff;
     --tool-label-bg: #ffffff;
     --tool-label-color: #000000;
   }
