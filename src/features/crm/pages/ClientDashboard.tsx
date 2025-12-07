@@ -220,7 +220,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
   onRequestQuote,
   onDelete,
 }) => (
-  <div className="bg-neutral-900 border border-neutral-700 rounded-xl overflow-hidden hover:border-blue-500 transition-all duration-300 flex flex-col">
+  <div className="bg-neutral-900 border border-neutral-700 rounded-xl hover:border-blue-500 transition-all duration-300 flex flex-col">
     <div
       className="h-40 bg-neutral-800 flex items-center justify-center text-6xl text-neutral-600 bg-cover bg-center bg-no-repeat"
       style={{
