@@ -1,194 +1,285 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../../lib/supabase';
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "../../../lib/supabase";
 
-// --- ESTILOS ---
-const containerStyle = { padding: '20px', color: '#e0e0e0', height: '100vh', display: 'flex', flexDirection: 'column' as const };
-const headerStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', background: '#1e1e1e', padding: '15px', borderRadius: '12px', border: '1px solid #333' };
-const controlsStyle = { display: 'flex', gap: '15px', alignItems: 'center' };
-const inputStyle = { background: '#252525', border: '1px solid #444', color: 'white', padding: '8px 12px', borderRadius: '6px', outline: 'none' };
-const btnStyle = { background: '#333', color: 'white', border: '1px solid #555', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer' };
+// Types
+interface Profile {
+  company_name?: string;
+  email?: string;
+  full_name?: string;
+}
 
-// Estilos Grilla Calendario
-const calendarGridStyle = { 
-    display: 'grid', 
-    gridTemplateColumns: 'repeat(7, 1fr)', 
-    gap: '1px', 
-    background: '#333', // Color de las líneas
-    border: '1px solid #333',
-    borderRadius: '8px',
-    overflow: 'hidden',
-    flex: 1
+interface Order {
+  id: string;
+  order_ref: string;
+  custom_name?: string;
+  estimated_delivery_date: string;
+  status: string;
+  profiles?: Profile;
+}
+
+type FilterType = "all" | "client" | "ref";
+
+const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
+/**
+ * Returns the background color for an order status
+ */
+const getStatusColor = (status: string): string => {
+  const colors: Record<string, string> = {
+    presupuestado: "bg-purple-600",
+    fabricacion: "bg-orange-600",
+    pedido: "bg-blue-600",
+    entregado: "bg-green-600",
+    retrasado: "bg-red-700",
+  };
+  return colors[status] || "bg-blue-600";
 };
-const dayHeaderStyle = { background: '#2a2a2a', padding: '10px', textAlign: 'center' as const, fontWeight: 'bold', color: '#888', textTransform: 'uppercase' as const, fontSize: '12px' };
-const dayCellStyle = { background: '#121212', minHeight: '100px', padding: '5px', position: 'relative' as const };
-const dayNumberStyle = { position: 'absolute' as const, top: '5px', right: '8px', color: '#444', fontWeight: 'bold' };
-const eventStyle = (status: string) => {
-    let bg = '#3498db'; // Azul por defecto (pedido)
-    if (status === 'presupuestado') bg = '#8e44ad';
-    if (status === 'fabricacion') bg = '#e67e22';
-    if (status === 'entregado') bg = '#27ae60';
-    if (status === 'retrasado') bg = '#c0392b';
 
-    return {
-        background: bg, color: 'white', padding: '4px 6px', borderRadius: '4px', marginBottom: '4px', 
-        fontSize: '11px', cursor: 'pointer', whiteSpace: 'nowrap' as const, overflow: 'hidden', textOverflow: 'ellipsis',
-        borderLeft: '3px solid rgba(0,0,0,0.2)'
-    };
-};
-
-const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-
-export const AdminCalendarPage = () => {
+/**
+ * Admin calendar page showing order delivery dates
+ */
+export const AdminCalendarPage: React.FC = () => {
   const navigate = useNavigate();
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [orders, setOrders] = useState<any[]>([]);
-  const [, setLoading] = useState(true);
-  
-  // Filtros
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'client' | 'ref'>('all');
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [orders, setOrders] = useState<Order[]>([]);
 
-  useEffect(() => { loadOrders(); }, []);
+  // Filters
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [filterType, setFilterType] = useState<FilterType>("all");
 
-  const loadOrders = async () => {
-    setLoading(true);
-    // Traemos pedidos que no estén cancelados ni rechazados y que tengan fecha
+  useEffect(() => {
+    loadOrders();
+  }, []);
+
+  /**
+   * Loads orders from database
+   */
+  const loadOrders = async (): Promise<void> => {
     const { data } = await supabase
-        .from('orders')
-        .select('id, order_ref, custom_name, estimated_delivery_date, status, profiles(company_name, email, full_name)')
-        .not('estimated_delivery_date', 'is', null)
-        .neq('status', 'rechazado')
-        .neq('status', 'cancelado');
-    
-    setOrders(data || []);
-    setLoading(false);
+      .from("orders")
+      .select(
+        "id, order_ref, custom_name, estimated_delivery_date, status, profiles(company_name, email, full_name)"
+      )
+      .not("estimated_delivery_date", "is", null)
+      .neq("status", "rechazado")
+      .neq("status", "cancelado");
+
+    setOrders((data as Order[]) || []);
   };
 
-  // --- LÓGICA DE CALENDARIO ---
-  const getDaysInMonth = (date: Date) => {
-      const year = date.getFullYear();
-      const month = date.getMonth();
-      const firstDay = new Date(year, month, 1);
-      const lastDay = new Date(year, month + 1, 0);
-      
-      // Ajustar para que la semana empiece en Lunes (0 = Domingo en JS, lo convertimos)
-      let startDay = firstDay.getDay() - 1; 
-      if (startDay === -1) startDay = 6; // Si es domingo, ponerlo al final
+  /**
+   * Gets all days in the month including padding
+   */
+  const getDaysInMonth = (date: Date): (Date | null)[] => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
 
-      const days = [];
-      // Rellenar huecos previos
-      for (let i = 0; i < startDay; i++) { days.push(null); }
-      // Rellenar días del mes
-      for (let i = 1; i <= lastDay.getDate(); i++) { days.push(new Date(year, month, i)); }
-      
-      return days;
+    // Adjust for Monday start (0 = Sunday in JS)
+    let startDay = firstDay.getDay() - 1;
+    if (startDay === -1) startDay = 6;
+
+    const days: (Date | null)[] = [];
+
+    // Fill previous month gaps
+    for (let i = 0; i < startDay; i++) {
+      days.push(null);
+    }
+
+    // Fill month days
+    for (let i = 1; i <= lastDay.getDate(); i++) {
+      days.push(new Date(year, month, i));
+    }
+
+    return days;
   };
 
-  const changeMonth = (offset: number) => {
-      const newDate = new Date(currentDate.setMonth(currentDate.getMonth() + offset));
-      setCurrentDate(new Date(newDate));
+  /**
+   * Changes the displayed month
+   */
+  const changeMonth = (offset: number): void => {
+    const newDate = new Date(currentDate);
+    newDate.setMonth(newDate.getMonth() + offset);
+    setCurrentDate(newDate);
   };
 
-  // --- FILTRADO ---
-  const filteredOrders = orders.filter(o => {
-      const searchLower = searchTerm.toLowerCase();
-      const matchesRef = o.order_ref.toLowerCase().includes(searchLower) || (o.custom_name && o.custom_name.toLowerCase().includes(searchLower));
-      const clientName = o.profiles?.company_name || o.profiles?.full_name || o.profiles?.email || '';
-      const matchesClient = clientName.toLowerCase().includes(searchLower);
+  /**
+   * Filters orders based on search term and filter type
+   */
+  const filteredOrders = orders.filter((order) => {
+    const searchLower = searchTerm.toLowerCase();
+    const matchesRef =
+      order.order_ref.toLowerCase().includes(searchLower) ||
+      (order.custom_name && order.custom_name.toLowerCase().includes(searchLower));
+    const clientName =
+      order.profiles?.company_name ||
+      order.profiles?.full_name ||
+      order.profiles?.email ||
+      "";
+    const matchesClient = clientName.toLowerCase().includes(searchLower);
 
-      if (filterType === 'all') return matchesRef || matchesClient;
-      if (filterType === 'client') return matchesClient;
-      if (filterType === 'ref') return matchesRef;
-      return true;
+    if (filterType === "all") return matchesRef || matchesClient;
+    if (filterType === "client") return matchesClient;
+    if (filterType === "ref") return matchesRef;
+    return true;
   });
 
-  const getEventsForDay = (day: Date) => {
-      return filteredOrders.filter(o => {
-          const d = new Date(o.estimated_delivery_date);
-          return d.getDate() === day.getDate() && d.getMonth() === day.getMonth() && d.getFullYear() === day.getFullYear();
-      });
+  /**
+   * Gets all events for a specific day
+   */
+  const getEventsForDay = (day: Date): Order[] => {
+    return filteredOrders.filter((order) => {
+      const orderDate = new Date(order.estimated_delivery_date);
+      return (
+        orderDate.getDate() === day.getDate() &&
+        orderDate.getMonth() === day.getMonth() &&
+        orderDate.getFullYear() === day.getFullYear()
+      );
+    });
   };
 
   const calendarDays = getDaysInMonth(currentDate);
 
   return (
-    <div style={containerStyle}>
-        
-        {/* CABECERA Y CONTROLES */}
-        <div style={headerStyle}>
-            <div style={{display:'flex', alignItems:'center', gap:'15px'}}>
-                <button onClick={() => changeMonth(-1)} style={btnStyle}>◀</button>
-                <h2 style={{margin:0, color:'white', width:'200px', textAlign:'center'}}>
-                    {currentDate.toLocaleString('es-ES', { month: 'long', year: 'numeric' }).toUpperCase()}
-                </h2>
-                <button onClick={() => changeMonth(1)} style={btnStyle}>▶</button>
-            </div>
-
-            <div style={controlsStyle}>
-                <select 
-                    value={filterType} 
-                    onChange={e => setFilterType(e.target.value as any)}
-                    style={{...inputStyle, width:'120px', cursor:'pointer'}}
-                >
-                    <option value="all">🔍 Todo</option>
-                    <option value="client">👤 Cliente</option>
-                    <option value="ref">📦 Pedido/Ref</option>
-                </select>
-                <input 
-                    type="text" 
-                    placeholder="Buscar..." 
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    style={{...inputStyle, width:'200px'}}
-                />
-                <button onClick={loadOrders} style={{...btnStyle, background:'#27ae60', border:'none'}}>🔄</button>
-            </div>
+    <div className="p-5 text-zinc-200 h-screen flex flex-col">
+      {/* Header and controls */}
+      <div className="flex justify-between items-center mb-5 bg-zinc-900 p-4 rounded-xl border border-zinc-800">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => changeMonth(-1)}
+            className="bg-zinc-800 text-white border border-zinc-700 py-2 px-3 rounded-md cursor-pointer hover:bg-zinc-700"
+          >
+            ◀
+          </button>
+          <h2 className="m-0 text-white w-52 text-center text-xl font-semibold">
+            {currentDate
+              .toLocaleString("es-ES", { month: "long", year: "numeric" })
+              .toUpperCase()}
+          </h2>
+          <button
+            onClick={() => changeMonth(1)}
+            className="bg-zinc-800 text-white border border-zinc-700 py-2 px-3 rounded-md cursor-pointer hover:bg-zinc-700"
+          >
+            ▶
+          </button>
         </div>
 
-        {/* LEYENDA */}
-        <div style={{display:'flex', gap:'15px', marginBottom:'10px', fontSize:'12px', color:'#888'}}>
-            <div style={{display:'flex', alignItems:'center', gap:'5px'}}><span style={{width:10, height:10, background:'#8e44ad', borderRadius:'2px'}}></span> Presupuestado (Fin Validez)</div>
-            <div style={{display:'flex', alignItems:'center', gap:'5px'}}><span style={{width:10, height:10, background:'#e67e22', borderRadius:'2px'}}></span> Fabricación</div>
-            <div style={{display:'flex', alignItems:'center', gap:'5px'}}><span style={{width:10, height:10, background:'#3498db', borderRadius:'2px'}}></span> Pedido Confirmado</div>
-            <div style={{display:'flex', alignItems:'center', gap:'5px'}}><span style={{width:10, height:10, background:'#27ae60', borderRadius:'2px'}}></span> Entregado</div>
+        <div className="flex gap-4 items-center">
+          <select
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value as FilterType)}
+            className="bg-zinc-950 border border-zinc-700 text-white py-2 px-3 rounded-md outline-none w-32 cursor-pointer"
+          >
+            <option value="all">🔍 Todo</option>
+            <option value="client">👤 Cliente</option>
+            <option value="ref">📦 Pedido/Ref</option>
+          </select>
+          <input
+            type="text"
+            placeholder="Buscar..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="bg-zinc-950 border border-zinc-700 text-white py-2 px-3 rounded-md outline-none w-52"
+          />
+          <button
+            onClick={loadOrders}
+            className="bg-green-600 text-white border-none py-2 px-3 rounded-md cursor-pointer hover:bg-green-700"
+          >
+            🔄
+          </button>
         </div>
+      </div>
 
-        {/* CALENDARIO */}
-        <div style={calendarGridStyle}>
-            {/* Cabeceras Días */}
-            {WEEKDAYS.map(d => <div key={d} style={dayHeaderStyle}>{d}</div>)}
-            
-            {/* Celdas */}
-            {calendarDays.map((day, idx) => {
-                if (!day) return <div key={`empty-${idx}`} style={{...dayCellStyle, background:'#1a1a1a'}}></div>;
-                
-                const events = getEventsForDay(day);
-                const isToday = new Date().toDateString() === day.toDateString();
+      {/* Legend */}
+      <div className="flex gap-4 mb-2.5 text-xs text-zinc-500">
+        <div className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 bg-purple-600 rounded-sm"></span>
+          Presupuestado (Fin Validez)
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 bg-orange-600 rounded-sm"></span>
+          Fabricación
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 bg-blue-600 rounded-sm"></span>
+          Pedido Confirmado
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 bg-green-600 rounded-sm"></span>
+          Entregado
+        </div>
+      </div>
 
-                return (
-                    <div key={day.toISOString()} style={{...dayCellStyle, background: isToday ? '#1e251e' : '#121212', border: isToday ? '1px solid #27ae60' : 'none'}}>
-                        <span style={{...dayNumberStyle, color: isToday ? '#27ae60' : '#444'}}>{day.getDate()}</span>
-                        
-                        <div style={{marginTop:'25px', display:'flex', flexDirection:'column', gap:'2px'}}>
-                            {events.map(ev => (
-                                <div 
-                                    key={ev.id} 
-                                    onClick={() => navigate(`/admin/order/${ev.id}`)}
-                                    title={`Cliente: ${ev.profiles?.company_name || ev.profiles?.email}\nRef: ${ev.order_ref}`}
-                                    style={eventStyle(ev.status)}
-                                >
-                                    <strong>{ev.order_ref}</strong>
-                                    <div style={{fontSize:'9px', opacity:0.9}}>
-                                        {ev.custom_name || ev.profiles?.company_name || 'Sin nombre'}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+      {/* Calendar */}
+      <div className="grid grid-cols-7 gap-px bg-zinc-800 border border-zinc-800 rounded-lg overflow-hidden flex-1">
+        {/* Weekday headers */}
+        {WEEKDAYS.map((day) => (
+          <div
+            key={day}
+            className="bg-zinc-900 p-2.5 text-center font-bold text-zinc-600 uppercase text-xs"
+          >
+            {day}
+          </div>
+        ))}
+
+        {/* Day cells */}
+        {calendarDays.map((day, idx) => {
+          if (!day) {
+            return (
+              <div
+                key={`empty-${idx}`}
+                className="bg-zinc-950 min-h-[100px] p-1"
+              ></div>
+            );
+          }
+
+          const events = getEventsForDay(day);
+          const isToday = new Date().toDateString() === day.toDateString();
+
+          return (
+            <div
+              key={day.toISOString()}
+              className={`min-h-[100px] p-1 relative ${
+                isToday
+                  ? "bg-zinc-900/50 border border-green-600"
+                  : "bg-zinc-950"
+              }`}
+            >
+              <span
+                className={`absolute top-1 right-2 font-bold text-sm ${
+                  isToday ? "text-green-600" : "text-zinc-700"
+                }`}
+              >
+                {day.getDate()}
+              </span>
+
+              <div className="mt-6 flex flex-col gap-0.5">
+                {events.map((event) => (
+                  <div
+                    key={event.id}
+                    onClick={() => navigate(`/admin/order/${event.id}`)}
+                    title={`Cliente: ${
+                      event.profiles?.company_name || event.profiles?.email
+                    }\nRef: ${event.order_ref}`}
+                    className={`${getStatusColor(
+                      event.status
+                    )} text-white py-1 px-1.5 rounded text-[11px] cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis border-l-[3px] border-black/20 hover:opacity-90`}
+                  >
+                    <strong>{event.order_ref}</strong>
+                    <div className="text-[9px] opacity-90">
+                      {event.custom_name ||
+                        event.profiles?.company_name ||
+                        "Sin nombre"}
                     </div>
-                );
-            })}
-        </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };

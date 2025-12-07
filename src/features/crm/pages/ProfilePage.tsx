@@ -1,214 +1,329 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '../../../lib/supabase';
-import type { Profile } from '../../../types/types';
+import { supabase } from '@/lib/supabase';
 
-const inputStyle = {
-  width: '100%',
-  padding: '10px',
-  background: '#2a2a2a',
-  border: '1px solid #444',
-  borderRadius: '6px',
-  color: 'white',
-  marginTop: '5px'
+// ============================================================================
+// TYPES
+// ============================================================================
+
+interface Profile {
+  id?: string;
+  company_name?: string;
+  full_name?: string;
+  email?: string;
+  cif?: string;
+  phone?: string;
+  shipping_address?: string;
+  billing_address?: string;
+  billing_email?: string;
+  observations?: string;
+}
+
+interface Message {
+  text: string;
+  type: 'success' | 'error';
+}
+
+interface FormFieldProps {
+  label: string;
+  type?: 'text' | 'email' | 'tel';
+  placeholder?: string;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+interface TextareaFieldProps {
+  label: string;
+  rows?: number;
+  placeholder?: string;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+const EMPTY_PROFILE: Profile = {
+  company_name: '',
+  full_name: '',
+  email: '',
+  cif: '',
+  phone: '',
+  shipping_address: '',
+  billing_address: '',
+  billing_email: '',
+  observations: '',
 };
 
-const labelStyle = { display: 'block', marginBottom: '15px', color: '#aaa', fontSize: '14px' };
-const sectionTitleStyle = { color: '#e67e22', borderBottom: '1px solid #333', paddingBottom: '10px', marginBottom: '20px', marginTop: '30px' };
+// ============================================================================
+// SUB-COMPONENTS
+// ============================================================================
 
-export const ProfilePage = () => {
+const MessageBanner: React.FC<{ message: Message }> = ({ message }) => (
+  <div
+    className={`
+      p-3 rounded-lg mb-5
+      ${message.type === 'success'
+        ? 'bg-green-500/20 text-green-500'
+        : 'bg-red-500/20 text-red-500'
+      }
+    `}
+  >
+    {message.text}
+  </div>
+);
+
+const SectionTitle: React.FC<{ icon: string; children: React.ReactNode }> = ({ 
+  icon, 
+  children 
+}) => (
+  <h4 className="text-orange-500 border-b border-neutral-800 pb-2 mb-5 mt-8 first:mt-0 flex items-center gap-2">
+    <span>{icon}</span>
+    <span>{children}</span>
+  </h4>
+);
+
+const FormField: React.FC<FormFieldProps> = ({
+  label,
+  type = 'text',
+  placeholder,
+  value,
+  onChange,
+}) => (
+  <label className="block mb-4">
+    <span className="block text-neutral-400 text-sm mb-1">{label}</span>
+    <input
+      type={type}
+      placeholder={placeholder}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full px-3 py-2.5 bg-neutral-800 border border-neutral-700 rounded-lg text-white focus:outline-none focus:border-orange-500 transition-colors"
+    />
+  </label>
+);
+
+const TextareaField: React.FC<TextareaFieldProps> = ({
+  label,
+  rows = 3,
+  placeholder,
+  value,
+  onChange,
+}) => (
+  <label className="block mb-4">
+    <span className="block text-neutral-400 text-sm mb-1">{label}</span>
+    <textarea
+      rows={rows}
+      placeholder={placeholder}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full px-3 py-2.5 bg-neutral-800 border border-neutral-700 rounded-lg text-white resize-none focus:outline-none focus:border-orange-500 transition-colors"
+    />
+  </label>
+);
+
+// ============================================================================
+// CUSTOM HOOKS
+// ============================================================================
+
+const useProfile = () => {
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
-  
-  const [formData, setFormData] = useState<Partial<Profile>>({
-    company_name: '',
-    full_name: '',
-    email: '', // Añadido campo email
-    cif: '',
-    phone: '',
-    shipping_address: '',
-    billing_address: '',
-    billing_email: '',
-    observations: ''
-  });
+  const [formData, setFormData] = useState<Profile>(EMPTY_PROFILE);
+  const [message, setMessage] = useState<Message | null>(null);
 
-  useEffect(() => {
-    loadProfile();
-  }, []);
-
-  const loadProfile = async () => {
+  const loadProfile = async (): Promise<void> => {
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('No user found');
+      }
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
       if (data) setFormData(data);
+    } catch (error) {
+      console.error('[ProfilePage] Load error:', error);
+      setMessage({
+        text: '❌ Error al cargar el perfil',
+        type: 'error',
+      });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  const handleSave = async () => {
+  const saveProfile = async (): Promise<void> => {
     setLoading(true);
     setMessage(null);
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) return;
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        throw new Error('No user found');
+      }
+
       const { error } = await supabase
         .from('profiles')
         .update(formData)
         .eq('id', user.id);
 
       if (error) throw error;
-      setMessage({ text: '✅ Perfil actualizado correctamente', type: 'success' });
+
+      setMessage({
+        text: '✅ Perfil actualizado correctamente',
+        type: 'success',
+      });
     } catch (error: any) {
-      setMessage({ text: '❌ Error al guardar: ' + error.message, type: 'error' });
+      setMessage({
+        text: `❌ Error al guardar: ${error.message}`,
+        type: 'error',
+      });
     } finally {
       setLoading(false);
     }
   };
 
+  const updateField = <K extends keyof Profile>(
+    field: K,
+    value: Profile[K]
+  ): void => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  return {
+    loading,
+    formData,
+    message,
+    loadProfile,
+    saveProfile,
+    updateField,
+  };
+};
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
+export const ProfilePage: React.FC = () => {
+  const { loading, formData, message, loadProfile, saveProfile, updateField } = useProfile();
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto', color: '#e0e0e0' }}>
-      <h2 style={{ color: 'white' }}>Mi Zona Personal</h2>
-      <p style={{ color: '#888' }}>Gestiona tus datos de facturación y envío.</p>
+    <div className="max-w-4xl mx-auto text-neutral-200 p-5">
+      {/* Header */}
+      <div className="mb-6">
+        <h2 className="text-white text-2xl font-bold mb-2">Mi Zona Personal</h2>
+        <p className="text-neutral-500">
+          Gestiona tus datos de facturación y envío.
+        </p>
+      </div>
 
-      {message && (
-        <div style={{ 
-          padding: '10px', 
-          borderRadius: '6px', 
-          background: message.type === 'success' ? 'rgba(39, 174, 96, 0.2)' : 'rgba(231, 76, 60, 0.2)',
-          color: message.type === 'success' ? '#2ecc71' : '#e74c3c',
-          marginBottom: '20px'
-        }}>
-          {message.text}
-        </div>
-      )}
+      {/* Message Banner */}
+      {message && <MessageBanner message={message} />}
 
-      <div style={{ background: '#1e1e1e', padding: '30px', borderRadius: '12px', border: '1px solid #333' }}>
+      {/* Form Container */}
+      <div className="bg-neutral-900 p-8 rounded-xl border border-neutral-800">
         
-        {/* DATOS EMPRESA */}
-        <h4 style={{ ...sectionTitleStyle, marginTop: 0 }}>🏢 Datos Fiscales</h4>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-          <label style={labelStyle}>
-            Nombre Empresa
-            <input 
-              type="text" 
-              style={inputStyle} 
-              value={formData.company_name || ''} 
-              onChange={e => setFormData({...formData, company_name: e.target.value})} 
-            />
-          </label>
-          <label style={labelStyle}>
-            CIF / NIF
-            <input 
-              type="text" 
-              style={inputStyle} 
-              value={formData.cif || ''} 
-              onChange={e => setFormData({...formData, cif: e.target.value})} 
-            />
-          </label>
+        {/* Company Information */}
+        <SectionTitle icon="🏢">Datos Fiscales</SectionTitle>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <FormField
+            label="Nombre Empresa"
+            value={formData.company_name || ''}
+            onChange={(value) => updateField('company_name', value)}
+          />
+          <FormField
+            label="CIF / NIF"
+            value={formData.cif || ''}
+            onChange={(value) => updateField('cif', value)}
+          />
         </div>
 
-        {/* CONTACTO */}
-        <h4 style={sectionTitleStyle}>👤 Contacto Principal</h4>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-          <label style={labelStyle}>
-            Nombre Completo
-            <input 
-              type="text" 
-              style={inputStyle} 
-              value={formData.full_name || ''} 
-              onChange={e => setFormData({...formData, full_name: e.target.value})} 
-            />
-          </label>
-          <label style={labelStyle}>
-            Teléfono
-            <input 
-              type="tel" 
-              style={inputStyle} 
-              value={formData.phone || ''} 
-              onChange={e => setFormData({...formData, phone: e.target.value})} 
-            />
-          </label>
-        </div>
-        
-        {/* NUEVO: EMAIL DE CONTACTO */}
-        <label style={labelStyle}>
-            Email de Contacto (CRM)
-            <input 
-              type="email" 
-              style={inputStyle} 
-              value={formData.email || ''} 
-              onChange={e => setFormData({...formData, email: e.target.value})} 
-              placeholder="ejemplo@empresa.com"
-            />
-        </label>
-
-        <label style={labelStyle}>
-            Email para Facturación (si es distinto)
-            <input 
-              type="email" 
-              style={inputStyle} 
-              value={formData.billing_email || ''} 
-              onChange={e => setFormData({...formData, billing_email: e.target.value})} 
-              placeholder="contabilidad@empresa.com..."
-            />
-        </label>
-
-        {/* DIRECCIONES */}
-        <h4 style={sectionTitleStyle}>📍 Direcciones</h4>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-            <label style={labelStyle}>
-                Dirección de Envío
-                <textarea 
-                rows={3}
-                style={{...inputStyle, resize: 'none'}} 
-                value={formData.shipping_address || ''} 
-                onChange={e => setFormData({...formData, shipping_address: e.target.value})} 
-                />
-            </label>
-            <label style={labelStyle}>
-                Dirección de Facturación
-                <textarea 
-                rows={3}
-                style={{...inputStyle, resize: 'none'}} 
-                value={formData.billing_address || ''} 
-                onChange={e => setFormData({...formData, billing_address: e.target.value})} 
-                />
-            </label>
+        {/* Contact Information */}
+        <SectionTitle icon="👤">Contacto Principal</SectionTitle>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <FormField
+            label="Nombre Completo"
+            value={formData.full_name || ''}
+            onChange={(value) => updateField('full_name', value)}
+          />
+          <FormField
+            label="Teléfono"
+            type="tel"
+            value={formData.phone || ''}
+            onChange={(value) => updateField('phone', value)}
+          />
         </div>
 
-        {/* OBSERVACIONES */}
-        <h4 style={sectionTitleStyle}>📝 Otros</h4>
-        <label style={labelStyle}>
-            Observaciones Generales
-            <textarea 
-              rows={2}
-              style={{...inputStyle, resize: 'none'}} 
-              value={formData.observations || ''} 
-              onChange={e => setFormData({...formData, observations: e.target.value})} 
-            />
-        </label>
+        {/* Email Fields */}
+        <FormField
+          label="Email de Contacto (CRM)"
+          type="email"
+          placeholder="ejemplo@empresa.com"
+          value={formData.email || ''}
+          onChange={(value) => updateField('email', value)}
+        />
 
-        <div style={{ marginTop: '30px', display: 'flex', justifyContent: 'flex-end' }}>
-          <button 
-            onClick={handleSave} 
+        <FormField
+          label="Email para Facturación (si es distinto)"
+          type="email"
+          placeholder="contabilidad@empresa.com"
+          value={formData.billing_email || ''}
+          onChange={(value) => updateField('billing_email', value)}
+        />
+
+        {/* Addresses */}
+        <SectionTitle icon="📍">Direcciones</SectionTitle>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <TextareaField
+            label="Dirección de Envío"
+            value={formData.shipping_address || ''}
+            onChange={(value) => updateField('shipping_address', value)}
+          />
+          <TextareaField
+            label="Dirección de Facturación"
+            value={formData.billing_address || ''}
+            onChange={(value) => updateField('billing_address', value)}
+          />
+        </div>
+
+        {/* Additional Information */}
+        <SectionTitle icon="📝">Otros</SectionTitle>
+        <TextareaField
+          label="Observaciones Generales"
+          rows={2}
+          value={formData.observations || ''}
+          onChange={(value) => updateField('observations', value)}
+        />
+
+        {/* Save Button */}
+        <div className="mt-8 flex justify-end">
+          <button
+            onClick={saveProfile}
             disabled={loading}
-            style={{ 
-              background: '#3b82f6', 
-              color: 'white', 
-              border: 'none', 
-              padding: '12px 30px', 
-              borderRadius: '6px', 
-              fontWeight: 'bold', 
-              cursor: loading ? 'wait' : 'pointer',
-              opacity: loading ? 0.7 : 1
-            }}
+            className={`
+              px-8 py-3 bg-blue-600 text-white rounded-lg font-bold
+              transition-all
+              ${loading
+                ? 'opacity-70 cursor-wait'
+                : 'hover:bg-blue-500 cursor-pointer'
+              }
+            `}
           >
             {loading ? 'Guardando...' : 'Guardar Cambios'}
           </button>
         </div>
-
       </div>
     </div>
   );

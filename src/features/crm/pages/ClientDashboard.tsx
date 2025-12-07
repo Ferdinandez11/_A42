@@ -1,228 +1,677 @@
-import { useEffect, useState } from 'react';
+// --- START OF FILE src/pages/client/ClientDashboard.tsx ---
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  FolderOpen,
+  FileText,
+  Package,
+  Archive,
+  Plus,
+  Edit,
+  ShoppingCart,
+  Trash2,
+  Eye,
+  RotateCcw,
+  Image as ImageIcon,
+} from 'lucide-react';
+
 import { supabase } from '../../../lib/supabase';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 
-// --- ESTILOS ---
-const containerStyle = { color: '#e0e0e0', padding: '20px', fontFamily: 'sans-serif', minHeight: '100vh', display:'flex', flexDirection:'column' as const };
-const headerStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', borderBottom: '1px solid #333', paddingBottom: '15px' };
-const tabContainerStyle = { display: 'flex', gap: '20px', marginBottom: '20px', borderBottom: '1px solid #333' };
-const tabStyle = (isActive: boolean) => ({
-  cursor: 'pointer', padding: '10px 15px', borderBottom: isActive ? '3px solid #3b82f6' : '3px solid transparent',
-  color: isActive ? '#fff' : '#888', fontWeight: isActive ? 'bold' : 'normal', transition: 'all 0.2s', marginBottom: '-2px'
-});
-const gridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' };
-const cardStyle = { background: '#1e1e1e', border: '1px solid #333', borderRadius: '12px', overflow: 'hidden', display: 'flex', flexDirection: 'column' as const };
-const cardImgStyle = { height: '160px', background: '#2a2a2a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '40px', color: '#555', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' };
-const cardBodyStyle = { padding: '15px' };
-const btnActionStyle = { flex: 1, padding: '8px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' };
-const tableStyle = { width: '100%', borderCollapse: 'collapse' as const, background: '#1e1e1e', borderRadius: '8px', overflow: 'hidden' };
-const thStyle = { textAlign: 'left' as const, padding: '15px', background: '#252525', color: '#aaa', borderBottom: '1px solid #333' };
-const tdStyle = { padding: '15px', borderBottom: '1px solid #333' };
+// ============================================================================
+// TIPOS E INTERFACES
+// ============================================================================
 
 type TabType = 'projects' | 'budgets' | 'orders' | 'archived';
 
-const getStatusColor = (status: string) => {
-    switch(status) {
-        case 'pedido': return '#3498db'; 
-        case 'fabricacion': return '#e67e22'; 
-        case 'entregado_parcial': return '#f1c40f'; 
-        case 'entregado': return '#27ae60'; 
-        case 'pendiente': return 'orange';
-        case 'rechazado': return '#c0392b';
-        case 'cancelado': return '#7f8c8d';
-        default: return '#27ae60';
-    }
+interface Project {
+  id: string;
+  name: string;
+  thumbnail_url?: string;
+  user_id: string;
+  updated_at: string;
+  orders?: any[];
+}
+
+interface Order {
+  id: string;
+  order_ref: string;
+  status: string;
+  total_price: number;
+  created_at: string;
+  estimated_delivery_date?: string;
+  is_archived: boolean;
+  user_id: string;
+  project_id?: string;
+  projects?: {
+    name: string;
+  };
+}
+
+interface ModalState {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  onConfirm: () => void;
+  isDestructive: boolean;
+}
+
+interface DashboardHeaderProps {
+  onCreateBudget: () => void;
+  onNewProject: () => void;
+}
+
+interface TabNavigationProps {
+  activeTab: TabType;
+  onTabChange: (tab: TabType) => void;
+}
+
+interface ProjectCardProps {
+  project: Project;
+  onEdit: (projectId: string) => void;
+  onRequestQuote: (project: Project) => void;
+  onDelete: (projectId: string) => void;
+}
+
+interface OrderTableProps {
+  orders: Order[];
+  activeTab: TabType;
+  onViewOrder: (orderId: string) => void;
+  onReactivate: (order: Order) => void;
+}
+
+// ============================================================================
+// CONSTANTES
+// ============================================================================
+
+const TAB_CONFIG = [
+  { id: 'projects' as TabType, label: 'Mis Proyectos', icon: FolderOpen },
+  { id: 'budgets' as TabType, label: 'Mis Presupuestos', icon: FileText },
+  { id: 'orders' as TabType, label: 'Mis Pedidos', icon: Package },
+  { id: 'archived' as TabType, label: 'Archivados', icon: Archive },
+] as const;
+
+const ORDER_STATUS_CONFIG: Record<
+  string,
+  { color: string; label: string; bgColor: string }
+> = {
+  pendiente: {
+    color: 'text-orange-400',
+    bgColor: 'bg-orange-500/10',
+    label: 'Pendiente',
+  },
+  presupuestado: {
+    color: 'text-purple-400',
+    bgColor: 'bg-purple-500/10',
+    label: 'Presupuestado',
+  },
+  pedido: {
+    color: 'text-blue-400',
+    bgColor: 'bg-blue-500/10',
+    label: 'Pedido',
+  },
+  fabricacion: {
+    color: 'text-yellow-400',
+    bgColor: 'bg-yellow-500/10',
+    label: 'Fabricación',
+  },
+  entregado_parcial: {
+    color: 'text-yellow-300',
+    bgColor: 'bg-yellow-500/10',
+    label: 'Entregado Parcial',
+  },
+  entregado: {
+    color: 'text-green-400',
+    bgColor: 'bg-green-500/10',
+    label: 'Entregado',
+  },
+  completado: {
+    color: 'text-green-500',
+    bgColor: 'bg-green-500/10',
+    label: 'Completado',
+  },
+  rechazado: {
+    color: 'text-red-400',
+    bgColor: 'bg-red-500/10',
+    label: 'Rechazado',
+  },
+  cancelado: {
+    color: 'text-gray-400',
+    bgColor: 'bg-gray-500/10',
+    label: 'Cancelado',
+  },
 };
 
-export const ClientDashboard = () => {
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = (searchParams.get('tab') as TabType) || 'projects';
-  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
-  
-  const [projects, setProjects] = useState<any[]>([]);
-  const [dataList, setDataList] = useState<any[]>([]); 
-  const [loading, setLoading] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
+const MESSAGES = {
+  NO_PROJECTS: 'No tienes proyectos pendientes.',
+  NO_DATA: 'No hay datos en esta sección.',
+  LOADING: 'Cargando datos...',
+  CREATE_BUDGET_SUCCESS: 'Presupuesto creado correctamente',
+  CREATE_BUDGET_ERROR: (error: string) => `Error al crear: ${error}`,
+  DELETE_PROJECT_TITLE: 'Borrar Proyecto',
+  DELETE_PROJECT_MESSAGE: '¿Estás seguro? Esta acción no se puede deshacer.',
+  REQUEST_QUOTE_TITLE: 'Solicitar Presupuesto',
+  REQUEST_QUOTE_MESSAGE: (name: string) => `¿Quieres enviar "${name}" a revisión?`,
+  REACTIVATE_TITLE: 'Reactivar Presupuesto',
+  REACTIVATE_MESSAGE: 'El presupuesto volverá a la lista de "Mis Presupuestos".',
+} as const;
 
-  const [modal, setModal] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {}, isDestructive: false });
-  const closeModal = () => setModal({ ...modal, isOpen: false });
+// ============================================================================
+// COMPONENTES
+// ============================================================================
 
-  useEffect(() => { setSearchParams({ tab: activeTab }); }, [activeTab, setSearchParams]);
+const DashboardHeader: React.FC<DashboardHeaderProps> = ({
+  onCreateBudget,
+  onNewProject,
+}) => (
+  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 pb-6 border-b border-neutral-700">
+    <h2 className="text-3xl font-bold text-white">Mi Espacio Personal</h2>
+    <div className="flex flex-wrap gap-3">
+      <button
+        onClick={onCreateBudget}
+        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 transition-colors"
+      >
+        <FileText size={20} />
+        Crear Presupuesto Manual
+      </button>
+      <button
+        onClick={onNewProject}
+        className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 transition-colors"
+      >
+        <Plus size={20} />
+        Nuevo Proyecto 3D
+      </button>
+    </div>
+  </div>
+);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { navigate('/login'); return; }
-      setUserId(user.id);
+const TabNavigation: React.FC<TabNavigationProps> = ({
+  activeTab,
+  onTabChange,
+}) => (
+  <div className="flex flex-wrap gap-2 mb-6 border-b border-neutral-700">
+    {TAB_CONFIG.map((tab) => {
+      const Icon = tab.icon;
+      const isActive = activeTab === tab.id;
+      return (
+        <button
+          key={tab.id}
+          onClick={() => onTabChange(tab.id)}
+          className={`
+            flex items-center gap-2 px-6 py-3 font-medium transition-all rounded-t-lg
+            ${
+              isActive
+                ? 'bg-blue-600 text-white border-b-4 border-blue-400'
+                : 'text-neutral-400 hover:text-white hover:bg-neutral-800'
+            }
+          `}
+        >
+          <Icon size={18} />
+          {tab.label}
+        </button>
+      );
+    })}
+  </div>
+);
 
-      try {
-        if (activeTab === 'projects') {
-          const { data } = await supabase.from('projects').select('*, orders(id)').eq('user_id', user.id).order('updated_at', { ascending: false });
-          const cleanProjects = (data || []).filter((p: any) => !p.orders || p.orders.length === 0);
-          setProjects(cleanProjects);
-        }
-        else {
-            let query = supabase.from('orders').select('*, projects(name)').order('created_at', { ascending: false });
-            
-            if (activeTab === 'budgets') query = query.eq('is_archived', false).in('status', ['pendiente', 'presupuestado', 'rechazado']);
-            else if (activeTab === 'orders') query = query.eq('is_archived', false).in('status', ['pedido', 'fabricacion', 'entregado_parcial', 'entregado', 'completado']);
-            else if (activeTab === 'archived') query = query.eq('is_archived', true);
+const ProjectCard: React.FC<ProjectCardProps> = ({
+  project,
+  onEdit,
+  onRequestQuote,
+  onDelete,
+}) => (
+  <div className="bg-neutral-900 border border-neutral-700 rounded-xl overflow-hidden hover:border-blue-500 transition-all duration-300 flex flex-col">
+    <div
+      className="h-40 bg-neutral-800 flex items-center justify-center text-6xl text-neutral-600 bg-cover bg-center bg-no-repeat"
+      style={{
+        backgroundImage: project.thumbnail_url
+          ? `url(${project.thumbnail_url})`
+          : 'none',
+      }}
+    >
+      {!project.thumbnail_url && <ImageIcon size={48} />}
+    </div>
+    <div className="p-4 flex-1 flex flex-col">
+      <h4 className="text-white font-bold mb-4 flex-1">
+        {project.name || 'Sin Nombre'}
+      </h4>
+      <div className="flex gap-2">
+        <button
+          onClick={() => onEdit(project.id)}
+          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
+        >
+          <Edit size={16} />
+          Editar
+        </button>
+        <button
+          onClick={() => onRequestQuote(project)}
+          className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
+        >
+          <ShoppingCart size={16} />
+          Pedir
+        </button>
+        <button
+          onClick={() => onDelete(project.id)}
+          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center justify-center transition-colors"
+          title="Eliminar proyecto"
+        >
+          <Trash2 size={16} />
+        </button>
+      </div>
+    </div>
+  </div>
+);
 
-            const { data } = await query;
-            setDataList(data || []);
-        }
-      } catch (error) { console.error(error); } finally { setLoading(false); }
-    };
-    fetchData();
-  }, [activeTab, navigate]);
-
-  const handleCreateManualBudget = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    const ref = 'MAN-' + Math.floor(10000 + Math.random() * 90000);
-    
-    const { data, error } = await supabase.from('orders').insert([{
-        user_id: user?.id,
-        order_ref: ref,
-        status: 'pendiente',
-        total_price: 0,
-        is_archived: false,
-        created_at: new Date().toISOString()
-    }]).select();
-
-    if (error) { alert("Error al crear: " + error.message); return; }
-    if (data) navigate(`/portal/order/${data[0].id}`);
-  };
-
-  const handleRequestQuote = (project: any) => {
-    setModal({
-      isOpen: true, title: 'Solicitar Presupuesto', message: `¿Quieres enviar "${project.name}" a revisión?`, isDestructive: false,
-      onConfirm: async () => {
-        const estimatedDate = new Date(); estimatedDate.setHours(estimatedDate.getHours() + 48);
-        const ref = 'SOL-' + Math.floor(10000 + Math.random() * 90000);
-        const { data } = await supabase.from('orders').insert([{ 
-            user_id: userId, project_id: project.id, order_ref: ref, total_price: 0, 
-            status: 'pendiente', estimated_delivery_date: estimatedDate.toISOString() 
-        }]).select();
-        
-        if(data) { navigate(`/portal/order/${data[0].id}`); }
-        closeModal();
-      }
-    });
-  };
-
-  const handleDeleteProject = (id: string) => {
-    setModal({
-      isOpen: true, title: 'Borrar Proyecto', message: '¿Estás seguro? Esta acción no se puede deshacer.', isDestructive: true,
-      onConfirm: async () => {
-        await supabase.from('projects').delete().eq('id', id);
-        setProjects(p => p.filter(x => x.id !== id));
-        closeModal();
-      }
-    });
-  };
-
-  const handleReactivate = (order: any) => {
-    setModal({
-      isOpen: true, title: 'Reactivar Presupuesto', message: 'El presupuesto volverá a la lista de "Mis Presupuestos".', isDestructive: false,
-      onConfirm: async () => {
-        await supabase.from('orders').update({ is_archived: false, status: 'pendiente', created_at: new Date().toISOString() }).eq('id', order.id);
-        setActiveTab('budgets');
-        closeModal();
-      }
-    });
-  };
+const OrderStatusBadge: React.FC<{ status: string }> = ({ status }) => {
+  const config = useMemo(
+    () =>
+      ORDER_STATUS_CONFIG[status] || {
+        color: 'text-neutral-400',
+        bgColor: 'bg-neutral-500/10',
+        label: status,
+      },
+    [status]
+  );
 
   return (
-    <div style={containerStyle}>
-      <ConfirmModal {...modal} onCancel={closeModal} />
+    <span
+      className={`${config.color} ${config.bgColor} px-3 py-1 rounded-full text-xs font-bold uppercase`}
+    >
+      {config.label}
+    </span>
+  );
+};
 
-      <div style={headerStyle}>
-        <h2 style={{ margin: 0, color: '#fff' }}>Mi Espacio Personal</h2>
-        <div style={{display:'flex', gap:'15px'}}>
-             {/* --- BOTONES DE ACCIÓN PRINCIPAL --- */}
-            <button onClick={handleCreateManualBudget} style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', display:'flex', alignItems:'center', gap:'8px' }}>
-                📝 Crear Presupuesto Manual
-            </button>
-            <a href="/" style={{ background: '#27ae60', color: 'white', textDecoration: 'none', padding: '10px 20px', borderRadius: '6px', fontWeight: 'bold', display:'flex', alignItems:'center', gap:'8px' }}>
-                + Nuevo Proyecto 3D
-            </a>
-        </div>
-      </div>
+const OrderTable: React.FC<OrderTableProps> = ({
+  orders,
+  activeTab,
+  onViewOrder,
+  onReactivate,
+}) => {
+  const isOrdersTab = useMemo(() => activeTab === 'orders', [activeTab]);
+  const isArchivedTab = useMemo(() => activeTab === 'archived', [activeTab]);
 
-      <div style={tabContainerStyle}>
-        <div onClick={() => setActiveTab('projects')} style={tabStyle(activeTab === 'projects')}>📂 Mis Proyectos</div>
-        <div onClick={() => setActiveTab('budgets')} style={tabStyle(activeTab === 'budgets')}>📑 Mis Presupuestos</div>
-        <div onClick={() => setActiveTab('orders')} style={tabStyle(activeTab === 'orders')}>📦 Mis Pedidos</div>
-        <div onClick={() => setActiveTab('archived')} style={tabStyle(activeTab === 'archived')}>🗄️ Archivados</div>
-      </div>
-
-      {loading ? ( <p style={{color:'#666'}}>Cargando datos...</p> ) : (
-        <>
-            {activeTab === 'projects' && (
-                <div style={gridStyle}>
-                    {projects.map(p => (
-                        <div key={p.id} style={cardStyle}>
-                            <div style={{...cardImgStyle, backgroundImage: p.thumbnail_url ? `url(${p.thumbnail_url})` : 'none'}}>{!p.thumbnail_url && '🏞️'}</div>
-                            <div style={cardBodyStyle}>
-                                <h4 style={{margin:'0 0 5px 0', color:'white'}}>{p.name || 'Sin Nombre'}</h4>
-                                <div style={{display:'flex', gap:'8px', marginTop:'10px'}}>
-                                    <button onClick={() => navigate(`/?project_id=${p.id}`)} style={{...btnActionStyle, background:'#3b82f6', color:'white'}}>✏️ Editar</button>
-                                    <button onClick={() => handleRequestQuote(p)} style={{...btnActionStyle, background:'#e67e22', color:'white'}}>🛒 Pedir</button>
-                                    <button onClick={() => handleDeleteProject(p.id)} style={{...btnActionStyle, background:'#e74c3c', color:'white', flex:0}}>🗑️</button>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                    {projects.length === 0 && <p style={{color:'#666'}}>No tienes proyectos pendientes.</p>}
-                </div>
+  return (
+    <div className="bg-neutral-900 rounded-xl border border-neutral-700 overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-neutral-800">
+            <tr>
+              <th className="text-left text-neutral-400 text-sm font-medium px-6 py-4">
+                Ref
+              </th>
+              <th className="text-left text-neutral-400 text-sm font-medium px-6 py-4">
+                Proyecto
+              </th>
+              <th className="text-left text-neutral-400 text-sm font-medium px-6 py-4">
+                {isOrdersTab ? 'F. Inicio Pedido' : 'F. Solicitud'}
+              </th>
+              <th className="text-left text-neutral-400 text-sm font-medium px-6 py-4">
+                F. Entrega Est.
+              </th>
+              <th className="text-left text-neutral-400 text-sm font-medium px-6 py-4">
+                Estado
+              </th>
+              <th className="text-left text-neutral-400 text-sm font-medium px-6 py-4">
+                Acciones
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-neutral-700">
+            {orders.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={6}
+                  className="px-6 py-12 text-center text-neutral-500"
+                >
+                  {MESSAGES.NO_DATA}
+                </td>
+              </tr>
+            ) : (
+              orders.map((order) => (
+                <tr
+                  key={order.id}
+                  className="hover:bg-neutral-800 transition-colors"
+                >
+                  <td className="px-6 py-4">
+                    <span className="text-white font-bold">
+                      {order.order_ref}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-neutral-300">
+                    {order.projects?.name || '---'}
+                  </td>
+                  <td className="px-6 py-4 text-neutral-300 text-sm">
+                    {new Date(order.created_at).toLocaleDateString('es-ES')}
+                  </td>
+                  <td className="px-6 py-4 text-sm">
+                    {order.estimated_delivery_date ? (
+                      <span className="text-neutral-300">
+                        {new Date(
+                          order.estimated_delivery_date
+                        ).toLocaleDateString('es-ES')}
+                      </span>
+                    ) : (
+                      <span className="text-neutral-600">--</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
+                    <OrderStatusBadge status={order.status} />
+                  </td>
+                  <td className="px-6 py-4">
+                    {isArchivedTab ? (
+                      <button
+                        onClick={() => onReactivate(order)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+                      >
+                        <RotateCcw size={14} />
+                        Reactivar
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => onViewOrder(order.id)}
+                        className="bg-neutral-700 hover:bg-neutral-600 text-white px-4 py-2 rounded-lg text-sm font-medium border border-neutral-600 flex items-center gap-2 transition-colors"
+                      >
+                        <Eye size={14} />
+                        Ver Ficha
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))
             )}
-
-            {activeTab !== 'projects' && (
-                <table style={tableStyle}>
-                    <thead>
-                        <tr>
-                            <th style={thStyle}>Ref</th>
-                            <th style={thStyle}>Proyecto</th>
-                            <th style={thStyle}>{activeTab === 'orders' ? 'F. Inicio Pedido' : 'F. Solicitud'}</th>
-                            <th style={thStyle}>F. Entrega Est.</th>
-                            <th style={thStyle}>Estado</th>
-                            <th style={thStyle}>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {dataList.map(o => (
-                            <tr key={o.id} style={{borderBottom:'1px solid #333'}}>
-                                <td style={tdStyle}><strong style={{color:'#fff'}}>{o.order_ref}</strong></td>
-                                <td style={tdStyle}>{o.projects?.name || '---'}</td>
-                                <td style={tdStyle}>{new Date(o.created_at).toLocaleDateString()}</td>
-                                <td style={{...tdStyle, color: o.estimated_delivery_date ? '#ccc' : '#666'}}>
-                                    {o.estimated_delivery_date ? new Date(o.estimated_delivery_date).toLocaleDateString() : '--'}
-                                </td>
-                                <td style={tdStyle}>
-                                    <span style={{ color: getStatusColor(o.status), fontWeight:'bold', textTransform:'uppercase', fontSize:'12px'}}>
-                                        {o.status.replace('_', ' ')}
-                                    </span>
-                                </td>
-                                <td style={tdStyle}>
-                                    {activeTab === 'archived' ? (
-                                        <button onClick={() => handleReactivate(o)} style={{background:'#3b82f6', color:'white', border:'none', padding:'5px 10px', borderRadius:'4px', cursor:'pointer'}}>Reactivar 🔄</button>
-                                    ) : (
-                                        <button onClick={() => navigate(`/portal/order/${o.id}`)} style={{background:'#333', color:'white', border:'1px solid #555', padding:'5px 10px', borderRadius:'4px', cursor:'pointer'}}>Ver Ficha 👁️</button>
-                                    )}
-                                </td>
-                            </tr>
-                        ))}
-                        {dataList.length === 0 && (
-                            <tr><td colSpan={6} style={{padding:'20px', textAlign:'center', color:'#666'}}>No hay datos en esta sección.</td></tr>
-                        )}
-                    </tbody>
-                </table>
-            )}
-        </>
-      )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };
+
+const LoadingState: React.FC = () => (
+  <div className="flex items-center justify-center py-12">
+    <p className="text-neutral-500 text-lg">{MESSAGES.LOADING}</p>
+  </div>
+);
+
+const EmptyProjectsState: React.FC = () => (
+  <div className="text-center py-12">
+    <FolderOpen size={64} className="mx-auto mb-4 text-neutral-600" />
+    <p className="text-neutral-500 text-lg">{MESSAGES.NO_PROJECTS}</p>
+  </div>
+);
+
+// ============================================================================
+// COMPONENTE PRINCIPAL
+// ============================================================================
+
+export const ClientDashboard: React.FC = () => {
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const initialTab = (searchParams.get('tab') as TabType) || 'projects';
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [modal, setModal] = useState<ModalState>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    isDestructive: false,
+  });
+
+  // ==========================================================================
+  // EFECTOS
+  // ==========================================================================
+
+  useEffect(() => {
+    setSearchParams({ tab: activeTab });
+  }, [activeTab, setSearchParams]);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    setUserId(user.id);
+
+    try {
+      if (activeTab === 'projects') {
+        const { data } = await supabase
+          .from('projects')
+          .select('*, orders(id)')
+          .eq('user_id', user.id)
+          .order('updated_at', { ascending: false });
+        const cleanProjects = (data || []).filter(
+          (p: any) => !p.orders || p.orders.length === 0
+        );
+        setProjects(cleanProjects);
+      } else {
+        let query = supabase
+          .from('orders')
+          .select('*, projects(name)')
+          .order('created_at', { ascending: false });
+
+        if (activeTab === 'budgets') {
+          query = query
+            .eq('is_archived', false)
+            .in('status', ['pendiente', 'presupuestado', 'rechazado']);
+        } else if (activeTab === 'orders') {
+          query = query
+            .eq('is_archived', false)
+            .in('status', [
+              'pedido',
+              'fabricacion',
+              'entregado_parcial',
+              'entregado',
+              'completado',
+            ]);
+        } else if (activeTab === 'archived') {
+          query = query.eq('is_archived', true);
+        }
+
+        const { data } = await query;
+        setOrders(data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [activeTab, navigate]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // ==========================================================================
+  // HANDLERS
+  // ==========================================================================
+
+  const handleCreateManualBudget = useCallback(async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const ref = 'MAN-' + Math.floor(10000 + Math.random() * 90000);
+
+    const { data, error } = await supabase
+      .from('orders')
+      .insert([
+        {
+          user_id: user?.id,
+          order_ref: ref,
+          status: 'pendiente',
+          total_price: 0,
+          is_archived: false,
+          created_at: new Date().toISOString(),
+        },
+      ])
+      .select();
+
+    if (error) {
+      alert(MESSAGES.CREATE_BUDGET_ERROR(error.message));
+      return;
+    }
+    if (data) navigate(`/portal/order/${data[0].id}`);
+  }, [navigate]);
+
+  const handleNewProject = useCallback(() => {
+    window.location.href = '/';
+  }, []);
+
+  const handleEditProject = useCallback(
+    (projectId: string) => {
+      window.location.href = `/?project_id=${projectId}`;
+    },
+    []
+  );
+
+  const handleRequestQuote = useCallback(
+    (project: Project) => {
+      setModal({
+        isOpen: true,
+        title: MESSAGES.REQUEST_QUOTE_TITLE,
+        message: MESSAGES.REQUEST_QUOTE_MESSAGE(project.name),
+        isDestructive: false,
+        onConfirm: async () => {
+          const estimatedDate = new Date();
+          estimatedDate.setHours(estimatedDate.getHours() + 48);
+          const ref = 'SOL-' + Math.floor(10000 + Math.random() * 90000);
+          const { data } = await supabase
+            .from('orders')
+            .insert([
+              {
+                user_id: userId,
+                project_id: project.id,
+                order_ref: ref,
+                total_price: 0,
+                status: 'pendiente',
+                estimated_delivery_date: estimatedDate.toISOString(),
+              },
+            ])
+            .select();
+
+          if (data) {
+            navigate(`/portal/order/${data[0].id}`);
+          }
+          setModal({ ...modal, isOpen: false });
+        },
+      });
+    },
+    [userId, navigate, modal]
+  );
+
+  const handleDeleteProject = useCallback(
+    (id: string) => {
+      setModal({
+        isOpen: true,
+        title: MESSAGES.DELETE_PROJECT_TITLE,
+        message: MESSAGES.DELETE_PROJECT_MESSAGE,
+        isDestructive: true,
+        onConfirm: async () => {
+          await supabase.from('projects').delete().eq('id', id);
+          setProjects((p) => p.filter((x) => x.id !== id));
+          setModal({ ...modal, isOpen: false });
+        },
+      });
+    },
+    [modal]
+  );
+
+  const handleViewOrder = useCallback(
+    (orderId: string) => {
+      navigate(`/portal/order/${orderId}`);
+    },
+    [navigate]
+  );
+
+  const handleReactivate = useCallback(
+    (order: Order) => {
+      setModal({
+        isOpen: true,
+        title: MESSAGES.REACTIVATE_TITLE,
+        message: MESSAGES.REACTIVATE_MESSAGE,
+        isDestructive: false,
+        onConfirm: async () => {
+          await supabase
+            .from('orders')
+            .update({
+              is_archived: false,
+              status: 'pendiente',
+              created_at: new Date().toISOString(),
+            })
+            .eq('id', order.id);
+          setActiveTab('budgets');
+          setModal({ ...modal, isOpen: false });
+        },
+      });
+    },
+    [modal]
+  );
+
+  const closeModal = useCallback(() => {
+    setModal({ ...modal, isOpen: false });
+  }, [modal]);
+
+  // ==========================================================================
+  // RENDER
+  // ==========================================================================
+
+  return (
+    <div className="min-h-screen bg-neutral-950 text-neutral-200 p-6">
+      <ConfirmModal {...modal} onCancel={closeModal} />
+
+      <div className="max-w-7xl mx-auto">
+        <DashboardHeader
+          onCreateBudget={handleCreateManualBudget}
+          onNewProject={handleNewProject}
+        />
+
+        <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+
+        {loading ? (
+          <LoadingState />
+        ) : (
+          <>
+            {activeTab === 'projects' && (
+              <>
+                {projects.length === 0 ? (
+                  <EmptyProjectsState />
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {projects.map((project) => (
+                      <ProjectCard
+                        key={project.id}
+                        project={project}
+                        onEdit={handleEditProject}
+                        onRequestQuote={handleRequestQuote}
+                        onDelete={handleDeleteProject}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {activeTab !== 'projects' && (
+              <OrderTable
+                orders={orders}
+                activeTab={activeTab}
+                onViewOrder={handleViewOrder}
+                onReactivate={handleReactivate}
+              />
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// --- END OF FILE ---
