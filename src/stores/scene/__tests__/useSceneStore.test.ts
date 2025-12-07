@@ -37,6 +37,13 @@ describe('useSceneStore', () => {
     it('should initialize with default fence config', () => {
       const { result } = renderHook(() => useSceneStore());
       expect(result.current.fenceConfig).toBeDefined();
+      expect(result.current.fenceConfig.presetId).toBe('wood');
+    });
+
+    it('should initialize with empty history', () => {
+      const { result } = renderHook(() => useSceneStore());
+      expect(result.current.past).toEqual([]);
+      expect(result.current.future).toEqual([]);
     });
   });
 
@@ -79,6 +86,17 @@ describe('useSceneStore', () => {
 
       expect(result.current.items).toHaveLength(2);
       expect(result.current.totalPrice).toBe(300);
+    });
+
+    it('should save snapshot to history when adding', () => {
+      const { result } = renderHook(() => useSceneStore());
+
+      act(() => {
+        result.current.addItem(mockItem);
+      });
+
+      // Past should have one snapshot (the empty state)
+      expect(result.current.past).toHaveLength(1);
     });
   });
 
@@ -130,43 +148,89 @@ describe('useSceneStore', () => {
 
       expect(result.current.items).toHaveLength(itemsBefore);
     });
+
+    it('should save snapshot to history when removing', () => {
+      const { result } = renderHook(() => useSceneStore());
+
+      act(() => {
+        result.current.addItem(mockItem);
+      });
+
+      const pastLengthBefore = result.current.past.length;
+
+      act(() => {
+        result.current.removeItem('test-item-1');
+      });
+
+      expect(result.current.past.length).toBeGreaterThan(pastLengthBefore);
+    });
   });
 
-  describe('updateItem', () => {
-    it('should update existing item', () => {
+  describe('updateItemTransform', () => {
+    it('should update item position', () => {
       const { result } = renderHook(() => useSceneStore());
 
       act(() => {
         result.current.addItem(mockItem);
       });
 
-      const updates = { price: 250, name: 'Updated Item' };
+      const newPosition = [5, 10, 15];
 
       act(() => {
-        result.current.updateItem('test-item-1', updates);
+        result.current.updateItemTransform(
+          'test-item-1',
+          newPosition,
+          [0, 0, 0],
+          [1, 1, 1]
+        );
       });
 
-      expect(result.current.items[0].price).toBe(250);
-      expect(result.current.items[0].name).toBe('Updated Item');
+      expect(result.current.items[0].position).toEqual(newPosition);
     });
 
-    it('should recalculate total price after update', () => {
+    it('should update item rotation', () => {
       const { result } = renderHook(() => useSceneStore());
 
       act(() => {
         result.current.addItem(mockItem);
       });
 
-      expect(result.current.totalPrice).toBe(100);
+      const newRotation = [0, Math.PI / 2, 0];
 
       act(() => {
-        result.current.updateItem('test-item-1', { price: 300 });
+        result.current.updateItemTransform(
+          'test-item-1',
+          [0, 0, 0],
+          newRotation,
+          [1, 1, 1]
+        );
       });
 
-      expect(result.current.totalPrice).toBe(300);
+      expect(result.current.items[0].rotation).toEqual(newRotation);
     });
 
-    it('should not affect other items when updating', () => {
+    it('should update item scale', () => {
+      const { result } = renderHook(() => useSceneStore());
+
+      act(() => {
+        result.current.addItem(mockItem);
+      });
+
+      const newScale = [2, 2, 2];
+
+      act(() => {
+        result.current.updateItemTransform(
+          'test-item-1',
+          [0, 0, 0],
+          [0, 0, 0],
+          newScale
+        );
+      });
+
+      expect(result.current.items[0].scale).toEqual(newScale);
+    });
+
+    it('should not affect other items', () => {
       const { result } = renderHook(() => useSceneStore());
 
       const item2: SceneItem = { 
@@ -181,10 +245,119 @@ describe('useSceneStore', () => {
       });
 
       act(() => {
-        result.current.updateItem('test-item-1', { name: 'Updated' });
+        result.current.updateItemTransform(
+          'test-item-1',
+          [5, 5, 5],
+          [0, 0, 0],
+          [1, 1, 1]
+        );
       });
 
-      expect(result.current.items[1].name).toBe('Test Item');
+      expect(result.current.items[1].position).toEqual([0, 0, 0]);
+    });
+  });
+
+  describe('updateFloorMaterial', () => {
+    it('should update floor material', () => {
+      const { result } = renderHook(() => useSceneStore());
+
+      const floorItem: SceneItem = {
+        uuid: 'floor-1',
+        type: 'floor',
+        name: 'Test Floor',
+        productId: 'floor-001',
+        position: [0, 0, 0],
+        rotation: [0, 0, 0],
+        scale: [1, 1, 1],
+        price: 350,
+        points: [
+          { x: 0, z: 0 },
+          { x: 10, z: 0 },
+          { x: 10, z: 10 },
+          { x: 0, z: 10 },
+        ],
+      };
+
+      act(() => {
+        result.current.addItem(floorItem);
+      });
+
+      act(() => {
+        result.current.updateFloorMaterial('floor-1', 'grass');
+      });
+
+      const updatedFloor = result.current.items[0];
+      if (updatedFloor.type === 'floor') {
+        expect(updatedFloor.floorMaterial).toBe('grass');
+      }
+    });
+
+    it('should clear texture when updating material', () => {
+      const { result } = renderHook(() => useSceneStore());
+
+      const floorItem: SceneItem = {
+        uuid: 'floor-1',
+        type: 'floor',
+        name: 'Test Floor',
+        productId: 'floor-001',
+        position: [0, 0, 0],
+        rotation: [0, 0, 0],
+        scale: [1, 1, 1],
+        price: 350,
+        points: [
+          { x: 0, z: 0 },
+          { x: 10, z: 0 },
+          { x: 10, z: 10 },
+          { x: 0, z: 10 },
+        ],
+        textureUrl: 'test-texture.jpg',
+      };
+
+      act(() => {
+        result.current.addItem(floorItem);
+      });
+
+      act(() => {
+        result.current.updateFloorMaterial('floor-1', 'concrete');
+      });
+
+      const updatedFloor = result.current.items[0];
+      if (updatedFloor.type === 'floor') {
+        expect(updatedFloor.textureUrl).toBeUndefined();
+      }
+    });
+  });
+
+  describe('setItems', () => {
+    it('should set all items at once', () => {
+      const { result } = renderHook(() => useSceneStore());
+
+      const items: SceneItem[] = [
+        mockItem,
+        { ...mockItem, uuid: 'item-2', productId: 'product-002', price: 200 },
+      ];
+
+      act(() => {
+        result.current.setItems(items);
+      });
+
+      expect(result.current.items).toEqual(items);
+      expect(result.current.totalPrice).toBe(300);
+    });
+
+    it('should clear history when setting items', () => {
+      const { result } = renderHook(() => useSceneStore());
+
+      act(() => {
+        result.current.addItem(mockItem);
+      });
+
+      act(() => {
+        result.current.setItems([]);
+      });
+
+      expect(result.current.past).toEqual([]);
+      expect(result.current.future).toEqual([]);
     });
   });
 
@@ -225,10 +398,25 @@ describe('useSceneStore', () => {
 
       expect(result.current.totalPrice).toBe(0);
     });
+
+    it('should clear history', () => {
+      const { result } = renderHook(() => useSceneStore());
+
+      act(() => {
+        result.current.addItem(mockItem);
+      });
+
+      act(() => {
+        result.current.resetScene();
+      });
+
+      expect(result.current.past).toEqual([]);
+      expect(result.current.future).toEqual([]);
+    });
   });
 
   describe('Fence configuration', () => {
-    it('should update fence config', () => {
+    it('should update global fence config', () => {
       const { result } = renderHook(() => useSceneStore());
 
       const newConfig = {
@@ -240,23 +428,25 @@ describe('useSceneStore', () => {
         result.current.setFenceConfig(newConfig);
       });
 
-      expect(result.current.fenceConfig).toEqual(newConfig);
+      expect(result.current.fenceConfig.presetId).toBe('metal');
+      expect(result.current.fenceConfig.colors).toEqual(newConfig.colors);
+    });
+
+    it('should partially update fence config', () => {
+      const { result } = renderHook(() => useSceneStore());
+
+      act(() => {
+        result.current.setFenceConfig({ presetId: 'custom' });
+      });
+
+      expect(result.current.fenceConfig.presetId).toBe('custom');
+      // Colors should remain from default
+      expect(result.current.fenceConfig.colors).toBeDefined();
     });
   });
 
   describe('History (undo/redo)', () => {
-    it('should save state to history on item add', () => {
-      const { result } = renderHook(() => useSceneStore());
-
-      act(() => {
-        result.current.addItem(mockItem);
-      });
-
-      // History should have at least 1 entry
-      expect(result.current.items).toHaveLength(1);
-    });
-
-    it('should undo last action', () => {
+    it('should undo to previous state', () => {
       const { result } = renderHook(() => useSceneStore());
 
       act(() => {
@@ -270,6 +460,50 @@ describe('useSceneStore', () => {
       });
 
       expect(result.current.items).toHaveLength(0);
+    });
+
+    it('should redo undone action', () => {
+      const { result } = renderHook(() => useSceneStore());
+
+      act(() => {
+        result.current.addItem(mockItem);
+      });
+
+      act(() => {
+        result.current.undo();
+      });
+
+      expect(result.current.items).toHaveLength(0);
+
+      act(() => {
+        result.current.redo();
+      });
+
+      expect(result.current.items).toHaveLength(1);
+    });
+
+    it('should not undo when no history', () => {
+      const { result } = renderHook(() => useSceneStore());
+
+      act(() => {
+        result.current.undo();
+      });
+
+      expect(result.current.items).toEqual([]);
+    });
+
+    it('should not redo when no future', () => {
+      const { result } = renderHook(() => useSceneStore());
+
+      act(() => {
+        result.current.addItem(mockItem);
+      });
+
+      act(() => {
+        result.current.redo();
+      });
+
+      expect(result.current.items).toHaveLength(1);
     });
   });
 
@@ -290,20 +524,26 @@ describe('useSceneStore', () => {
       expect(result.current.totalPrice).toBe(0);
     });
 
-    it('should handle negative prices', () => {
+    it('should recalculate total price correctly with multiple items', () => {
       const { result } = renderHook(() => useSceneStore());
 
-      const negativeItem: SceneItem = { 
-        ...mockItem,
-        productId: 'product-negative',
-        price: -50 
-      };
-
       act(() => {
-        result.current.addItem(negativeItem);
+        result.current.addItem({ ...mockItem, price: 100 });
+        result.current.addItem({ 
+          ...mockItem, 
+          uuid: 'item-2', 
+          productId: 'product-002',
+          price: 200 
+        });
+        result.current.addItem({ 
+          ...mockItem, 
+          uuid: 'item-3', 
+          productId: 'product-003',
+          price: 300 
+        });
       });
 
-      expect(result.current.totalPrice).toBe(-50);
+      expect(result.current.totalPrice).toBe(600);
     });
   });
 });
