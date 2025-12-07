@@ -26,10 +26,241 @@ import {
   QrCode,
 } from "lucide-react";
 
-export const Editor3D = () => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [engineInstance, setEngineInstance] = useState<A42Engine | null>(null);
+// 🎨 Types
+type GizmoMode = 'translate' | 'rotate' | 'scale';
+type CameraType = 'perspective' | 'orthographic';
+type CameraView = 'top' | 'front' | 'side' | 'iso';
 
+interface GizmoButtonConfig {
+  mode: GizmoMode;
+  icon: React.ReactNode;
+  label: string;
+}
+
+interface ActionButtonConfig {
+  action: () => void;
+  icon: React.ReactNode;
+  label: string;
+}
+
+// 🎨 Constants
+const GIZMO_BUTTONS: GizmoButtonConfig[] = [
+  { mode: 'translate', icon: <Move size={16} />, label: 'Mover' },
+  { mode: 'rotate', icon: <RotateCw size={16} />, label: 'Rotar' },
+  { mode: 'scale', icon: <Scaling size={16} />, label: 'Escalar' },
+];
+
+const SKY_BACKGROUND_COLOR = "#111111";
+
+const CLASSES = {
+  container: "w-screen h-screen relative bg-neutral-900 overflow-hidden",
+  canvas: "absolute inset-0 z-0",
+  catalogOverlay: "absolute inset-0 z-40",
+  qrButton: "absolute top-6 right-6 z-20 bg-neutral-800/90 hover:bg-neutral-700 text-white p-3 rounded-full border border-neutral-600 shadow-lg",
+  priceButton: "absolute bottom-6 left-6 z-20",
+  priceContent: "bg-neutral-800/90 px-4 py-3 rounded-full border border-neutral-600 text-white flex gap-3 items-center",
+  gizmoPanel: "absolute bottom-20 left-1/2 -translate-x-1/2 flex gap-2 glass-panel p-2 rounded-xl z-30",
+  measurementDisplay: "fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-black/80 px-6 py-3 text-white rounded-full border border-white/20 backdrop-blur-md font-mono pointer-events-none",
+  watermark: "absolute bottom-6 right-6 text-white/5 font-black text-4xl pointer-events-none select-none",
+} as const;
+
+// 🎨 Custom Hooks
+const useEngineInitialization = (
+  containerRef: React.RefObject<HTMLDivElement | null>,
+  gridVisible: boolean,
+  sunPosition: { azimuth: number; elevation: number },
+  backgroundColor: string
+) => {
+  const [engine, setEngine] = useState<A42Engine | null>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    // Initialize engine
+    const engineInstance = new A42Engine(containerRef.current);
+    engineInstance.init();
+    setEngine(engineInstance);
+
+    // Setup pointer event handler
+    const handlePointerDown = (e: PointerEvent): void => {
+      if ((e.target as HTMLElement).tagName === "CANVAS") {
+        engineInstance.interactionManager.onPointerDown(e);
+      }
+    };
+
+    const container = containerRef.current;
+    container.addEventListener("pointerdown", handlePointerDown);
+
+    // Initial configuration
+    engineInstance.setGridVisible(gridVisible);
+    engineInstance.updateSunPosition(sunPosition.azimuth, sunPosition.elevation);
+    
+    if (backgroundColor === SKY_BACKGROUND_COLOR) {
+      engineInstance.setSkyVisible(true);
+    } else {
+      engineInstance.setBackgroundColor(backgroundColor);
+    }
+
+    return () => {
+      container.removeEventListener("pointerdown", handlePointerDown);
+      engineInstance.dispose();
+      setEngine(null);
+    };
+  }, []); // Empty deps - only run on mount/unmount
+
+  return engine;
+};
+
+const useEngineSync = (
+  engine: A42Engine | null,
+  mode: string,
+  selectedItemId: string | null,
+  items: any[],
+  gridVisible: boolean,
+  cameraType: CameraType,
+  safetyZonesVisible: boolean,
+  sunPosition: { azimuth: number; elevation: number },
+  backgroundColor: string,
+  pendingView: CameraView | null,
+  clearPendingView: () => void
+) => {
+  // Clear tools on mode change
+  useEffect(() => {
+    engine?.clearTools();
+  }, [mode, engine]);
+
+  // Sync selection
+  useEffect(() => {
+    engine?.interactionManager.selectItemByUUID(selectedItemId);
+  }, [selectedItemId, engine]);
+
+  // Sync scene items
+  useEffect(() => {
+    engine?.syncSceneFromStore(items);
+  }, [items, engine]);
+
+  // Sync grid visibility
+  useEffect(() => {
+    engine?.setGridVisible(gridVisible);
+  }, [gridVisible, engine]);
+
+  // Sync camera
+  useEffect(() => {
+    if (!engine) return;
+    engine.switchCamera(cameraType);
+    engine.interactionManager.updateCamera(engine.activeCamera);
+  }, [cameraType, engine]);
+
+  // Sync safety zones
+  useEffect(() => {
+    engine?.updateSafetyZones(safetyZonesVisible);
+  }, [safetyZonesVisible, engine]);
+
+  // Sync sun position
+  useEffect(() => {
+    engine?.updateSunPosition(sunPosition.azimuth, sunPosition.elevation);
+  }, [sunPosition, engine]);
+
+  // Handle pending view
+  useEffect(() => {
+    if (!pendingView || !engine) return;
+    engine.setView(pendingView);
+    clearPendingView();
+  }, [pendingView, clearPendingView, engine]);
+
+  // Sync background
+  useEffect(() => {
+    if (!engine) return;
+    
+    if (backgroundColor === SKY_BACKGROUND_COLOR) {
+      engine.setSkyVisible(true);
+    } else {
+      engine.setBackgroundColor(backgroundColor);
+    }
+  }, [backgroundColor, engine]);
+};
+
+// 🎨 Sub-Components
+const QRButton: React.FC<{ onClick: () => void }> = ({ onClick }) => (
+  <button
+    onClick={onClick}
+    className={CLASSES.qrButton}
+    aria-label="Mostrar código QR"
+  >
+    <QrCode size={20} />
+  </button>
+);
+
+const PriceDisplay: React.FC<{ price: number }> = ({ price }) => (
+  <div className={CLASSES.priceButton}>
+    <button className={CLASSES.priceContent}>
+      <Euro size={18} />
+      <span className="text-lg">{price.toLocaleString()} €</span>
+    </button>
+  </div>
+);
+
+const GizmoButton: React.FC<{
+  mode: GizmoMode;
+  icon: React.ReactNode;
+  onClick: () => void;
+}> = ({ icon, onClick }) => (
+  <button onClick={onClick}>
+    {icon}
+  </button>
+);
+
+const GizmoPanel: React.FC<{
+  engine: A42Engine | null;
+  onDuplicate: () => void;
+  onRemove: () => void;
+}> = ({ engine, onDuplicate, onRemove }) => {
+  const handleGizmoMode = (mode: GizmoMode): void => {
+    engine?.setGizmoMode(mode);
+  };
+
+  const actionButtons: ActionButtonConfig[] = [
+    { action: onDuplicate, icon: <Copy size={16} />, label: 'Duplicar' },
+    { action: onRemove, icon: <Trash2 size={16} />, label: 'Eliminar' },
+  ];
+
+  return (
+    <div className={CLASSES.gizmoPanel}>
+      {GIZMO_BUTTONS.map((button) => (
+        <GizmoButton
+          key={button.mode}
+          mode={button.mode}
+          icon={button.icon}
+          onClick={() => handleGizmoMode(button.mode)}
+        />
+      ))}
+      {actionButtons.map((button, index) => (
+        <button key={index} onClick={button.action}>
+          {button.icon}
+        </button>
+      ))}
+    </div>
+  );
+};
+
+const MeasurementDisplay: React.FC<{ result: number | null }> = ({ result }) => (
+  <div className={CLASSES.measurementDisplay}>
+    {result !== null
+      ? `Distancia: ${result.toFixed(2)} m`
+      : "Selecciona punto A y B"}
+  </div>
+);
+
+const Watermark: React.FC = () => (
+  <div className={CLASSES.watermark}>A42</div>
+);
+
+// 🎨 Main Component
+export const Editor3D: React.FC = () => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [qrVisible, setQRVisible] = useState<boolean>(false);
+
+  // Store hooks
   const {
     mode,
     gridVisible,
@@ -39,173 +270,96 @@ export const Editor3D = () => {
     sunPosition,
     backgroundColor,
     safetyZonesVisible,
-    measurementResult, // 👈 1. AÑADE ESTO AQUÍ
+    measurementResult,
   } = useEditorStore();
 
   const { items, totalPrice } = useSceneStore();
   const { selectedItemId, duplicateSelection, removeSelection } = useSelectionStore();
   const { isReadOnlyMode } = useProjectStore();
 
-  const [qrVisible, setQRVisible] = React.useState(false);
+  // Initialize engine
+  const engine = useEngineInitialization(
+    containerRef,
+    gridVisible,
+    sunPosition,
+    backgroundColor
+  );
 
-  // 1. INICIALIZACIÓN Y EVENTOS DOM
-  useEffect(() => {
-    if (!containerRef.current) return;
+  // Sync engine state
+  useEngineSync(
+    engine,
+    mode,
+    selectedItemId,
+    items,
+    gridVisible,
+    cameraType,
+    safetyZonesVisible,
+    sunPosition,
+    backgroundColor,
+    pendingView,
+    clearPendingView
+  );
 
-    // Instanciar motor
-    const engine = new A42Engine(containerRef.current);
-    engine.init();
+  // Computed values
+  const showGizmoPanel = selectedItemId && mode === "editing";
+  const showMeasurement = mode === "measuring";
+  const showCatalog = mode === "catalog";
 
-    // Guardar en estado
-    setEngineInstance(engine);
-
-    // 🔥 FIX: Añadir listener directo al DOM para evitar problemas de bubbling en React
-    const handlePointerDown = (e: PointerEvent) => {
-      // Solo procesar si el click es en el canvas (evitar UI)
-      if ((e.target as HTMLElement).tagName === "CANVAS") {
-        engine.interactionManager.onPointerDown(e);
-      }
-    };
-
-    const container = containerRef.current;
-    container.addEventListener("pointerdown", handlePointerDown);
-
-    // Configuración inicial
-    engine.setGridVisible(gridVisible);
-    engine.updateSunPosition(sunPosition.azimuth, sunPosition.elevation);
-    if (backgroundColor === "#111111") engine.setSkyVisible(true);
-    else engine.setBackgroundColor(backgroundColor);
-
-    return () => {
-      container.removeEventListener("pointerdown", handlePointerDown);
-      engine.dispose();
-      setEngineInstance(null);
-    };
-  }, []);
-
-  // 2. LIMPIEZA DE HERRAMIENTAS AL CAMBIAR MODO
-  useEffect(() => {
-    if (engineInstance) {
-      engineInstance.clearTools();
-    }
-  }, [mode, engineInstance]);
-
-  // 3. SINCRONIZACIÓN DE ESTADO
-  useEffect(() => {
-    if (engineInstance) {
-      engineInstance.interactionManager.selectItemByUUID(selectedItemId);
-    }
-  }, [selectedItemId, engineInstance]);
-
-  useEffect(() => {
-    engineInstance?.syncSceneFromStore(items);
-  }, [items, engineInstance]);
-
-  useEffect(() => {
-    engineInstance?.setGridVisible(gridVisible);
-  }, [gridVisible, engineInstance]);
-
-  useEffect(() => {
-    if (!engineInstance) return;
-    engineInstance.switchCamera(cameraType);
-    engineInstance.interactionManager.updateCamera(engineInstance.activeCamera);
-  }, [cameraType, engineInstance]);
-
-  useEffect(() => {
-    engineInstance?.updateSafetyZones(safetyZonesVisible);
-  }, [safetyZonesVisible, engineInstance]);
-
-  useEffect(() => {
-    engineInstance?.updateSunPosition(sunPosition.azimuth, sunPosition.elevation);
-  }, [sunPosition, engineInstance]);
-
-  useEffect(() => {
-    if (!pendingView || !engineInstance) return;
-    engineInstance.setView(pendingView);
-    clearPendingView();
-  }, [pendingView, clearPendingView, engineInstance]);
-
-  useEffect(() => {
-    if (!engineInstance) return;
-    if (backgroundColor === "#111111") engineInstance.setSkyVisible(true);
-    else engineInstance.setBackgroundColor(backgroundColor);
-  }, [backgroundColor, engineInstance]);
+  // Handlers
+  const handleQROpen = (): void => setQRVisible(true);
+  const handleQRClose = (): void => setQRVisible(false);
+  const handleContextMenu = (e: React.MouseEvent): void => e.preventDefault();
 
   return (
-    <EngineContext.Provider value={{ engine: engineInstance }}>
-      <div className="w-screen h-screen relative bg-neutral-900 overflow-hidden">
-        
-        {/* Contenedor del Motor 3D */}
+    <EngineContext.Provider value={{ engine }}>
+      <div className={CLASSES.container}>
+        {/* 3D Engine Container */}
         <div
           ref={containerRef}
-          className="absolute inset-0 z-0"
-          onContextMenu={(e) => e.preventDefault()}
+          className={CLASSES.canvas}
+          onContextMenu={handleContextMenu}
         />
 
-        {/* UI LAYERS */}
+        {/* UI Panels */}
         <BudgetPanel />
         <EnvironmentPanel />
         <FloorProperties />
         <FenceProperties />
 
-        {/* 🔥 FIX: Asegurar que el Catálogo esté por encima de todo */}
-        {mode === 'catalog' && (
-          <div className="absolute inset-0 z-40">
+        {/* Catalog Overlay */}
+        {showCatalog && (
+          <div className={CLASSES.catalogOverlay}>
             <Catalog />
           </div>
         )}
 
-        <button
-          onClick={() => setQRVisible(true)}
-          className="absolute top-6 right-6 z-20 bg-neutral-800/90 hover:bg-neutral-700 text-white p-3 rounded-full border border-neutral-600 shadow-lg"
-        >
-          <QrCode size={20} />
-        </button>
+        {/* QR Button */}
+        <QRButton onClick={handleQROpen} />
 
-        {!isReadOnlyMode && (
-          <div className="absolute bottom-6 left-6 z-20">
-            <button className="bg-neutral-800/90 px-4 py-3 rounded-full border border-neutral-600 text-white flex gap-3 items-center">
-              <Euro size={18} />
-              <span className="text-lg">{totalPrice.toLocaleString()} €</span>
-            </button>
-          </div>
+        {/* Price Display */}
+        {!isReadOnlyMode && <PriceDisplay price={totalPrice} />}
+
+        {/* Gizmo Panel */}
+        {showGizmoPanel && (
+          <GizmoPanel
+            engine={engine}
+            onDuplicate={duplicateSelection}
+            onRemove={removeSelection}
+          />
         )}
 
-        {selectedItemId && mode === "editing" && (
-          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex gap-2 glass-panel p-2 rounded-xl z-30">
-            <button onClick={() => engineInstance?.setGizmoMode("translate")}>
-              <Move size={16} />
-            </button>
-            <button onClick={() => engineInstance?.setGizmoMode("rotate")}>
-              <RotateCw size={16} />
-            </button>
-            <button onClick={() => engineInstance?.setGizmoMode("scale")}>
-              <Scaling size={16} />
-            </button>
-            <button onClick={duplicateSelection}>
-              <Copy size={16} />
-            </button>
-            <button onClick={removeSelection}>
-              <Trash2 size={16} />
-            </button>
-          </div>
-        )}
+        {/* Measurement Display */}
+        {showMeasurement && <MeasurementDisplay result={measurementResult} />}
 
-        {mode === "measuring" && (
-          <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-black/80 px-6 py-3 text-white rounded-full border border-white/20 backdrop-blur-md font-mono pointer-events-none">
-            {measurementResult !== null
-              ? `Distancia: ${measurementResult.toFixed(2)} m`
-              : "Selecciona punto A y B"}
-          </div>
-        )}
-
+        {/* Toolbar */}
         <Toolbar />
-        <QRModal isOpen={qrVisible} onClose={() => setQRVisible(false)} />
+
+        {/* Modals */}
+        <QRModal isOpen={qrVisible} onClose={handleQRClose} />
         <InputModal />
 
-        <div className="absolute bottom-6 right-6 text-white/5 font-black text-4xl pointer-events-none select-none">
-          A42
-        </div>
+        {/* Watermark */}
+        <Watermark />
       </div>
     </EngineContext.Provider>
   );

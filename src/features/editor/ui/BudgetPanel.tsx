@@ -1,14 +1,212 @@
 // --- START OF FILE src/features/editor/ui/BudgetPanel.tsx ---
-import { Trash2, X } from "lucide-react";
+import React, { useCallback, useMemo } from 'react';
+import { Trash2, X, Receipt } from 'lucide-react';
 
-import { useUIStore } from "@/stores/ui/useUIStore"; // UI toggles
-import { useSceneStore } from "@/stores/scene/useSceneStore"; // 🔥 items y acciones
-import { useSelectionStore } from "@/stores/selection/useSelectionStore"; 
+import { useUIStore } from '@/stores/ui/useUIStore';
+import { useSceneStore } from '@/stores/scene/useSceneStore';
+import { useSelectionStore } from '@/stores/selection/useSelectionStore';
 
-export const BudgetPanel = () => {
+// ============================================================================
+// TIPOS E INTERFACES
+// ============================================================================
+
+interface BudgetItem {
+  uuid: string;
+  name: string;
+  productId: string;
+  price: number;
+  type?: string;
+}
+
+interface BudgetItemCardProps {
+  item: BudgetItem;
+  onSelect: (uuid: string) => void;
+  onRemove: (uuid: string) => void;
+}
+
+interface BudgetSummaryProps {
+  totalPrice: number;
+  itemCount: number;
+  onClearAll: () => void;
+}
+
+interface EmptyStateProps {
+  message?: string;
+}
+
+// ============================================================================
+// CONSTANTES
+// ============================================================================
+
+const PANEL_CONFIG = {
+  width: 'w-80',
+  maxHeight: 'max-h-[70vh]',
+  position: 'top-20 left-6',
+  zIndex: 'z-30',
+} as const;
+
+const MESSAGES = {
+  EMPTY_SCENE: 'La escena está vacía.',
+  CONFIRM_DELETE_ALL: '¿Borrar todo?',
+  UNNAMED_ITEM: 'Sin Nombre',
+  PANEL_TITLE: 'Presupuesto',
+  TOTAL_LABEL: 'Total Estimado',
+  CLEAR_ALL_BUTTON: 'Borrar Todo',
+} as const;
+
+const CURRENCY_SYMBOL = '€';
+
+// ============================================================================
+// COMPONENTES AUXILIARES
+// ============================================================================
+
+/**
+ * Estado vacío cuando no hay items
+ */
+const EmptyState: React.FC<EmptyStateProps> = ({ 
+  message = MESSAGES.EMPTY_SCENE 
+}) => (
+  <div className="text-center py-8 text-neutral-500 italic">
+    {message}
+  </div>
+);
+
+/**
+ * Tarjeta individual de item del presupuesto
+ */
+const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
+  item,
+  onSelect,
+  onRemove,
+}) => {
+  const handleRemove = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onRemove(item.uuid);
+    },
+    [item.uuid, onRemove]
+  );
+
+  const handleSelect = useCallback(() => {
+    onSelect(item.uuid);
+  }, [item.uuid, onSelect]);
+
+  const formattedPrice = useMemo(
+    () => item.price.toLocaleString(),
+    [item.price]
+  );
+
+  return (
+    <div
+      onClick={handleSelect}
+      className="flex justify-between items-center p-3 bg-neutral-800 rounded-lg group hover:bg-neutral-700 transition-colors border border-transparent hover:border-blue-500/30 cursor-pointer"
+    >
+      {/* Información del item */}
+      <div className="flex flex-col flex-1 min-w-0">
+        <span className="text-white font-medium text-sm truncate">
+          {item.name || MESSAGES.UNNAMED_ITEM}
+        </span>
+        <span className="text-xs text-neutral-500 uppercase font-mono truncate">
+          {item.productId}
+        </span>
+      </div>
+
+      {/* Precio y acciones */}
+      <div className="flex items-center gap-3 ml-2">
+        <span className="text-sm font-bold text-neutral-400 whitespace-nowrap">
+          {formattedPrice} {CURRENCY_SYMBOL}
+        </span>
+
+        <button
+          onClick={handleRemove}
+          className="text-neutral-500 hover:text-red-400 p-2 rounded-full hover:bg-red-900/20 transition-all opacity-0 group-hover:opacity-100"
+          title="Eliminar item"
+          aria-label={`Eliminar ${item.name}`}
+        >
+          <Trash2 size={16} />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Resumen del presupuesto con total y botón de limpiar
+ */
+const BudgetSummary: React.FC<BudgetSummaryProps> = ({
+  totalPrice,
+  itemCount,
+  onClearAll,
+}) => {
+  const handleClearAll = useCallback(() => {
+    if (window.confirm(MESSAGES.CONFIRM_DELETE_ALL)) {
+      onClearAll();
+    }
+  }, [onClearAll]);
+
+  const formattedTotal = useMemo(
+    () => totalPrice.toLocaleString(),
+    [totalPrice]
+  );
+
+  return (
+    <div className="p-4 border-t border-neutral-700 bg-neutral-800/50 rounded-b-xl space-y-3">
+      {/* Total */}
+      <div className="flex justify-between items-end">
+        <span className="text-neutral-400 text-sm">
+          {MESSAGES.TOTAL_LABEL}
+        </span>
+        <span className="text-2xl font-bold text-green-400">
+          {formattedTotal} {CURRENCY_SYMBOL}
+        </span>
+      </div>
+
+      {/* Botón de limpiar todo */}
+      {itemCount > 0 && (
+        <button
+          onClick={handleClearAll}
+          className="w-full py-2 bg-red-900/30 hover:bg-red-600 text-red-200 hover:text-white rounded-lg text-sm font-medium transition-all flex justify-center items-center gap-2 border border-red-900/50"
+          aria-label="Borrar todos los items"
+        >
+          <Trash2 size={16} />
+          {MESSAGES.CLEAR_ALL_BUTTON}
+        </button>
+      )}
+    </div>
+  );
+};
+
+/**
+ * Header del panel con título y botón de cerrar
+ */
+const PanelHeader: React.FC<{ onClose: () => void }> = ({ onClose }) => (
+  <div className="p-4 border-b border-neutral-700 flex justify-between items-center bg-neutral-800/50 rounded-t-xl">
+    <h2 className="text-white font-bold text-lg flex items-center gap-2">
+      <Receipt size={20} />
+      {MESSAGES.PANEL_TITLE}
+    </h2>
+    <button
+      onClick={onClose}
+      className="text-neutral-400 hover:text-white transition-colors"
+      aria-label="Cerrar panel de presupuesto"
+    >
+      <X size={20} />
+    </button>
+  </div>
+);
+
+// ============================================================================
+// COMPONENTE PRINCIPAL
+// ============================================================================
+
+export const BudgetPanel: React.FC = () => {
+  // ==========================================================================
+  // HOOKS Y ESTADO
+  // ==========================================================================
+
   const { budgetVisible, toggleBudget } = useUIStore();
 
-  // Datos de la escena desde SceneStore
+  // Datos de la escena
   const items = useSceneStore((s) => s.items);
   const totalPrice = useSceneStore((s) => s.totalPrice);
   const removeItem = useSceneStore((s) => s.removeItem);
@@ -16,83 +214,89 @@ export const BudgetPanel = () => {
 
   const selectItem = useSelectionStore((s) => s.selectItem);
 
+  // ==========================================================================
+  // CALLBACKS
+  // ==========================================================================
+
+  const handleSelectItem = useCallback(
+    (uuid: string) => {
+      selectItem(uuid);
+    },
+    [selectItem]
+  );
+
+  const handleRemoveItem = useCallback(
+    (uuid: string) => {
+      removeItem(uuid);
+    },
+    [removeItem]
+  );
+
+  const handleResetScene = useCallback(() => {
+    resetScene();
+  }, [resetScene]);
+
+  // ==========================================================================
+  // MEMOIZACIÓN
+  // ==========================================================================
+
+  const itemCount = useMemo(() => items.length, [items.length]);
+  const hasItems = useMemo(() => itemCount > 0, [itemCount]);
+
+  // ==========================================================================
+  // RENDER
+  // ==========================================================================
+
   if (!budgetVisible) return null;
 
   return (
-    <div className="absolute top-20 left-6 bg-neutral-900/95 backdrop-blur-md border border-neutral-700 rounded-xl shadow-2xl w-80 max-h-[70vh] flex flex-col z-30 animate-in fade-in slide-in-from-left-5 duration-200">
+    <div
+      className={`
+        absolute ${PANEL_CONFIG.position} 
+        bg-neutral-900/95 backdrop-blur-md 
+        border border-neutral-700 
+        rounded-xl shadow-2xl 
+        ${PANEL_CONFIG.width} ${PANEL_CONFIG.maxHeight} 
+        flex flex-col ${PANEL_CONFIG.zIndex}
+        animate-in fade-in slide-in-from-left-5 duration-200
+      `}
+      role="complementary"
+      aria-label="Panel de presupuesto"
+    >
+      {/* Header */}
+      <PanelHeader onClose={toggleBudget} />
 
-      <div className="p-4 border-b border-neutral-700 flex justify-between items-center bg-neutral-800/50 rounded-t-xl">
-        <h2 className="text-white font-bold text-lg flex items-center gap-2">
-          🧾 Presupuesto
-        </h2>
-        <button onClick={toggleBudget} className="text-neutral-400 hover:text-white">
-          <X size={20} />
-        </button>
-      </div>
-
+      {/* Lista de items */}
       <div className="flex-grow overflow-y-auto p-2 custom-scrollbar space-y-2">
-        {items.length === 0 ? (
-          <div className="text-center py-8 text-neutral-500 italic">
-            La escena está vacía.
-          </div>
+        {!hasItems ? (
+          <EmptyState />
         ) : (
           items.map((item) => (
-            <div
+            <BudgetItemCard
               key={item.uuid}
-              className="flex justify-between items-center p-3 bg-neutral-800 rounded-lg group hover:bg-neutral-700 transition-colors border border-transparent hover:border-blue-500/30 cursor-pointer"
-              onClick={() => selectItem(item.uuid)}
-            >
-              <div className="flex flex-col">
-                <span className="text-white font-medium text-sm">
-                  {item.name || "Sin Nombre"}
-                </span>
-
-                <span className="text-xs text-neutral-500 uppercase font-mono">
-                  {item.productId}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-bold text-neutral-400">
-                  {item.price.toLocaleString()}€
-                </span>
-
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeItem(item.uuid);
-                  }}
-                  className="text-neutral-500 hover:text-red-400 p-2 rounded-full hover:bg-red-900/20 transition-all opacity-0 group-hover:opacity-100"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            </div>
+              item={item as BudgetItem}
+              onSelect={handleSelectItem}
+              onRemove={handleRemoveItem}
+            />
           ))
         )}
       </div>
 
-      <div className="p-4 border-t border-neutral-700 bg-neutral-800/50 rounded-b-xl space-y-3">
-        <div className="flex justify-between items-end">
-          <span className="text-neutral-400 text-sm">Total Estimado</span>
-          <span className="text-2xl font-bold text-green-400">
-            {totalPrice.toLocaleString()} €
-          </span>
-        </div>
-
-        {items.length > 0 && (
-          <button
-            onClick={() => {
-              if (window.confirm("¿Borrar todo?")) resetScene();
-            }}
-            className="w-full py-2 bg-red-900/30 hover:bg-red-600 text-red-200 hover:text-white rounded-lg text-sm font-medium transition-all flex justify-center items-center gap-2 border border-red-900/50"
-          >
-            <Trash2 size={16} />
-            Borrar Todo
-          </button>
-        )}
-      </div>
+      {/* Resumen */}
+      <BudgetSummary
+        totalPrice={totalPrice}
+        itemCount={itemCount}
+        onClearAll={handleResetScene}
+      />
     </div>
   );
 };
+
+// ============================================================================
+// EXPORTS ADICIONALES
+// ============================================================================
+
+// Exportar componentes individuales para testing o reutilización
+export { BudgetItemCard, BudgetSummary, EmptyState };
+
 // --- END OF FILE ---
