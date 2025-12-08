@@ -101,20 +101,27 @@ jobs:
           path: dist/
           retention-days: 7
 
-  deploy:
-    name: Deploy to Vercel
-    runs-on: ubuntu-latest
-    needs: [build]
-    if: github.ref == 'refs/heads/main'
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Deploy to Vercel
-        uses: amondnet/vercel-action@v25
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: '--prod'
+  # ============================================================================
+  # DEPLOY DESACTIVADO - Configurar secretos de Vercel para activar:
+  # - VERCEL_TOKEN (https://vercel.com/account/tokens)
+  # - VERCEL_ORG_ID (ejecutar: npx vercel link)
+  # - VERCEL_PROJECT_ID (ejecutar: npx vercel link)
+  # ============================================================================
+  
+  # deploy:
+  #   name: Deploy to Vercel
+  #   runs-on: ubuntu-latest
+  #   needs: [build]
+  #   if: github.ref == 'refs/heads/main'
+  #   
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  # 
+  #     - name: Deploy to Vercel
+  #       uses: amondnet/vercel-action@v25
+  #       with:
+  #         vercel-token: ${{ secrets.VERCEL_TOKEN }}
+  #         vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+  #         vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+  #         vercel-args: '--prod'
