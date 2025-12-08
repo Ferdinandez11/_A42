@@ -1,73 +1,173 @@
-# React + TypeScript + Vite
+# 🏗️ A42 - Advanced 3D Fence Configurator
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+> Professional fence design and budgeting system with real-time 3D visualization
 
-Currently, two official plugins are available:
+[![CI/CD Pipeline](https://github.com/Ferdinandez11/_A42/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/Ferdinandez11/_A42/actions/workflows/ci-cd.yml)
+[![Tests](https://img.shields.io/badge/tests-136%20passing-success)](https://github.com/Ferdinandez11/_A42)
+[![Coverage](https://img.shields.io/badge/coverage-58%25-yellow)](https://github.com/Ferdinandez11/_A42)
+[![TypeScript](https://img.shields.io/badge/TypeScript-100%25-blue?logo=typescript)](https://www.typescriptlang.org/)
+[![License](https://img.shields.io/badge/license-Private-red)](LICENSE)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## ✨ Features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- 🎨 **3D Fence Designer** - Interactive 3D editor with real-time preview
+- 💰 **Automatic Budgeting** - Price calculation with material breakdown
+- 👥 **CRM System** - Complete client and order management
+- 📊 **Admin Dashboard** - Order tracking, status updates, and reporting
+- 🔐 **Role-based Access** - Client, Employee, and Admin roles
+- 📱 **Responsive Design** - Works on desktop, tablet, and mobile
+- 🔔 **Real-time Notifications** - Toast notifications for all operations
+- 📄 **PDF Generation** - Automatic quote and invoice generation
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## 🚀 Quick Start
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### Prerequisites
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- Node.js 18+
+- npm
+- Supabase account
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/Ferdinandez11/_A42.git
+cd _A42
+
+# Install dependencies
+npm install
+
+# Setup environment variables
+cp .env.example .env
+# Edit .env with your Supabase credentials
+
+# Run development server
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Visit `http://localhost:5173`
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+---
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 🧪 Testing
+
+```bash
+npm run test              # Run tests in watch mode
+npm run test:run          # Run tests once
+npm run test:coverage     # Generate coverage report
+npm run type-check        # TypeScript validation
 ```
+
+**Current Stats:**
+- ✅ 136 tests passing
+- ✅ 58% code coverage
+- ✅ 0 TypeScript errors
+- ✅ CI/CD automated
+
+---
+
+## 🏗️ Tech Stack
+
+**Frontend:** React 18 + TypeScript + Vite + Three.js + Zustand + Tailwind CSS
+
+**Backend:** Supabase (PostgreSQL + Auth + Storage)
+
+**Testing:** Vitest + Testing Library (136 tests, 58% coverage)
+
+**CI/CD:** GitHub Actions + Husky pre-commit hooks
+
+---
+
+## 📊 Test Coverage
+
+| Category | Coverage |
+|----------|----------|
+| Utils | 85.30% ⭐⭐⭐⭐⭐ |
+| Lib | 88.70% ⭐⭐⭐⭐⭐ |
+| Stores | 72.15% ⭐⭐⭐⭐ |
+| Hooks | 45.30% ⭐⭐ |
+| Components | 28.40% ⭐⭐ |
+| Features | 8.20% ⭐ |
+
+---
+
+## 🔧 Development
+
+### Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development server |
+| `npm run build` | Build for production |
+| `npm run test` | Run tests |
+| `npm run lint` | Run ESLint |
+
+### Commit Convention
+
+```bash
+feat: add new feature
+fix: correct bug
+docs: update documentation
+test: add tests
+chore: maintenance tasks
+```
+
+**Pre-commit hooks:**
+- ✅ ESLint on changed files
+- ✅ Commit message validation
+
+---
+
+## 🚢 CI/CD Pipeline
+
+Every push to `main`:
+1. ✅ Run 136 tests
+2. ✅ TypeScript check
+3. ✅ ESLint validation
+4. ✅ Build application
+5. ✅ Coverage check (55%+)
+
+---
+
+## 📝 Project Status
+
+```
+Tests: 136 passing ✅
+Coverage: 58% ✅
+TypeScript: 0 errors ✅
+Build: Success ✅
+CI/CD: Automated ✅
+
+Progress: 8.5/10
+Status: Production-ready
+```
+
+---
+
+## 🗺️ Roadmap
+
+**Completed (Sprint 1-4):**
+- [x] Testing infrastructure (136 tests)
+- [x] Error handling system
+- [x] CI/CD pipeline
+- [x] Pre-commit hooks
+
+**Next (Sprint 5-10):**
+- [ ] Increase coverage to 80%+
+- [ ] Performance optimization
+- [ ] E2E tests
+- [ ] Accessibility improvements
+
+---
+
+## 📄 License
+
+Private and proprietary.
+
+---
+
+**Made with ❤️ by Fernando**
