@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 import { PriceCalculator, PRICES } from '../../../utils/PriceCalculator';
-import type { Order } from '../../../types/types';
+import type { Order, OrderStatus } from '../../../types/types';
 
 // ✅ IMPORTS DEL SISTEMA DE ERRORES
 import { useErrorHandler } from '@/hooks/useErrorHandler';
@@ -25,6 +25,59 @@ import { BudgetChatPanel } from './BudgetChatPanel';
 import { BudgetCatalogModal } from './BudgetCatalogModal';
 import { BudgetParametricModal } from './BudgetParametricModal';
 
+// ✅ TIPOS ADICIONALES
+interface Item3D {
+  uuid: string;
+  name: string;
+  quantity: number;
+  info: string;
+  price: number;
+  is3D: boolean;
+}
+
+interface ManualItem {
+  id: string;
+  order_id: string;
+  product_id: string;
+  name: string;
+  quantity: number;
+  total_price: number;
+  dimensions: string;
+}
+
+interface OrderMessage {
+  id: string;
+  order_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  profiles?: {
+    full_name: string;
+    role: string;
+  };
+}
+
+interface Observation {
+  id: string;
+  order_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  profiles?: {
+    full_name: string;
+    role: string;
+  };
+}
+
+interface Attachment {
+  id: string;
+  order_id: string;
+  file_name: string;
+  file_url: string;
+  uploader_id: string;
+  created_at: string;
+}
+
 export const BudgetDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -35,19 +88,19 @@ export const BudgetDetailPage = () => {
   });
   
   const [order, setOrder] = useState<Order | null>(null);
-  const [items3D, setItems3D] = useState<any[]>([]);
-  const [manualItems, setManualItems] = useState<any[]>([]);
-  const [messages, setMessages] = useState<any[]>([]);
+  const [items3D, setItems3D] = useState<Item3D[]>([]);
+  const [manualItems, setManualItems] = useState<ManualItem[]>([]);
+  const [messages, setMessages] = useState<OrderMessage[]>([]);
   
   // Nombres y Notas
   const [customName, setCustomName] = useState('');
   
   // Observaciones
-  const [observations, setObservations] = useState<any[]>([]);
+  const [observations, setObservations] = useState<Observation[]>([]);
   const [newObservation, setNewObservation] = useState('');
   
   // Archivos
-  const [attachments, setAttachments] = useState<any[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
 
   // UI
@@ -72,6 +125,7 @@ export const BudgetDetailPage = () => {
   
   const closeModal = () => setModal({ ...modal, isOpen: false });
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadOrderData(); }, [id]);
 
   const loadOrderData = async () => {
@@ -101,21 +155,23 @@ export const BudgetDetailPage = () => {
       }
       
       // Items 3D
-      let calculated3DItems: any[] = [];
+      let calculated3DItems: Item3D[] = [];
       const raw3DItems = orderData.projects?.data?.items || orderData.projects?.items || [];
       
       if (raw3DItems.length > 0) {
-        calculated3DItems = raw3DItems.map((item: any) => ({
-          uuid: item.uuid,
-          name: item.name || 'Elemento 3D',
+        calculated3DItems = raw3DItems.map((item: Record<string, unknown>) => ({
+          uuid: item.uuid as string,
+          name: (item.name as string) || 'Elemento 3D',
           quantity: 1,
+          // @ts-expect-error - PriceCalculator expects SceneItem but we have dynamic data
           info: PriceCalculator.getItemDimensions(item),
+          // @ts-expect-error - PriceCalculator expects SceneItem but we have dynamic data
           price: PriceCalculator.getItemPrice(item),
           is3D: true
         }));
       }
       setItems3D(calculated3DItems);
-      setOrder(orderData as any);
+      setOrder(orderData);
       
       // Cargar Nombre si existe
       if (orderData.custom_name) setCustomName(orderData.custom_name);
@@ -172,7 +228,8 @@ export const BudgetDetailPage = () => {
     const total3D = items3D.reduce((acc, item) => acc + item.price, 0);
     const totalManual = manualItems.reduce((acc, item) => acc + item.total_price, 0);
     const subtotal = total3D + totalManual;
-    const discountRate = (order as any)?.profiles?.discount_rate || 0;
+    // @ts-expect-error - discount_rate exists in database but not in Profile type
+    const discountRate = order?.profiles?.discount_rate || 0;
     const discountAmount = subtotal * (discountRate / 100);
     return { subtotal, discountRate, discountAmount, final: subtotal - discountAmount };
   };
@@ -446,7 +503,10 @@ export const BudgetDetailPage = () => {
         );
         
         try {
-          const update: any = { status, total_price: totals.final };
+          const update: Partial<Order> = { 
+            status: status as OrderStatus, 
+            total_price: totals.final 
+          };
           
           if (status === 'pedido') {
             const d = new Date(); 
