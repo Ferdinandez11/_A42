@@ -459,17 +459,16 @@ export const ClientDashboard: React.FC = () => {
       
       setUserId(user.id);
 
-      if (activeTab === 'projects') {
-        const { data, error } = await supabase
-          .from('projects')
-          .select('*, orders(id)')
-          .eq('user_id', user.id)
-          .order('updated_at', { ascending: false });
-        
-        if (error) throw error;
-        
-      setProjects(data || []);
-      } else {
+   if (activeTab === 'projects') {
+     const { data, error } = await supabase
+       .from('projects')
+       .select('*, orders(id, order_ref, status)')
+       .eq('user_id', userId);
+
+     if (error) throw error;
+
+     setProjects(data || []); // ← SOLO ESTA LÍNEA
+   } else {
         let query = supabase
           .from('orders')
           .select('*, projects(name)')
