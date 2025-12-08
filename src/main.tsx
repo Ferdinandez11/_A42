@@ -5,14 +5,6 @@ import './index.css';
 
 import { ToastProvider } from './components/providers/ToastProvider';
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <ToastProvider>
-      <App />
-    </ToastProvider>
-  </React.StrictMode>,
-);
-
 // 🎨 Constants
 const ROOT_ELEMENT_ID = 'root';
 
@@ -44,7 +36,9 @@ const initializeApp = (): void => {
     
     root.render(
       <React.StrictMode>
-        <App />
+        <ToastProvider>
+          <App />
+        </ToastProvider>
       </React.StrictMode>
     );
     
