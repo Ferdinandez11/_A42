@@ -1,0 +1,38 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🐶 Husky: Ejecutando validaciones pre-commit..."
+echo ""
+
+# Ejecutar lint-staged (solo en archivos modificados)
+echo "📝 Lint-staged..."
+npx lint-staged
+if [ $? -ne 0 ]; then
+  echo "❌ Lint-staged failed"
+  exit 1
+fi
+echo "✅ Lint-staged passed"
+echo ""
+
+# TypeScript check
+echo "🔍 TypeScript check..."
+npm run type-check
+if [ $? -ne 0 ]; then
+  echo "❌ TypeScript check failed"
+  exit 1
+fi
+echo "✅ TypeScript OK"
+echo ""
+
+# Tests (puedes comentar esta sección si los tests tardan mucho)
+echo "🧪 Running tests..."
+npm run test:run
+if [ $? -ne 0 ]; then
+  echo "❌ Tests failed"
+  exit 1
+fi
+echo "✅ Tests passed"
+echo ""
+
+echo "✅ All pre-commit validations passed!"
+echo "🚀 Proceeding with commit..."

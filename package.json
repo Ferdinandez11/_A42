@@ -13,7 +13,8 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest --watch",
     "type-check": "tsc --noEmit",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "prepare": "husky"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.86.0",
@@ -30,10 +31,9 @@
     "three": "^0.158.0",
     "zustand": "^5.0.8"
   },
-
-
-  
   "devDependencies": {
+    "@commitlint/cli": "^20.2.0",
+    "@commitlint/config-conventional": "^20.2.0",
     "@eslint/js": "^9.39.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
@@ -50,7 +50,9 @@
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
     "happy-dom": "^20.0.11",
+    "husky": "^9.1.7",
     "jsdom": "^27.2.0",
+    "lint-staged": "^16.2.7",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
     "typescript": "~5.9.3",
@@ -58,42 +60,37 @@
     "vite": "^7.2.4",
     "vitest": "^4.0.15"
   },
-
-  
-    "lint-staged": {
-      "*.{ts,tsx}": [
-        "eslint --fix",
-        "prettier --write"
-      ],
-      "*.{json,md,yml,yaml}": [
-        "prettier --write"
-      ]
-    },
-    "commitlint": {
-      "extends": [
-        "@commitlint/config-conventional"
-      ],
-      "rules": {
-        "type-enum": [
-          2,
-          "always",
-          [
-            "feat",
-            "fix",
-            "docs",
-            "style",
-            "refactor",
-            "perf",
-            "test",
-            "build",
-            "ci",
-            "chore",
-            "revert"
-          ]
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  },
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
+    ],
+    "rules": {
+      "type-enum": [
+        2,
+        "always",
+        [
+          "feat",
+          "fix",
+          "docs",
+          "style",
+          "refactor",
+          "perf",
+          "test",
+          "build",
+          "ci",
+          "chore",
+          "revert"
         ]
-      }
+      ]
     }
-  
-
-
+  }
 }
