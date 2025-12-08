@@ -22,6 +22,9 @@ import { AdminOrderDetailPage } from "./features/crm/pages/AdminOrderDetailPage"
 import { AdminClientDetailPage } from "./features/crm/pages/AdminClientDetailPage";
 import { AdminCalendarPage } from "./features/crm/pages/AdminCalendarPage";
 
+import { useErrorHandler } from '@/hooks/useErrorHandler';
+import { AppError, ErrorType, ErrorSeverity } from "@/lib/errorHandler";
+
 // --- TYPES ---
 type UserRole = "admin" | "employee" | "client";
 
@@ -160,6 +163,9 @@ const ClientPortalLayout: React.FC = () => (
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { setUser, setSession } = useAuthStore();
+  const { handleError, showSuccess } = useErrorHandler({ 
+  context: 'LoginPage' 
+  });
 
   const [step, setStep] = React.useState<AuthStep>("selection");
   const [targetRole, setTargetRole] = React.useState<TargetRole>("client");
@@ -168,20 +174,22 @@ const LoginPage: React.FC = () => {
   const [email, setEmail] = React.useState<string>("");
   const [password, setPassword] = React.useState<string>("");
   const [loading, setLoading] = React.useState<boolean>(false);
-  const [errorMsg, setErrorMsg] = React.useState<string>("");
+  
 
   const selectRole = (role: TargetRole): void => {
     setTargetRole(role);
     setStep("form");
-    setErrorMsg("");
   };
 
-  const checkUserStatus = async (userId: string): Promise<void> => {
-    const { data: profile } = await supabase
+const checkUserStatus = async (userId: string): Promise<void> => {
+  try {
+    const { data: profile, error } = await supabase
       .from("profiles")
       .select("role, is_approved")
       .eq("id", userId)
       .single();
+
+    if (error) throw error;
 
     if (profile) {
       const typedProfile = profile as Profile;
@@ -195,44 +203,61 @@ const LoginPage: React.FC = () => {
         navigate("/portal");
       } else {
         await supabase.auth.signOut();
-        throw new Error("🔒 Cuenta creada. Pendiente de validación.");
+        showSuccess('✅ Cuenta creada. Pendiente de aprobación.');
+        throw new AppError(
+          ErrorType.PERMISSION,
+          'Account pending approval',
+          { 
+            severity: ErrorSeverity.LOW,
+            userMessage: 'Tu cuenta está pendiente de validación por un administrador.' 
+          }
+        );
       }
     }
-  };
+  } catch (error) {
+    throw error; // Re-lanzar para que handleAuth lo capture
+  }
+};
+const handleAuth = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
+  e.preventDefault();
+  setLoading(true);
 
-  const handleAuth = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
-    e.preventDefault();
-    setLoading(true);
-    setErrorMsg("");
+  try {
+    let result;
 
-    try {
-      let result;
-
-      if (isRegistering) {
-        result = await supabase.auth.signUp({
-          email,
-          password,
-          options: { data: { role: "client" } },
-        });
-      } else {
-        result = await supabase.auth.signInWithPassword({ email, password });
-      }
-
-      if (result.error) throw result.error;
-
-      if (!result.data.user) throw new Error("Error desconocido.");
-
-      setUser(result.data.user as ExtendedUser);
-      const session = (await supabase.auth.getSession()).data.session;
-      setSession(session);
-
-      await checkUserStatus(result.data.user.id);
-    } catch (error: any) {
-      setErrorMsg(error.message);
-    } finally {
-      setLoading(false);
+    if (isRegistering) {
+      result = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { role: "client" } },
+      });
+    } else {
+      result = await supabase.auth.signInWithPassword({ email, password });
     }
-  };
+
+    if (result.error) throw result.error;
+
+    if (!result.data.user) {
+      throw new AppError(
+        ErrorType.AUTH,
+        'No user data received',
+        { userMessage: 'Error de autenticación. Intenta nuevamente.' }
+      );
+    }
+
+    setUser(result.data.user as ExtendedUser);
+    const session = (await supabase.auth.getSession()).data.session;
+    setSession(session);
+
+    await checkUserStatus(result.data.user.id);
+    
+    showSuccess(isRegistering ? '✅ Cuenta creada exitosamente' : '👋 Bienvenido');
+  } catch (error) {
+    handleError(error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <>
@@ -280,17 +305,7 @@ const LoginPage: React.FC = () => {
                 : "Acceso Clientes"}
             </h2>
 
-            {errorMsg && (
-              <div
-                className={`${
-                  errorMsg.includes("validación")
-                    ? "bg-green-500/20 text-green-400"
-                    : "bg-red-500/20 text-red-400"
-                } p-2.5 rounded-md mb-4 text-xs`}
-              >
-                {errorMsg}
-              </div>
-            )}
+
 
             <form onSubmit={handleAuth} className="flex flex-col gap-4">
               <input
@@ -331,7 +346,6 @@ const LoginPage: React.FC = () => {
                 <button
                   onClick={() => {
                     setIsRegistering(!isRegistering);
-                    setErrorMsg("");
                   }}
                   className="bg-transparent border-none text-blue-500 cursor-pointer font-bold underline hover:text-blue-400"
                 >

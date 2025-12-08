@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
+import { AppError, ErrorType, ErrorSeverity } from '@/lib/errorHandler';
 
 // ============================================================================
 // TYPES
@@ -134,17 +136,21 @@ const useCrmData = (activeTab: DashboardTab) => {
   const [loading, setLoading] = useState(false);
   const [dataList, setDataList] = useState<Order[]>([]);
   const [clients, setClients] = useState<Profile[]>([]);
+  
+  // ✅ AÑADIR
+  const { handleError } = useErrorHandler({ context: 'CrmDashboard.loadData' });
 
   const loadData = async () => {
     setLoading(true);
     
     try {
       if (activeTab === 'clients') {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('profiles')
           .select('*')
           .order('created_at', { ascending: false });
         
+        if (error) throw error;
         setClients(data || []);
       } else {
         let query = supabase
@@ -163,11 +169,13 @@ const useCrmData = (activeTab: DashboardTab) => {
           query = query.in('status', ORDER_STATUSES);
         }
 
-        const { data } = await query;
+        const { data, error } = await query;
+        if (error) throw error;
+        
         setDataList(data || []);
       }
     } catch (err) {
-      console.error('[CrmDashboard] Load error:', err);
+      handleError(err);
     } finally {
       setLoading(false);
     }
@@ -363,56 +371,115 @@ export const CrmDashboard: React.FC = () => {
   const [newClientData, setNewClientData] = useState<NewClientData>(EMPTY_CLIENT_DATA);
 
   const { loading, dataList, clients, loadData } = useCrmData(activeTab);
-
+  const { handleError, showSuccess, showLoading, dismissToast } = useErrorHandler({
+    context: 'CrmDashboard'
+  });
   // Handlers
-  const handleApproveClient = async (clientId: string): Promise<void> => {
+const handleApproveClient = async (clientId: string): Promise<void> => {
+  const loadingToast = showLoading('Aprobando cliente...');
+  
+  try {
     const { error } = await supabase
       .from('profiles')
       .update({ is_approved: true })
       .eq('id', clientId);
 
-    if (!error) {
-      alert('Usuario aprobado.');
-      loadData();
-    }
-  };
+    if (error) throw error;
+    
+    dismissToast(loadingToast);
+    showSuccess('✅ Cliente aprobado correctamente');
+    loadData();
+  } catch (error) {
+    dismissToast(loadingToast);
+    handleError(error);
+  }
+};
 
-  const handleCreateClient = async (): Promise<void> => {
-    if (!newClientData.email) {
-      alert('Email obligatorio');
-      return;
-    }
+const handleCreateClient = async (): Promise<void> => {
+  if (!newClientData.email) {
+    handleError(
+      new AppError(
+        ErrorType.VALIDATION,
+        'Email required',
+        { 
+          userMessage: 'El email es obligatorio',
+          severity: ErrorSeverity.LOW 
+        }
+      )
+    );
+    return;
+  }
 
+  const loadingToast = showLoading('Creando cliente...');
+
+  try {
     const { error } = await supabase
       .from('pre_clients')
       .insert([newClientData]);
 
-    if (error) {
-      alert('Error: ' + error.message);
-    } else {
-      alert(`✅ Ficha creada para ${newClientData.email}.`);
-      setShowCreateModal(false);
-      setNewClientData(EMPTY_CLIENT_DATA);
-    }
-  };
-
-  const handleDeleteClient = async (id: string): Promise<void> => {
-    if (!confirm('¿Borrar cliente?')) return;
+    if (error) throw error;
     
-    await supabase.from('profiles').delete().eq('id', id);
+    dismissToast(loadingToast);
+    showSuccess(`✅ Cliente ${newClientData.email} creado correctamente`);
+    setShowCreateModal(false);
+    setNewClientData(EMPTY_CLIENT_DATA);
     loadData();
-  };
+  } catch (error) {
+    dismissToast(loadingToast);
+    handleError(error);
+  }
+};
 
-  const handleDeleteOrder = async (id: string): Promise<void> => {
-    if (!confirm('¿Borrar registro?')) return;
+const handleDeleteClient = async (id: string): Promise<void> => {
+  if (!confirm('¿Borrar cliente?')) return;
+  
+  const loadingToast = showLoading('Eliminando cliente...');
+  
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('id', id);
     
-    await supabase.from('orders').delete().eq('id', id);
+    if (error) throw error;
+    
+    dismissToast(loadingToast);
+    showSuccess('✅ Cliente eliminado');
     loadData();
-  };
+  } catch (error) {
+    dismissToast(loadingToast);
+    handleError(error);
+  }
+};
 
-  const handleStatusUpdate = async (id: string, newStatus: OrderStatus): Promise<void> => {
-    if (!confirm(`¿Cambiar estado a "${newStatus.toUpperCase()}"?`)) return;
+const handleDeleteOrder = async (id: string): Promise<void> => {
+  if (!confirm('¿Borrar registro?')) return;
+  
+  const loadingToast = showLoading('Eliminando...');
+  
+  try {
+    const { error } = await supabase
+      .from('orders')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+    
+    dismissToast(loadingToast);
+    showSuccess('✅ Registro eliminado');
+    loadData();
+  } catch (error) {
+    dismissToast(loadingToast);
+    handleError(error);
+  }
+};
 
+const handleStatusUpdate = async (id: string, newStatus: OrderStatus): Promise<void> => {
+  if (!confirm(`¿Cambiar estado a "${newStatus.toUpperCase()}"?`)) return;
+
+  const loadingToast = showLoading('Actualizando estado...');
+
+  try {
     const updateData: Partial<Order> = { status: newStatus };
     const deliveryDate = calculateEstimatedDelivery(newStatus);
     
@@ -420,9 +487,21 @@ export const CrmDashboard: React.FC = () => {
       updateData.estimated_delivery_date = deliveryDate;
     }
 
-    await supabase.from('orders').update(updateData).eq('id', id);
+    const { error } = await supabase
+      .from('orders')
+      .update(updateData)
+      .eq('id', id);
+    
+    if (error) throw error;
+    
+    dismissToast(loadingToast);
+    showSuccess('✅ Estado actualizado');
     loadData();
-  };
+  } catch (error) {
+    dismissToast(loadingToast);
+    handleError(error);
+  }
+};
 
   return (
     <div className="text-neutral-200 p-5 font-sans">

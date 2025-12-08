@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { supabase } from "@/lib/supabase";
 import type { User, Session } from "@supabase/supabase-js";
+import { handleError } from '@/lib/errorHandler';
 
 /**
  * Authentication store state
@@ -27,7 +28,15 @@ export const useAuthStore = create<AuthState>((set) => ({
   setSession: (session) => set({ session }),
 
   logout: async () => {
-    await supabase.auth.signOut();
-    set({ user: null, session: null });
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      set({ user: null, session: null });
+      localStorage.clear();
+    } catch (error) {
+      // Re-lanzar para que el componente lo maneje
+      throw handleError(error, 'useAuthStore.logout');
+    }
   },
 }));
