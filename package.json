@@ -30,6 +30,9 @@
     "three": "^0.158.0",
     "zustand": "^5.0.8"
   },
+
+
+  
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@testing-library/jest-dom": "^6.9.1",
@@ -55,4 +58,42 @@
     "vite": "^7.2.4",
     "vitest": "^4.0.15"
   }
+
+  
+    "lint-staged": {
+      "*.{ts,tsx}": [
+        "eslint --fix",
+        "prettier --write"
+      ],
+      "*.{json,md,yml,yaml}": [
+        "prettier --write"
+      ]
+    },
+    "commitlint": {
+      "extends": [
+        "@commitlint/config-conventional"
+      ],
+      "rules": {
+        "type-enum": [
+          2,
+          "always",
+          [
+            "feat",
+            "fix",
+            "docs",
+            "style",
+            "refactor",
+            "perf",
+            "test",
+            "build",
+            "ci",
+            "chore",
+            "revert"
+          ]
+        ]
+      }
+    }
+  
+
+
 }
