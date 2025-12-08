@@ -27,11 +27,11 @@ export default tseslint.config(
       // ✅ Convertir errores en warnings para no bloquear CI
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': 'warn',
-      '@typescript-eslint/ban-ts-comment': 'off',
+      '@typescript-eslint/ban-ts-comment': 'warn',
       'no-empty-pattern': 'warn',
       'prefer-const': 'warn',
       'no-useless-catch': 'warn',
-      '@typescript-eslint/no-empty-interface': 'off', // Permitir interfaces vacías
+      '@typescript-eslint/no-empty-interface': 'warn', // Permitir interfaces vacías
       
       // Permitir ts-expect-error y ts-ignore con descripción
       '@typescript-eslint/ban-ts-comment': [
