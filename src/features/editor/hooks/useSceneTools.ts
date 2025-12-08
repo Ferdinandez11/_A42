@@ -27,7 +27,6 @@ interface SceneToolsActions {
   swapCadSelection: () => ToolOperationResult;
 }
 
-interface UseSceneToolsReturn extends SceneToolsActions {}
 
 // ============================================================================
 // CONSTANTES
@@ -45,7 +44,7 @@ const ERROR_MESSAGES = {
 // HOOK useSceneTools
 // ============================================================================
 
-export const useSceneTools = (): UseSceneToolsReturn => {
+export const useSceneTools = (): SceneToolsActions => {
   const engine = useEngine();
 
   // ==========================================================================
