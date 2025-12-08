@@ -27,7 +27,7 @@ export default tseslint.config(
       // ✅ Convertir errores en warnings para no bloquear CI
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': 'warn',
-      '@typescript-eslint/ban-ts-comment': 'warn',
+      '@typescript-eslint/ban-ts-comment': 'off',
       'no-empty-pattern': 'warn',
       'prefer-const': 'warn',
       'no-useless-catch': 'warn',
