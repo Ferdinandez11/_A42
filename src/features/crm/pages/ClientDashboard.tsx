@@ -437,80 +437,113 @@ export const ClientDashboard: React.FC = () => {
     setSearchParams({ tab: activeTab });
   }, [activeTab, setSearchParams]);
 
-  const fetchData = useCallback(async () => {
-    const loadingToast = showLoading('Cargando datos...');
-    setLoading(true);
+const fetchData = useCallback(async () => {
+  console.log('🔍 [FETCH] fetchData iniciado');
+  console.log('🔍 [FETCH] activeTab:', activeTab);
+  
+  const loadingToast = showLoading('Cargando datos...');
+  
+  try {
+    console.log('🔍 [FETCH] Obteniendo usuario...');
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
     
-    try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
-      if (userError) throw userError;
-      
-      if (!user) {
-        throw new AppError(
-          ErrorType.AUTH,
-          'No authenticated user',
-          { 
-            userMessage: 'Sesión expirada. Por favor, inicia sesión nuevamente.',
-            severity: ErrorSeverity.MEDIUM 
-          }
-        );
-      }
-      
-      setUserId(user.id);
-
-   if (activeTab === 'projects') {
-     const { data, error } = await supabase
-       .from('projects')
-       .select('*, orders(id, order_ref, status)')
-       .eq('user_id', userId);
-
-     if (error) throw error;
-
-     setProjects(data || []); // ← SOLO ESTA LÍNEA
-   } else {
-        let query = supabase
-          .from('orders')
-          .select('*, projects(name)')
-          .order('created_at', { ascending: false });
-
-        if (activeTab === 'budgets') {
-          query = query
-            .eq('is_archived', false)
-            .in('status', ['pendiente', 'presupuestado', 'rechazado']);
-        } else if (activeTab === 'orders') {
-          query = query
-            .eq('is_archived', false)
-            .in('status', [
-              'pedido',
-              'fabricacion',
-              'entregado_parcial',
-              'entregado',
-              'completado',
-            ]);
-        } else if (activeTab === 'archived') {
-          query = query.eq('is_archived', true);
+    console.log('🔍 [FETCH] Usuario obtenido:', user?.id);
+    console.log('🔍 [FETCH] Error de usuario:', userError);
+    
+    if (userError) throw userError;
+    
+    if (!user) {
+      console.log('⚠️ [FETCH] No hay usuario, redirigiendo...');
+      throw new AppError(
+      ErrorType.AUTH,  // ✅ tipo primero
+      'No hay sesión activa',
+        { 
+          severity: ErrorSeverity.MEDIUM 
         }
-
-        const { data, error } = await query;
-        if (error) throw error;
-        
-        setOrders(data || []);
-      }
-
-      dismissToast(loadingToast);
-    } catch (error) {
-      dismissToast(loadingToast);
-      handleError(error);
-      
-      // Si es error de auth, redirigir a login
-      if (error instanceof AppError && error.type === ErrorType.AUTH) {
-        navigate('/login');
-      }
-    } finally {
-      setLoading(false);
+      );
     }
-  }, [activeTab, navigate, handleError, showLoading, dismissToast]);
+    
+    console.log('✅ [FETCH] Usuario autenticado:', user.id);
+    setUserId(user.id);
+
+    if (activeTab === 'projects') {
+      console.log('🔍 [FETCH] Consultando PROJECTS...');
+      
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*, orders(id)')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false });
+      
+      console.log('📦 [FETCH] Projects data recibida:', data);
+      console.log('📦 [FETCH] Projects count:', data?.length);
+      console.log('❌ [FETCH] Projects error:', error);
+      
+      if (error) throw error;
+      
+      console.log('✅ [FETCH] Seteando projects...');
+      setProjects(data || []);
+      console.log('✅ [FETCH] Projects seteados');
+      
+    } else {
+      console.log('🔍 [FETCH] Consultando ORDERS para tab:', activeTab);
+      
+      let query = supabase
+        .from('orders')
+        .select('*, projects(name)')
+        .order('created_at', { ascending: false });
+
+      if (activeTab === 'budgets') {
+        query = query
+          .eq('is_archived', false)
+          .in('status', ['pendiente', 'presupuestado', 'rechazado']);
+      } else if (activeTab === 'orders') {
+        query = query
+          .eq('is_archived', false)
+          .in('status', [
+            'pedido',
+            'fabricacion',
+            'entregado_parcial',
+            'entregado',
+            'completado',
+          ]);
+      } else if (activeTab === 'archived') {
+        query = query.eq('is_archived', true);
+      }
+
+      const { data, error } = await query;
+      
+      console.log('📦 [FETCH] Orders data recibida:', data);
+      console.log('📦 [FETCH] Orders count:', data?.length);
+      console.log('❌ [FETCH] Orders error:', error);
+      
+      if (error) throw error;
+      
+      console.log('✅ [FETCH] Seteando orders...');
+      setOrders(data || []);
+      console.log('✅ [FETCH] Orders seteados');
+    }
+
+    console.log('🏁 [FETCH] dismissToast...');
+    dismissToast(loadingToast);
+    console.log('🏁 [FETCH] Toast dismissed');
+    
+  } catch (error) {
+    console.error('💥 [FETCH] Error capturado:', error);
+    dismissToast(loadingToast);
+    handleError(error);
+    
+    // Si es error de auth, redirigir a login
+    if (error instanceof AppError && error.type === ErrorType.AUTH) {
+      console.log('🔐 [FETCH] Error de auth, redirigiendo a login');
+      navigate('/login');
+    }
+  } finally {
+    console.log('🏁 [FETCH] Finally - setLoading(false)');
+    setLoading(false);
+    console.log('🏁 [FETCH] fetchData finalizado');
+  }
+}, [activeTab, navigate, handleError, showLoading, dismissToast]);
 
   useEffect(() => {
     fetchData();
