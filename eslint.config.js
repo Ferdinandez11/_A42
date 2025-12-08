@@ -31,7 +31,7 @@ export default tseslint.config(
       'no-empty-pattern': 'warn',
       'prefer-const': 'warn',
       'no-useless-catch': 'warn',
-      '@typescript-eslint/no-empty-interface': 'warn',
+      '@typescript-eslint/no-empty-interface': 'off', // Permitir interfaces vacías
       
       // Permitir ts-expect-error y ts-ignore con descripción
       '@typescript-eslint/ban-ts-comment': [
