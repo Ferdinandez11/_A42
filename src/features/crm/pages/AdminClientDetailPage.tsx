@@ -5,6 +5,10 @@ import { ArrowLeft, Building2, Package, Save, ExternalLink } from 'lucide-react'
 
 import { supabase } from '../../../lib/supabase';
 
+// ✅ IMPORTS DEL SISTEMA DE ERRORES
+import { useErrorHandler } from '@/hooks/useErrorHandler';
+import { AppError, ErrorType, ErrorSeverity } from '@/lib/errorHandler';
+
 // ============================================================================
 // TIPOS E INTERFACES
 // ============================================================================
@@ -75,8 +79,6 @@ const MESSAGES = {
   LOADING: 'Cargando ficha...',
   NOT_FOUND: 'Cliente no encontrado.',
   BACK_TO_LIST: 'Volver al Listado',
-  SAVE_SUCCESS: '✅ Cliente actualizado correctamente',
-  SAVE_ERROR: (error: string) => `Error al guardar: ${error}`,
   NO_ORDERS: 'Sin pedidos.',
   CLIENT_CARD_TITLE: 'Ficha Cliente:',
 } as const;
@@ -378,6 +380,11 @@ export const AdminClientDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
+  // ✅ AÑADIR ERROR HANDLER
+  const { handleError, showSuccess, showLoading, dismissToast } = useErrorHandler({
+    context: 'AdminClientDetailPage'
+  });
+
   const [profile, setProfile] = useState<ClientProfile | null>(null);
   const [clientOrders, setClientOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -390,6 +397,7 @@ export const AdminClientDetailPage: React.FC = () => {
   const loadClientData = useCallback(async () => {
     if (!id) return;
 
+    const loadingToast = showLoading('Cargando ficha del cliente...');
     setLoading(true);
 
     try {
@@ -401,7 +409,19 @@ export const AdminClientDetailPage: React.FC = () => {
         .single();
 
       if (profileError) throw profileError;
-      if (profileData) setProfile(profileData);
+      
+      if (!profileData) {
+        throw new AppError(
+          ErrorType.NOT_FOUND,
+          'Client profile not found',
+          { 
+            userMessage: 'Cliente no encontrado',
+            severity: ErrorSeverity.MEDIUM 
+          }
+        );
+      }
+      
+      setProfile(profileData);
 
       // Cargar pedidos
       const { data: ordersData, error: ordersError } = await supabase
@@ -412,13 +432,15 @@ export const AdminClientDetailPage: React.FC = () => {
 
       if (ordersError) throw ordersError;
       setClientOrders(ordersData || []);
+
+      dismissToast(loadingToast);
     } catch (error) {
-      console.error('Error loading client data:', error);
-      alert('Error al cargar los datos del cliente');
+      dismissToast(loadingToast);
+      handleError(error);
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, handleError, showLoading, dismissToast]);
 
   useEffect(() => {
     loadClientData();
@@ -435,6 +457,7 @@ export const AdminClientDetailPage: React.FC = () => {
   const handleSave = useCallback(async () => {
     if (!profile || !id) return;
 
+    const loadingToast = showLoading('Guardando cambios...');
     setSaving(true);
 
     try {
@@ -456,14 +479,15 @@ export const AdminClientDetailPage: React.FC = () => {
 
       if (error) throw error;
 
-      alert(MESSAGES.SAVE_SUCCESS);
-    } catch (error: any) {
-      console.error('Error saving profile:', error);
-      alert(MESSAGES.SAVE_ERROR(error.message));
+      dismissToast(loadingToast);
+      showSuccess('✅ Cliente actualizado correctamente');
+    } catch (error) {
+      dismissToast(loadingToast);
+      handleError(error);
     } finally {
       setSaving(false);
     }
-  }, [profile, id]);
+  }, [profile, id, handleError, showSuccess, showLoading, dismissToast]);
 
   const handleViewOrder = useCallback(
     (orderId: string) => {

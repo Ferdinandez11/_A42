@@ -6,6 +6,10 @@ import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 import { PriceCalculator, PRICES } from '../../../utils/PriceCalculator';
 import type { Order } from '../../../types/types';
 
+// ✅ IMPORTS DEL SISTEMA DE ERRORES
+import { useErrorHandler } from '@/hooks/useErrorHandler';
+import { AppError, ErrorType, ErrorSeverity } from '@/lib/errorHandler';
+
 // Importar tipos y utilidades
 import type { CatalogItem, ModalState } from './budgetTypes';
 import { getStatusBadge } from './budgetUtils';
@@ -24,6 +28,11 @@ import { BudgetParametricModal } from './BudgetParametricModal';
 export const BudgetDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  
+  // ✅ AÑADIR ERROR HANDLER
+  const { handleError, showSuccess, showLoading, dismissToast } = useErrorHandler({
+    context: 'BudgetDetailPage'
+  });
   
   const [order, setOrder] = useState<Order | null>(null);
   const [items3D, setItems3D] = useState<any[]>([]);
@@ -67,70 +76,96 @@ export const BudgetDetailPage = () => {
 
   const loadOrderData = async () => {
     if (!id) return;
+    
+    const loadingToast = showLoading('Cargando presupuesto...');
     setLoading(true);
 
-    const { data: orderData } = await supabase
-      .from('orders')
-      .select('*, projects(*), profiles(discount_rate)')
-      .eq('id', id)
-      .single();
-    
-    if (!orderData) { 
-      navigate('/portal'); 
-      return; 
+    try {
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .select('*, projects(*), profiles(discount_rate)')
+        .eq('id', id)
+        .single();
+      
+      if (orderError) throw orderError;
+      
+      if (!orderData) {
+        throw new AppError(
+          ErrorType.NOT_FOUND,
+          'Order not found',
+          { 
+            userMessage: 'Presupuesto no encontrado',
+            severity: ErrorSeverity.MEDIUM 
+          }
+        );
+      }
+      
+      // Items 3D
+      let calculated3DItems: any[] = [];
+      const raw3DItems = orderData.projects?.data?.items || orderData.projects?.items || [];
+      
+      if (raw3DItems.length > 0) {
+        calculated3DItems = raw3DItems.map((item: any) => ({
+          uuid: item.uuid,
+          name: item.name || 'Elemento 3D',
+          quantity: 1,
+          info: PriceCalculator.getItemDimensions(item),
+          price: PriceCalculator.getItemPrice(item),
+          is3D: true
+        }));
+      }
+      setItems3D(calculated3DItems);
+      setOrder(orderData as any);
+      
+      // Cargar Nombre si existe
+      if (orderData.custom_name) setCustomName(orderData.custom_name);
+
+      // Items Manuales
+      const { data: mItems, error: itemsError } = await supabase
+        .from('order_items')
+        .select('*')
+        .eq('order_id', id);
+      
+      if (itemsError) throw itemsError;
+      setManualItems(mItems || []);
+
+      // Chat
+      const { data: chatData, error: chatError } = await supabase
+        .from('order_messages')
+        .select('*, profiles(full_name, role)')
+        .eq('order_id', id)
+        .order('created_at', { ascending: true });
+      
+      if (chatError) throw chatError;
+      setMessages(chatData || []);
+
+      // Adjuntos
+      const { data: att, error: attError } = await supabase
+        .from('order_attachments')
+        .select('*')
+        .eq('order_id', id);
+      
+      if (attError) throw attError;
+      setAttachments(att || []);
+
+      // Observaciones
+      const { data: obs, error: obsError } = await supabase
+        .from('order_observations')
+        .select('*, profiles(full_name, role)')
+        .eq('order_id', id)
+        .order('created_at', { ascending: false }); 
+      
+      if (obsError) throw obsError;
+      setObservations(obs || []);
+
+      dismissToast(loadingToast);
+    } catch (error) {
+      dismissToast(loadingToast);
+      handleError(error);
+      navigate('/portal');
+    } finally {
+      setLoading(false);
     }
-    
-    // Items 3D
-    let calculated3DItems: any[] = [];
-    const raw3DItems = orderData.projects?.data?.items || orderData.projects?.items || [];
-    
-    if (raw3DItems.length > 0) {
-      calculated3DItems = raw3DItems.map((item: any) => ({
-        uuid: item.uuid,
-        name: item.name || 'Elemento 3D',
-        quantity: 1,
-        info: PriceCalculator.getItemDimensions(item),
-        price: PriceCalculator.getItemPrice(item),
-        is3D: true
-      }));
-    }
-    setItems3D(calculated3DItems);
-    setOrder(orderData as any);
-    
-    // Cargar Nombre si existe
-    if (orderData.custom_name) setCustomName(orderData.custom_name);
-
-    // Items Manuales
-    const { data: mItems } = await supabase
-      .from('order_items')
-      .select('*')
-      .eq('order_id', id);
-    setManualItems(mItems || []);
-
-    // Chat
-    const { data: chatData } = await supabase
-      .from('order_messages')
-      .select('*, profiles(full_name, role)')
-      .eq('order_id', id)
-      .order('created_at', { ascending: true });
-    setMessages(chatData || []);
-
-    // Adjuntos
-    const { data: att } = await supabase
-      .from('order_attachments')
-      .select('*')
-      .eq('order_id', id);
-    setAttachments(att || []);
-
-    // Observaciones
-    const { data: obs } = await supabase
-      .from('order_observations')
-      .select('*, profiles(full_name, role)')
-      .eq('order_id', id)
-      .order('created_at', { ascending: false }); 
-    setObservations(obs || []);
-
-    setLoading(false);
   };
 
   const calculateTotal = () => {
@@ -146,36 +181,76 @@ export const BudgetDetailPage = () => {
 
   // --- ACCIONES DATOS ---
   const handleSaveName = async () => {
-    const { error } = await supabase
-      .from('orders')
-      .update({ custom_name: customName })
-      .eq('id', id);
+    const loadingToast = showLoading('Guardando nombre...');
     
-    if (error) alert("Error: " + error.message);
-    else alert("✅ Nombre guardado");
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ custom_name: customName })
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      dismissToast(loadingToast);
+      showSuccess('✅ Nombre guardado correctamente');
+    } catch (error) {
+      dismissToast(loadingToast);
+      handleError(error);
+    }
   };
 
   const handleAddObservation = async () => {
-    if (!newObservation.trim()) return;
-    const { data: { user } } = await supabase.auth.getUser();
+    if (!newObservation.trim()) {
+      handleError(
+        new AppError(
+          ErrorType.VALIDATION,
+          'Empty observation',
+          { 
+            userMessage: 'La observación no puede estar vacía',
+            severity: ErrorSeverity.LOW 
+          }
+        )
+      );
+      return;
+    }
     
-    const { error } = await supabase.from('order_observations').insert([{
-      order_id: id,
-      user_id: user?.id,
-      content: newObservation
-    }]);
+    const loadingToast = showLoading('Añadiendo observación...');
     
-    if (error) alert("Error: " + error.message);
-    else {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { error } = await supabase.from('order_observations').insert([{
+        order_id: id,
+        user_id: user?.id,
+        content: newObservation
+      }]);
+      
+      if (error) throw error;
+      
+      dismissToast(loadingToast);
+      showSuccess('✅ Observación añadida');
       setNewObservation('');
       loadOrderData();
+    } catch (error) {
+      dismissToast(loadingToast);
+      handleError(error);
     }
   };
 
   // --- ACCIONES ITEMS ---
   const handleAddItem = (item: CatalogItem) => {
     if (order?.status !== 'pendiente') {
-      return alert("Solo puedes añadir elementos si el presupuesto está pendiente.");
+      handleError(
+        new AppError(
+          ErrorType.PERMISSION,
+          'Cannot add items to non-pending budget',
+          { 
+            userMessage: 'Solo puedes añadir elementos si el presupuesto está pendiente',
+            severity: ErrorSeverity.LOW 
+          }
+        )
+      );
+      return;
     }
     
     if (item.type === 'fence' || item.type === 'floor') {
@@ -187,7 +262,20 @@ export const BudgetDetailPage = () => {
 
   const confirmParametricItem = () => {
     const val = parseFloat(parametricModal.value);
-    if (!val || val <= 0) return alert("Valor inválido");
+    
+    if (!val || val <= 0) {
+      handleError(
+        new AppError(
+          ErrorType.VALIDATION,
+          'Invalid value',
+          { 
+            userMessage: 'El valor debe ser mayor que 0',
+            severity: ErrorSeverity.LOW 
+          }
+        )
+      );
+      return;
+    }
     
     const item = parametricModal.item;
     if (!item) return;
@@ -214,25 +302,64 @@ export const BudgetDetailPage = () => {
     total: number, 
     dims: string
   ) => {
-    await supabase.from('order_items').insert([{
-      order_id: id, 
-      product_id: prodId, 
-      name, 
-      quantity: qty, 
-      total_price: total, 
-      dimensions: dims
-    }]);
-    setIsCatalogOpen(false);
-    loadOrderData(); 
+    const loadingToast = showLoading('Añadiendo elemento...');
+    
+    try {
+      const { error } = await supabase.from('order_items').insert([{
+        order_id: id, 
+        product_id: prodId, 
+        name, 
+        quantity: qty, 
+        total_price: total, 
+        dimensions: dims
+      }]);
+      
+      if (error) throw error;
+      
+      dismissToast(loadingToast);
+      showSuccess(`✅ ${name} añadido correctamente`);
+      setIsCatalogOpen(false);
+      loadOrderData();
+    } catch (error) {
+      dismissToast(loadingToast);
+      handleError(error);
+    }
   };
 
   const handleDeleteManualItem = async (itemId: string) => {
     if (order?.status !== 'pendiente') {
-      return alert("Solo editable en fase pendiente.");
+      handleError(
+        new AppError(
+          ErrorType.PERMISSION,
+          'Cannot delete items from non-pending budget',
+          { 
+            userMessage: 'Solo editable en fase pendiente',
+            severity: ErrorSeverity.LOW 
+          }
+        )
+      );
+      return;
     }
+    
     if (!confirm("¿Borrar línea?")) return;
-    await supabase.from('order_items').delete().eq('id', itemId);
-    loadOrderData();
+    
+    const loadingToast = showLoading('Eliminando elemento...');
+    
+    try {
+      const { error } = await supabase
+        .from('order_items')
+        .delete()
+        .eq('id', itemId);
+      
+      if (error) throw error;
+      
+      dismissToast(loadingToast);
+      showSuccess('✅ Elemento eliminado');
+      loadOrderData();
+    } catch (error) {
+      dismissToast(loadingToast);
+      handleError(error);
+    }
   };
 
   // --- ARCHIVOS ---
@@ -240,29 +367,43 @@ export const BudgetDetailPage = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     
+    const loadingToast = showLoading('Subiendo archivo...');
     setUploading(true);
+    
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${Math.random()}.${fileExt}`;
       const filePath = `${id}/${fileName}`;
       
-      await supabase.storage.from('attachments').upload(filePath, file);
+      const { error: uploadError } = await supabase.storage
+        .from('attachments')
+        .upload(filePath, file);
+      
+      if (uploadError) throw uploadError;
       
       const { data: { publicUrl } } = supabase.storage
         .from('attachments')
         .getPublicUrl(filePath);
       
       const { data: { user } } = await supabase.auth.getUser();
-      await supabase.from('order_attachments').insert([{
-        order_id: id, 
-        file_name: file.name, 
-        file_url: publicUrl, 
-        uploader_id: user?.id
-      }]);
       
+      const { error: insertError } = await supabase
+        .from('order_attachments')
+        .insert([{
+          order_id: id, 
+          file_name: file.name, 
+          file_url: publicUrl, 
+          uploader_id: user?.id
+        }]);
+      
+      if (insertError) throw insertError;
+      
+      dismissToast(loadingToast);
+      showSuccess(`✅ ${file.name} subido correctamente`);
       loadOrderData();
-    } catch (error: any) { 
-      alert('Error al subir: ' + error.message); 
+    } catch (error) {
+      dismissToast(loadingToast);
+      handleError(error);
     } finally { 
       setUploading(false); 
     }
@@ -270,8 +411,24 @@ export const BudgetDetailPage = () => {
 
   const handleDeleteAttachment = async (attId: string) => {
     if (!confirm("¿Borrar archivo?")) return;
-    await supabase.from('order_attachments').delete().eq('id', attId);
-    loadOrderData();
+    
+    const loadingToast = showLoading('Eliminando archivo...');
+    
+    try {
+      const { error } = await supabase
+        .from('order_attachments')
+        .delete()
+        .eq('id', attId);
+      
+      if (error) throw error;
+      
+      dismissToast(loadingToast);
+      showSuccess('✅ Archivo eliminado');
+      loadOrderData();
+    } catch (error) {
+      dismissToast(loadingToast);
+      handleError(error);
+    }
   };
 
   // --- ESTADOS Y BOTONES ---
@@ -284,20 +441,42 @@ export const BudgetDetailPage = () => {
         : 'El presupuesto pasará a archivados.',
       isDestructive: status === 'rechazado',
       onConfirm: async () => {
-        const update: any = { status, total_price: totals.final };
+        const loadingToast = showLoading(
+          status === 'pedido' ? 'Confirmando pedido...' : 'Rechazando presupuesto...'
+        );
         
-        if (status === 'pedido') {
-          const d = new Date(); 
-          d.setDate(d.getDate() + 42); 
-          update.estimated_delivery_date = d.toISOString();
+        try {
+          const update: any = { status, total_price: totals.final };
+          
+          if (status === 'pedido') {
+            const d = new Date(); 
+            d.setDate(d.getDate() + 42); 
+            update.estimated_delivery_date = d.toISOString();
+          }
+          
+          const { error } = await supabase
+            .from('orders')
+            .update(update)
+            .eq('id', id);
+          
+          if (error) throw error;
+          
+          dismissToast(loadingToast);
+          showSuccess(
+            status === 'pedido' 
+              ? '✅ Pedido confirmado. ¡Pasando a fabricación!' 
+              : '✅ Presupuesto archivado'
+          );
+          
+          if (status === 'pedido') navigate('/portal?tab=orders');
+          else navigate('/portal?tab=archived');
+          
+          closeModal();
+        } catch (error) {
+          dismissToast(loadingToast);
+          handleError(error);
+          closeModal();
         }
-        
-        await supabase.from('orders').update(update).eq('id', id);
-        
-        if (status === 'pedido') navigate('/portal?tab=orders');
-        else navigate('/portal?tab=archived');
-        
-        closeModal();
       }
     });
   };
@@ -309,9 +488,25 @@ export const BudgetDetailPage = () => {
       message: 'Se borrará la solicitud y el diseño. ¿Continuar?', 
       isDestructive: true,
       onConfirm: async () => {
-        await supabase.from('orders').delete().eq('id', id);
-        navigate('/portal?tab=orders');
-        closeModal();
+        const loadingToast = showLoading('Eliminando solicitud...');
+        
+        try {
+          const { error } = await supabase
+            .from('orders')
+            .delete()
+            .eq('id', id);
+          
+          if (error) throw error;
+          
+          dismissToast(loadingToast);
+          showSuccess('✅ Solicitud eliminada');
+          navigate('/portal?tab=orders');
+          closeModal();
+        } catch (error) {
+          dismissToast(loadingToast);
+          handleError(error);
+          closeModal();
+        }
       }
     });
   };
@@ -323,26 +518,53 @@ export const BudgetDetailPage = () => {
       message: 'El pedido pasará a cancelado.', 
       isDestructive: true,
       onConfirm: async () => {
-        await supabase
-          .from('orders')
-          .update({ status: 'cancelado', is_archived: true })
-          .eq('id', id);
-        navigate('/portal?tab=archived');
-        closeModal();
+        const loadingToast = showLoading('Cancelando pedido...');
+        
+        try {
+          const { error } = await supabase
+            .from('orders')
+            .update({ status: 'cancelado', is_archived: true })
+            .eq('id', id);
+          
+          if (error) throw error;
+          
+          dismissToast(loadingToast);
+          showSuccess('✅ Pedido cancelado');
+          navigate('/portal?tab=archived');
+          closeModal();
+        } catch (error) {
+          dismissToast(loadingToast);
+          handleError(error);
+          closeModal();
+        }
       }
     });
   };
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !id) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from('order_messages').insert([{ 
-      order_id: id, 
-      user_id: user?.id, 
-      content: newMessage 
-    }]);
-    setNewMessage(''); 
-    loadOrderData();
+    
+    const loadingToast = showLoading('Enviando mensaje...');
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { error } = await supabase.from('order_messages').insert([{ 
+        order_id: id, 
+        user_id: user?.id, 
+        content: newMessage 
+      }]);
+      
+      if (error) throw error;
+      
+      dismissToast(loadingToast);
+      showSuccess('✅ Mensaje enviado');
+      setNewMessage(''); 
+      loadOrderData();
+    } catch (error) {
+      dismissToast(loadingToast);
+      handleError(error);
+    }
   };
 
   if (loading) return <p className="text-gray-500 p-5">Cargando...</p>;

@@ -18,6 +18,10 @@ import {
 import { supabase } from '../../../lib/supabase';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 
+// ✅ IMPORTS DEL SISTEMA DE ERRORES
+import { useErrorHandler } from '@/hooks/useErrorHandler';
+import { AppError, ErrorType, ErrorSeverity } from '@/lib/errorHandler';
+
 // ============================================================================
 // TIPOS E INTERFACES
 // ============================================================================
@@ -146,8 +150,6 @@ const MESSAGES = {
   NO_PROJECTS: 'No tienes proyectos pendientes.',
   NO_DATA: 'No hay datos en esta sección.',
   LOADING: 'Cargando datos...',
-  CREATE_BUDGET_SUCCESS: 'Presupuesto creado correctamente',
-  CREATE_BUDGET_ERROR: (error: string) => `Error al crear: ${error}`,
   DELETE_PROJECT_TITLE: 'Borrar Proyecto',
   DELETE_PROJECT_MESSAGE: '¿Estás seguro? Esta acción no se puede deshacer.',
   REQUEST_QUOTE_TITLE: 'Solicitar Presupuesto',
@@ -408,6 +410,11 @@ export const ClientDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
+  // ✅ AÑADIR ERROR HANDLER
+  const { handleError, showSuccess, showLoading, dismissToast } = useErrorHandler({
+    context: 'ClientDashboard'
+  });
+
   const initialTab = (searchParams.get('tab') as TabType) || 'projects';
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -431,23 +438,36 @@ export const ClientDashboard: React.FC = () => {
   }, [activeTab, setSearchParams]);
 
   const fetchData = useCallback(async () => {
+    const loadingToast = showLoading('Cargando datos...');
     setLoading(true);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-    setUserId(user.id);
-
+    
     try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError) throw userError;
+      
+      if (!user) {
+        throw new AppError(
+          ErrorType.AUTH,
+          'No authenticated user',
+          { 
+            userMessage: 'Sesión expirada. Por favor, inicia sesión nuevamente.',
+            severity: ErrorSeverity.MEDIUM 
+          }
+        );
+      }
+      
+      setUserId(user.id);
+
       if (activeTab === 'projects') {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('projects')
           .select('*, orders(id)')
           .eq('user_id', user.id)
           .order('updated_at', { ascending: false });
+        
+        if (error) throw error;
+        
         const cleanProjects = (data || []).filter(
           (p: any) => !p.orders || p.orders.length === 0
         );
@@ -476,15 +496,25 @@ export const ClientDashboard: React.FC = () => {
           query = query.eq('is_archived', true);
         }
 
-        const { data } = await query;
+        const { data, error } = await query;
+        if (error) throw error;
+        
         setOrders(data || []);
       }
+
+      dismissToast(loadingToast);
     } catch (error) {
-      console.error('Error fetching data:', error);
+      dismissToast(loadingToast);
+      handleError(error);
+      
+      // Si es error de auth, redirigir a login
+      if (error instanceof AppError && error.type === ErrorType.AUTH) {
+        navigate('/login');
+      }
     } finally {
       setLoading(false);
     }
-  }, [activeTab, navigate]);
+  }, [activeTab, navigate, handleError, showLoading, dismissToast]);
 
   useEffect(() => {
     fetchData();
@@ -495,31 +525,39 @@ export const ClientDashboard: React.FC = () => {
   // ==========================================================================
 
   const handleCreateManualBudget = useCallback(async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const ref = 'MAN-' + Math.floor(10000 + Math.random() * 90000);
+    const loadingToast = showLoading('Creando presupuesto...');
+    
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      
+      const ref = 'MAN-' + Math.floor(10000 + Math.random() * 90000);
 
-    const { data, error } = await supabase
-      .from('orders')
-      .insert([
-        {
-          user_id: user?.id,
-          order_ref: ref,
-          status: 'pendiente',
-          total_price: 0,
-          is_archived: false,
-          created_at: new Date().toISOString(),
-        },
-      ])
-      .select();
+      const { data, error } = await supabase
+        .from('orders')
+        .insert([
+          {
+            user_id: user?.id,
+            order_ref: ref,
+            status: 'pendiente',
+            total_price: 0,
+            is_archived: false,
+            created_at: new Date().toISOString(),
+          },
+        ])
+        .select();
 
-    if (error) {
-      alert(MESSAGES.CREATE_BUDGET_ERROR(error.message));
-      return;
+      if (error) throw error;
+      
+      dismissToast(loadingToast);
+      showSuccess('✅ Presupuesto creado correctamente');
+      
+      if (data) navigate(`/portal/order/${data[0].id}`);
+    } catch (error) {
+      dismissToast(loadingToast);
+      handleError(error);
     }
-    if (data) navigate(`/portal/order/${data[0].id}`);
-  }, [navigate]);
+  }, [navigate, handleError, showSuccess, showLoading, dismissToast]);
 
   const handleNewProject = useCallback(() => {
     window.location.href = '/';
@@ -540,31 +578,45 @@ export const ClientDashboard: React.FC = () => {
         message: MESSAGES.REQUEST_QUOTE_MESSAGE(project.name),
         isDestructive: false,
         onConfirm: async () => {
-          const estimatedDate = new Date();
-          estimatedDate.setHours(estimatedDate.getHours() + 48);
-          const ref = 'SOL-' + Math.floor(10000 + Math.random() * 90000);
-          const { data } = await supabase
-            .from('orders')
-            .insert([
-              {
-                user_id: userId,
-                project_id: project.id,
-                order_ref: ref,
-                total_price: 0,
-                status: 'pendiente',
-                estimated_delivery_date: estimatedDate.toISOString(),
-              },
-            ])
-            .select();
+          const loadingToast = showLoading('Creando solicitud de presupuesto...');
+          
+          try {
+            const estimatedDate = new Date();
+            estimatedDate.setHours(estimatedDate.getHours() + 48);
+            const ref = 'SOL-' + Math.floor(10000 + Math.random() * 90000);
+            
+            const { data, error } = await supabase
+              .from('orders')
+              .insert([
+                {
+                  user_id: userId,
+                  project_id: project.id,
+                  order_ref: ref,
+                  total_price: 0,
+                  status: 'pendiente',
+                  estimated_delivery_date: estimatedDate.toISOString(),
+                },
+              ])
+              .select();
 
-          if (data) {
-            navigate(`/portal/order/${data[0].id}`);
+            if (error) throw error;
+            
+            dismissToast(loadingToast);
+            showSuccess('✅ Solicitud de presupuesto enviada');
+
+            if (data) {
+              navigate(`/portal/order/${data[0].id}`);
+            }
+            setModal({ ...modal, isOpen: false });
+          } catch (error) {
+            dismissToast(loadingToast);
+            handleError(error);
+            setModal({ ...modal, isOpen: false });
           }
-          setModal({ ...modal, isOpen: false });
         },
       });
     },
-    [userId, navigate, modal]
+    [userId, navigate, modal, handleError, showSuccess, showLoading, dismissToast]
   );
 
   const handleDeleteProject = useCallback(
@@ -575,13 +627,29 @@ export const ClientDashboard: React.FC = () => {
         message: MESSAGES.DELETE_PROJECT_MESSAGE,
         isDestructive: true,
         onConfirm: async () => {
-          await supabase.from('projects').delete().eq('id', id);
-          setProjects((p) => p.filter((x) => x.id !== id));
-          setModal({ ...modal, isOpen: false });
+          const loadingToast = showLoading('Eliminando proyecto...');
+          
+          try {
+            const { error } = await supabase
+              .from('projects')
+              .delete()
+              .eq('id', id);
+            
+            if (error) throw error;
+            
+            dismissToast(loadingToast);
+            showSuccess('✅ Proyecto eliminado');
+            setProjects((p) => p.filter((x) => x.id !== id));
+            setModal({ ...modal, isOpen: false });
+          } catch (error) {
+            dismissToast(loadingToast);
+            handleError(error);
+            setModal({ ...modal, isOpen: false });
+          }
         },
       });
     },
-    [modal]
+    [modal, handleError, showSuccess, showLoading, dismissToast]
   );
 
   const handleViewOrder = useCallback(
@@ -599,20 +667,33 @@ export const ClientDashboard: React.FC = () => {
         message: MESSAGES.REACTIVATE_MESSAGE,
         isDestructive: false,
         onConfirm: async () => {
-          await supabase
-            .from('orders')
-            .update({
-              is_archived: false,
-              status: 'pendiente',
-              created_at: new Date().toISOString(),
-            })
-            .eq('id', order.id);
-          setActiveTab('budgets');
-          setModal({ ...modal, isOpen: false });
+          const loadingToast = showLoading('Reactivando presupuesto...');
+          
+          try {
+            const { error } = await supabase
+              .from('orders')
+              .update({
+                is_archived: false,
+                status: 'pendiente',
+                created_at: new Date().toISOString(),
+              })
+              .eq('id', order.id);
+            
+            if (error) throw error;
+            
+            dismissToast(loadingToast);
+            showSuccess('✅ Presupuesto reactivado');
+            setActiveTab('budgets');
+            setModal({ ...modal, isOpen: false });
+          } catch (error) {
+            dismissToast(loadingToast);
+            handleError(error);
+            setModal({ ...modal, isOpen: false });
+          }
         },
       });
     },
-    [modal]
+    [modal, handleError, showSuccess, showLoading, dismissToast]
   );
 
   const closeModal = useCallback(() => {

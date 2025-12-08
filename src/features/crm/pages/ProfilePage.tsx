@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
+// ✅ IMPORTS DEL SISTEMA DE ERRORES
+import { useErrorHandler } from '@/hooks/useErrorHandler';
+import { AppError, ErrorType, ErrorSeverity } from '@/lib/errorHandler';
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -16,11 +20,6 @@ interface Profile {
   billing_address?: string;
   billing_email?: string;
   observations?: string;
-}
-
-interface Message {
-  text: string;
-  type: 'success' | 'error';
 }
 
 interface FormFieldProps {
@@ -58,20 +57,6 @@ const EMPTY_PROFILE: Profile = {
 // ============================================================================
 // SUB-COMPONENTS
 // ============================================================================
-
-const MessageBanner: React.FC<{ message: Message }> = ({ message }) => (
-  <div
-    className={`
-      p-3 rounded-lg mb-5
-      ${message.type === 'success'
-        ? 'bg-green-500/20 text-green-500'
-        : 'bg-red-500/20 text-red-500'
-      }
-    `}
-  >
-    {message.text}
-  </div>
-);
 
 const SectionTitle: React.FC<{ icon: string; children: React.ReactNode }> = ({ 
   icon, 
@@ -128,16 +113,30 @@ const TextareaField: React.FC<TextareaFieldProps> = ({
 const useProfile = () => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<Profile>(EMPTY_PROFILE);
-  const [message, setMessage] = useState<Message | null>(null);
+  
+  // ✅ AÑADIR ERROR HANDLER
+  const { handleError, showSuccess, showLoading, dismissToast } = useErrorHandler({
+    context: 'ProfilePage'
+  });
 
   const loadProfile = async (): Promise<void> => {
+    const loadingToast = showLoading('Cargando perfil...');
     setLoading(true);
     
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError) throw userError;
       
       if (!user) {
-        throw new Error('No user found');
+        throw new AppError(
+          ErrorType.AUTH,
+          'No authenticated user',
+          { 
+            userMessage: 'No se encontró usuario autenticado',
+            severity: ErrorSeverity.MEDIUM 
+          }
+        );
       }
 
       const { data, error } = await supabase
@@ -147,27 +146,36 @@ const useProfile = () => {
         .single();
 
       if (error) throw error;
+      
       if (data) setFormData(data);
+      
+      dismissToast(loadingToast);
     } catch (error) {
-      console.error('[ProfilePage] Load error:', error);
-      setMessage({
-        text: '❌ Error al cargar el perfil',
-        type: 'error',
-      });
+      dismissToast(loadingToast);
+      handleError(error);
     } finally {
       setLoading(false);
     }
   };
 
   const saveProfile = async (): Promise<void> => {
+    const loadingToast = showLoading('Guardando cambios...');
     setLoading(true);
-    setMessage(null);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
 
+      if (userError) throw userError;
+      
       if (!user) {
-        throw new Error('No user found');
+        throw new AppError(
+          ErrorType.AUTH,
+          'No authenticated user',
+          { 
+            userMessage: 'No se encontró usuario autenticado',
+            severity: ErrorSeverity.MEDIUM 
+          }
+        );
       }
 
       const { error } = await supabase
@@ -177,15 +185,11 @@ const useProfile = () => {
 
       if (error) throw error;
 
-      setMessage({
-        text: '✅ Perfil actualizado correctamente',
-        type: 'success',
-      });
-    } catch (error: any) {
-      setMessage({
-        text: `❌ Error al guardar: ${error.message}`,
-        type: 'error',
-      });
+      dismissToast(loadingToast);
+      showSuccess('✅ Perfil actualizado correctamente');
+    } catch (error) {
+      dismissToast(loadingToast);
+      handleError(error);
     } finally {
       setLoading(false);
     }
@@ -201,7 +205,6 @@ const useProfile = () => {
   return {
     loading,
     formData,
-    message,
     loadProfile,
     saveProfile,
     updateField,
@@ -213,7 +216,7 @@ const useProfile = () => {
 // ============================================================================
 
 export const ProfilePage: React.FC = () => {
-  const { loading, formData, message, loadProfile, saveProfile, updateField } = useProfile();
+  const { loading, formData, loadProfile, saveProfile, updateField } = useProfile();
 
   useEffect(() => {
     loadProfile();
@@ -228,9 +231,6 @@ export const ProfilePage: React.FC = () => {
           Gestiona tus datos de facturación y envío.
         </p>
       </div>
-
-      {/* Message Banner */}
-      {message && <MessageBanner message={message} />}
 
       {/* Form Container */}
       <div className="bg-neutral-900 p-8 rounded-xl border border-neutral-800">

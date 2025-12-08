@@ -6,6 +6,10 @@ import { PriceCalculator, PRICES } from '../../../utils/PriceCalculator';
 import { generateBillOfMaterials } from '../../../utils/budgetUtils';
 import { generateBudgetPDF } from '../../../utils/pdfGenerator';
 
+// ✅ IMPORTS DEL SISTEMA DE ERRORES
+import { useErrorHandler } from '@/hooks/useErrorHandler';
+import { AppError, ErrorType, ErrorSeverity } from '@/lib/errorHandler';
+
 // Importar tipos
 import type { OrderData, OrderStatus, CatalogItem } from './types';
 import { formatMoney, calculateDeliveryDate } from './utils';
@@ -22,6 +26,12 @@ import { ParametricModal } from './ParametricModal';
 
 export const AdminOrderDetailPage = () => {
   const { id } = useParams<{ id: string }>();
+  
+  // ✅ AÑADIR ERROR HANDLER
+  const { handleError, showSuccess, showLoading, dismissToast } = useErrorHandler({
+    context: 'AdminOrderDetailPage'
+  });
+  
   const [order, setOrder] = useState<OrderData | null>(null);
   
   // Items
@@ -56,15 +66,31 @@ export const AdminOrderDetailPage = () => {
   const loadData = async () => {
     if (!id) return;
     
-    // 1. Cargar Pedido
-    const { data: o } = await supabase
-      .from('orders')
-      .select('*, projects(*), profiles(*)')
-      .eq('id', id)
-      .single();
+    const loadingToast = showLoading('Cargando pedido...');
     
-    if (o) {
+    try {
+      // 1. Cargar Pedido
+      const { data: o, error: orderError } = await supabase
+        .from('orders')
+        .select('*, projects(*), profiles(*)')
+        .eq('id', id)
+        .single();
+      
+      if (orderError) throw orderError;
+      
+      if (!o) {
+        throw new AppError(
+          ErrorType.NOT_FOUND,
+          'Order not found',
+          { 
+            userMessage: 'Pedido no encontrado',
+            severity: ErrorSeverity.MEDIUM 
+          }
+        );
+      }
+      
       setOrder(o as OrderData);
+      
       if (o.estimated_delivery_date) {
         setNewDate(new Date(o.estimated_delivery_date).toISOString().slice(0, 16));
       } else {
@@ -87,39 +113,61 @@ export const AdminOrderDetailPage = () => {
       setItems3D(processed3DItems);
 
       // 1.2 Cargar Items Manuales
-      const { data: mItems } = await supabase.from('order_items').select('*').eq('order_id', id);
+      const { data: mItems, error: itemsError } = await supabase
+        .from('order_items')
+        .select('*')
+        .eq('order_id', id);
+      
+      if (itemsError) throw itemsError;
+      
       const manual = mItems || [];
       setManualItems(manual);
 
       // 1.3 Calcular Total Base Real
       const totalManual = manual.reduce((acc: number, item: any) => acc + item.total_price, 0);
       setCalculatedBasePrice(total3D + totalManual);
+
+      // 2. Chat
+      const { data: m, error: messagesError } = await supabase
+        .from('order_messages')
+        .select('*, profiles(full_name, role)')
+        .eq('order_id', id)
+        .order('created_at', { ascending: true });
+      
+      if (messagesError) throw messagesError;
+      setMessages(m || []);
+
+      // 3. Adjuntos
+      const { data: att, error: attachmentsError } = await supabase
+        .from('order_attachments')
+        .select('*')
+        .eq('order_id', id);
+      
+      if (attachmentsError) throw attachmentsError;
+      setAttachments(att || []);
+
+      // 4. Observaciones
+      const { data: obs, error: observationsError } = await supabase
+        .from('order_observations')
+        .select('*, profiles(full_name, role)')
+        .eq('order_id', id)
+        .order('created_at', { ascending: false });
+      
+      if (observationsError) throw observationsError;
+      setObservations(obs || []);
+
+      dismissToast(loadingToast);
+    } catch (error) {
+      dismissToast(loadingToast);
+      handleError(error);
     }
-
-    // 2. Chat
-    const { data: m } = await supabase
-      .from('order_messages')
-      .select('*, profiles(full_name, role)')
-      .eq('order_id', id)
-      .order('created_at', { ascending: true });
-    setMessages(m || []);
-
-    // 3. Adjuntos
-    const { data: att } = await supabase.from('order_attachments').select('*').eq('order_id', id);
-    setAttachments(att || []);
-
-    // 4. Observaciones
-    const { data: obs } = await supabase
-      .from('order_observations')
-      .select('*, profiles(full_name, role)')
-      .eq('order_id', id)
-      .order('created_at', { ascending: false });
-    setObservations(obs || []);
   };
 
   // --- ACTUALIZAR PEDIDO Y GENERAR PDF ---
   const handleUpdateOrder = async () => {
     if (!order) return;
+    
+    const loadingToast = showLoading('Guardando cambios...');
     setIsGeneratingPDF(true);
 
     try {
@@ -137,46 +185,58 @@ export const AdminOrderDetailPage = () => {
 
       // 2. Si el estado es "presupuestado", generar PDF automático
       if (order.status === 'presupuestado') {
-        // Convertir OrderData a formato compatible con generateBudgetPDF
-        const orderForPDF = {
-          ...order,
-          custom_name: order.custom_name ?? undefined,
-          estimated_delivery_date: order.estimated_delivery_date ?? undefined,
-          project_id: order.project_id ?? undefined,
-        };
+        dismissToast(loadingToast);
+        const pdfToast = showLoading('Generando PDF de presupuesto...');
         
-        const pdfBlob = await generateBudgetPDF(orderForPDF as any, items3D, manualItems);
-        
-        const fileName = `Presupuesto_${order.order_ref}_${Date.now()}.pdf`;
-        const filePath = `${id}/${fileName}`;
+        try {
+          // Convertir OrderData a formato compatible con generateBudgetPDF
+          const orderForPDF = {
+            ...order,
+            custom_name: order.custom_name ?? undefined,
+            estimated_delivery_date: order.estimated_delivery_date ?? undefined,
+            project_id: order.project_id ?? undefined,
+          };
+          
+          const pdfBlob = await generateBudgetPDF(orderForPDF as any, items3D, manualItems);
+          
+          const fileName = `Presupuesto_${order.order_ref}_${Date.now()}.pdf`;
+          const filePath = `${id}/${fileName}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from('attachments')
-          .upload(filePath, pdfBlob);
-        if (uploadError) throw uploadError;
+          const { error: uploadError } = await supabase.storage
+            .from('attachments')
+            .upload(filePath, pdfBlob);
+          
+          if (uploadError) throw uploadError;
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('attachments')
-          .getPublicUrl(filePath);
+          const { data: { publicUrl } } = supabase.storage
+            .from('attachments')
+            .getPublicUrl(filePath);
 
-        const { data: { user } } = await supabase.auth.getUser();
-        const { error: dbError } = await supabase.from('order_attachments').insert([{
-          order_id: id,
-          file_name: `📄 ${fileName}`,
-          file_url: publicUrl,
-          uploader_id: user?.id
-        }]);
+          const { data: { user } } = await supabase.auth.getUser();
+          const { error: dbError } = await supabase.from('order_attachments').insert([{
+            order_id: id,
+            file_name: `📄 ${fileName}`,
+            file_url: publicUrl,
+            uploader_id: user?.id
+          }]);
 
-        if (dbError) throw dbError;
-        
-        alert("✅ Cambios guardados y PDF de Presupuesto generado y enviado al cliente.");
+          if (dbError) throw dbError;
+          
+          dismissToast(pdfToast);
+          showSuccess("✅ Cambios guardados y PDF de Presupuesto enviado al cliente");
+        } catch (pdfError) {
+          dismissToast(pdfToast);
+          throw pdfError;
+        }
       } else {
-        alert("✅ Pedido actualizado correctamente.");
+        dismissToast(loadingToast);
+        showSuccess("✅ Pedido actualizado correctamente");
       }
 
       loadData();
-    } catch (error: any) {
-      alert("Error: " + error.message);
+    } catch (error) {
+      dismissToast(loadingToast);
+      handleError(error);
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -199,29 +259,53 @@ export const AdminOrderDetailPage = () => {
       `Dto (${discount}%): -${formatMoney(discountAmount)}\n\n` +
       `Total: ${formatMoney(finalPrice)}`
     )) {
-      setOrder({ ...order, total_price: finalPrice }); 
+      setOrder({ ...order, total_price: finalPrice });
+      showSuccess(`✅ Descuento del ${discount}% aplicado`);
     }
   };
 
   const copyBasePrice = () => {
     if (order) {
       setOrder({ ...order, total_price: calculatedBasePrice });
+      showSuccess('✅ Precio base copiado al total');
     }
   };
 
   // --- OBSERVACIONES ---
   const handleAddObservation = async () => {
-    if (!newObservation.trim()) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase.from('order_observations').insert([{
-      order_id: id, 
-      user_id: user?.id, 
-      content: newObservation
-    }]);
-    if (error) alert("Error: " + error.message);
-    else { 
+    if (!newObservation.trim()) {
+      handleError(
+        new AppError(
+          ErrorType.VALIDATION,
+          'Empty observation',
+          { 
+            userMessage: 'La observación no puede estar vacía',
+            severity: ErrorSeverity.LOW 
+          }
+        )
+      );
+      return;
+    }
+    
+    const loadingToast = showLoading('Añadiendo observación...');
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase.from('order_observations').insert([{
+        order_id: id, 
+        user_id: user?.id, 
+        content: newObservation
+      }]);
+      
+      if (error) throw error;
+      
+      dismissToast(loadingToast);
+      showSuccess('✅ Observación añadida');
       setNewObservation(''); 
-      loadData(); 
+      loadData();
+    } catch (error) {
+      dismissToast(loadingToast);
+      handleError(error);
     }
   };
 
@@ -236,7 +320,20 @@ export const AdminOrderDetailPage = () => {
 
   const confirmParametricItem = () => {
     const val = parseFloat(parametricModal.value);
-    if (!val || val <= 0) return alert("Valor inválido");
+    
+    if (!val || val <= 0) {
+      handleError(
+        new AppError(
+          ErrorType.VALIDATION,
+          'Invalid value',
+          { 
+            userMessage: 'El valor debe ser mayor que 0',
+            severity: ErrorSeverity.LOW 
+          }
+        )
+      );
+      return;
+    }
     
     const item = parametricModal.item;
     if (!item) return;
@@ -263,64 +360,116 @@ export const AdminOrderDetailPage = () => {
     total: number, 
     dims: string
   ) => {
-    await supabase.from('order_items').insert([{
-      order_id: id, 
-      product_id: prodId, 
-      name, 
-      quantity: qty, 
-      total_price: total, 
-      dimensions: dims
-    }]);
-    setIsCatalogOpen(false);
-    loadData(); 
+    const loadingToast = showLoading('Añadiendo elemento...');
+    
+    try {
+      const { error } = await supabase.from('order_items').insert([{
+        order_id: id, 
+        product_id: prodId, 
+        name, 
+        quantity: qty, 
+        total_price: total, 
+        dimensions: dims
+      }]);
+      
+      if (error) throw error;
+      
+      dismissToast(loadingToast);
+      showSuccess(`✅ ${name} añadido correctamente`);
+      setIsCatalogOpen(false);
+      loadData();
+    } catch (error) {
+      dismissToast(loadingToast);
+      handleError(error);
+    }
   };
 
   const handleDeleteManualItem = async (itemId: string) => {
     if (!confirm("¿Borrar línea?")) return;
-    await supabase.from('order_items').delete().eq('id', itemId);
-    loadData();
+    
+    const loadingToast = showLoading('Eliminando elemento...');
+    
+    try {
+      const { error } = await supabase
+        .from('order_items')
+        .delete()
+        .eq('id', itemId);
+      
+      if (error) throw error;
+      
+      dismissToast(loadingToast);
+      showSuccess('✅ Elemento eliminado');
+      loadData();
+    } catch (error) {
+      dismissToast(loadingToast);
+      handleError(error);
+    }
   };
 
   // --- CHAT & FILES ---
   const handleSendMessage = async () => {
     if (!newMessage.trim()) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from('order_messages').insert([{ 
-      order_id: id, 
-      user_id: user?.id, 
-      content: newMessage 
-    }]);
-    setNewMessage(''); 
-    loadData();
+    
+    const loadingToast = showLoading('Enviando mensaje...');
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase.from('order_messages').insert([{ 
+        order_id: id, 
+        user_id: user?.id, 
+        content: newMessage 
+      }]);
+      
+      if (error) throw error;
+      
+      dismissToast(loadingToast);
+      showSuccess('✅ Mensaje enviado');
+      setNewMessage(''); 
+      loadData();
+    } catch (error) {
+      dismissToast(loadingToast);
+      handleError(error);
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
+    const loadingToast = showLoading('Subiendo archivo...');
     setUploading(true);
+    
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${Math.random()}.${fileExt}`;
       const filePath = `${id}/${fileName}`;
       
-      await supabase.storage.from('attachments').upload(filePath, file);
+      const { error: uploadError } = await supabase.storage
+        .from('attachments')
+        .upload(filePath, file);
+      
+      if (uploadError) throw uploadError;
       
       const { data: { publicUrl } } = supabase.storage
         .from('attachments')
         .getPublicUrl(filePath);
       
       const { data: { user } } = await supabase.auth.getUser();
-      await supabase.from('order_attachments').insert([{
+      const { error: insertError } = await supabase.from('order_attachments').insert([{
         order_id: id, 
         file_name: file.name, 
         file_url: publicUrl, 
         uploader_id: user?.id
       }]);
       
+      if (insertError) throw insertError;
+      
+      dismissToast(loadingToast);
+      showSuccess(`✅ ${file.name} subido correctamente`);
       loadData();
-    } catch (error: any) { 
-      alert('Error: ' + error.message); 
+    } catch (error) {
+      dismissToast(loadingToast);
+      handleError(error);
     } finally { 
       setUploading(false); 
     }
@@ -328,8 +477,24 @@ export const AdminOrderDetailPage = () => {
 
   const handleDeleteAttachment = async (attId: string) => {
     if (!confirm("¿Borrar archivo?")) return;
-    await supabase.from('order_attachments').delete().eq('id', attId);
-    loadData();
+    
+    const loadingToast = showLoading('Eliminando archivo...');
+    
+    try {
+      const { error } = await supabase
+        .from('order_attachments')
+        .delete()
+        .eq('id', attId);
+      
+      if (error) throw error;
+      
+      dismissToast(loadingToast);
+      showSuccess('✅ Archivo eliminado');
+      loadData();
+    } catch (error) {
+      dismissToast(loadingToast);
+      handleError(error);
+    }
   };
 
   if (!order) return <p className="text-white">Cargando...</p>;
