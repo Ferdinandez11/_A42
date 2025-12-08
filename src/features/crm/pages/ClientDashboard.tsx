@@ -468,10 +468,7 @@ export const ClientDashboard: React.FC = () => {
         
         if (error) throw error;
         
-        const cleanProjects = (data || []).filter(
-          (p: Project) => !p.orders || p.orders.length === 0
-        );
-        setProjects(cleanProjects);
+      setProjects(data || []);
       } else {
         let query = supabase
           .from('orders')
