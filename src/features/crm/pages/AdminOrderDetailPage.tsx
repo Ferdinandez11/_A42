@@ -153,12 +153,11 @@ export const AdminOrderDetailPage = () => {
       const raw3DItems = o.projects?.data?.items || o.projects?.items || [];
 
       if (raw3DItems.length > 0) {
-        // @ts-ignore - Complex type from dynamic project data
         const itemsWithRealPrices = raw3DItems.map((item: Record<string, unknown>) => ({
           ...item,
+          // @ts-expect-error - PriceCalculator expects SceneItem but we have dynamic project data
           price: PriceCalculator.getItemPrice(item) 
         }));
-        // @ts-ignore - Type conversion from dynamic data
         processed3DItems = generateBillOfMaterials(itemsWithRealPrices);
         total3D = processed3DItems.reduce((acc, line) => acc + line.totalPrice, 0);
       }
@@ -249,7 +248,7 @@ export const AdminOrderDetailPage = () => {
             project_id: order.project_id ?? undefined,
           };
           
-          // @ts-ignore - Type mismatch between OrderData and PDF generator expected type
+          // @ts-expect-error - Type mismatch between OrderData and PDF generator expected type
           const pdfBlob = await generateBudgetPDF(orderForPDF, items3D, manualItems);
           
           const fileName = `Presupuesto_${order.order_ref}_${Date.now()}.pdf`;
