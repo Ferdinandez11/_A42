@@ -34,7 +34,7 @@ interface Project {
   thumbnail_url?: string;
   user_id: string;
   updated_at: string;
-  orders?: any[];
+  orders?: Order[];
 }
 
 interface Order {
@@ -469,7 +469,7 @@ export const ClientDashboard: React.FC = () => {
         if (error) throw error;
         
         const cleanProjects = (data || []).filter(
-          (p: any) => !p.orders || p.orders.length === 0
+          (p: Project) => !p.orders || p.orders.length === 0
         );
         setProjects(cleanProjects);
       } else {

@@ -14,9 +14,9 @@ export interface OrderData {
   };
   projects?: {
     data?: {
-      items?: any[];
+      items?: Record<string, unknown>[];
     };
-    items?: any[];
+    items?: Record<string, unknown>[];
   };
 }
 
