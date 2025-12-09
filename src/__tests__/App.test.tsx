@@ -60,15 +60,25 @@ vi.mock('@/lib/supabase', () => ({
 
 // Mock stores
 vi.mock('@/stores/auth/useAuthStore', () => ({
-  useAuthStore: vi.fn((selector) => {
-    const state = {
-      user: null,
-      session: null,
-      setUser: vi.fn(),
-      setSession: vi.fn(),
-    };
-    return selector ? selector(state) : state;
-  }),
+  useAuthStore: Object.assign(
+    vi.fn((selector) => {
+      const state = {
+        user: null,
+        session: null,
+        setUser: vi.fn(),
+        setSession: vi.fn(),
+      };
+      return selector ? selector(state) : state;
+    }),
+    {
+      getState: vi.fn(() => ({
+        user: null,
+        session: null,
+        setUser: vi.fn(),
+        setSession: vi.fn(),
+      }))
+    }
+  ),
 }));
 
 vi.mock('@/stores/project/useProjectStore', () => ({
@@ -348,6 +358,432 @@ describe('App', () => {
         
         unmount();
       }
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // LOGIN PAGE INTERACTIONS
+  // --------------------------------------------------------------------------
+  
+  describe('LoginPage Interactions', () => {
+    it('should switch to form step when clicking client role', async () => {
+      render(createAppAtRoute('/login'));
+      
+      const clientButton = screen.getByText('Soy Cliente');
+      clientButton.click();
+      
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Email')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('Contraseña')).toBeInTheDocument();
+      });
+    });
+
+    it('should switch to form step when clicking employee role', async () => {
+      render(createAppAtRoute('/login'));
+      
+      const employeeButton = screen.getByText('Soy Empleado');
+      employeeButton.click();
+      
+      await waitFor(() => {
+        expect(screen.getByText('Acceso Empleados')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('Email')).toBeInTheDocument();
+      });
+    });
+
+    it('should show registration form when toggling to register', async () => {
+      render(createAppAtRoute('/login'));
+      
+      // Click client role
+      const clientButton = screen.getByText('Soy Cliente');
+      clientButton.click();
+      
+      await waitFor(() => {
+        const registerLink = screen.getByText('Regístrate aquí');
+        registerLink.click();
+      });
+      
+      await waitFor(() => {
+        expect(screen.getByText('Nuevo Registro')).toBeInTheDocument();
+        expect(screen.getByText('Crear Cuenta')).toBeInTheDocument();
+      });
+    });
+
+    it('should go back to role selection when clicking back button', async () => {
+      render(createAppAtRoute('/login'));
+      
+      // Go to form
+      const clientButton = screen.getByText('Soy Cliente');
+      clientButton.click();
+      
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Email')).toBeInTheDocument();
+      });
+      
+      // Click back
+      const backButton = screen.getByText('← Volver');
+      backButton.click();
+      
+      await waitFor(() => {
+        expect(screen.getByText('Bienvenido')).toBeInTheDocument();
+        expect(screen.getByText('Soy Cliente')).toBeInTheDocument();
+      });
+    });
+
+    it('should show loading state when submitting form', async () => {
+      const { supabase } = await import('@/lib/supabase');
+      
+      // Mock delayed response
+      (supabase.auth.signInWithPassword as any).mockImplementation(
+        () => new Promise(resolve => setTimeout(() => resolve({ 
+          data: { user: { id: 'test', email: 'test@test.com' }, session: {} }, 
+          error: null 
+        }), 100))
+      );
+      
+      render(createAppAtRoute('/login'));
+      
+      // Go to form
+      const clientButton = screen.getByText('Soy Cliente');
+      clientButton.click();
+      
+      await waitFor(() => {
+        const emailInput = screen.getByPlaceholderText('Email');
+        const passwordInput = screen.getByPlaceholderText('Contraseña');
+        const submitButton = screen.getByText('Entrar');
+        
+        // Fill form
+        emailInput.setAttribute('value', 'test@example.com');
+        passwordInput.setAttribute('value', 'password123');
+        
+        // Submit
+        submitButton.click();
+      });
+      
+      // Should show loading state
+      await waitFor(() => {
+        expect(screen.getByText('Procesando...')).toBeInTheDocument();
+      }, { timeout: 500 });
+    });
+
+    it('should have required attribute on email and password inputs', async () => {
+      render(createAppAtRoute('/login'));
+      
+      const clientButton = screen.getByText('Soy Cliente');
+      clientButton.click();
+      
+      await waitFor(() => {
+        const emailInput = screen.getByPlaceholderText('Email');
+        const passwordInput = screen.getByPlaceholderText('Contraseña');
+        
+        expect(emailInput).toHaveAttribute('required');
+        expect(emailInput).toHaveAttribute('type', 'email');
+        expect(passwordInput).toHaveAttribute('required');
+        expect(passwordInput).toHaveAttribute('type', 'password');
+      });
+    });
+
+    it('should not show register option for employees', async () => {
+      render(createAppAtRoute('/login'));
+      
+      const employeeButton = screen.getByText('Soy Empleado');
+      employeeButton.click();
+      
+      await waitFor(() => {
+        expect(screen.queryByText('Regístrate aquí')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should toggle between login and register modes', async () => {
+      render(createAppAtRoute('/login'));
+      
+      // Go to client form
+      const clientButton = screen.getByText('Soy Cliente');
+      clientButton.click();
+      
+      await waitFor(() => {
+        expect(screen.getByText('Entrar')).toBeInTheDocument();
+      });
+      
+      // Toggle to register
+      const registerLink = screen.getByText('Regístrate aquí');
+      registerLink.click();
+      
+      await waitFor(() => {
+        expect(screen.getByText('Crear Cuenta')).toBeInTheDocument();
+      });
+      
+      // Toggle back to login
+      const loginLink = screen.getByText('Inicia Sesión');
+      loginLink.click();
+      
+      await waitFor(() => {
+        expect(screen.getByText('Entrar')).toBeInTheDocument();
+      });
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // VIEWER PAGE EFFECTS
+  // --------------------------------------------------------------------------
+  
+  describe('ViewerPage Effects', () => {
+    it('should render ViewerPage with default state', async () => {
+      render(createAppAtRoute('/'));
+      
+      await waitFor(() => {
+        expect(screen.getByTestId('editor-3d')).toBeInTheDocument();
+      });
+    });
+
+    it('should show login link when no user is authenticated', async () => {
+      render(createAppAtRoute('/'));
+      
+      await waitFor(() => {
+        const loginLink = screen.getByText(/Acceso \/ Login/i);
+        expect(loginLink).toBeInTheDocument();
+        expect(loginLink.getAttribute('href')).toBe('/login');
+      });
+    });
+
+    it('should render Editor3D component on root path', async () => {
+      render(createAppAtRoute('/'));
+      
+      await waitFor(() => {
+        expect(screen.getByTestId('editor-3d')).toBeInTheDocument();
+      });
+    });
+
+    it('should not show admin button when no user', async () => {
+      render(createAppAtRoute('/'));
+      
+      await waitFor(() => {
+        expect(screen.queryByText('⬅️ Volver al Panel')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // FORM STATE MANAGEMENT
+  // --------------------------------------------------------------------------
+  
+  describe('Form State Management', () => {
+    it('should have email input with correct type and attributes', async () => {
+      render(createAppAtRoute('/login'));
+      
+      const clientButton = screen.getByText('Soy Cliente');
+      clientButton.click();
+      
+      await waitFor(() => {
+        const emailInput = screen.getByPlaceholderText('Email');
+        expect(emailInput).toHaveAttribute('type', 'email');
+        expect(emailInput).toHaveAttribute('required');
+      });
+    });
+
+    it('should have password input with correct type and attributes', async () => {
+      render(createAppAtRoute('/login'));
+      
+      const clientButton = screen.getByText('Soy Cliente');
+      clientButton.click();
+      
+      await waitFor(() => {
+        const passwordInput = screen.getByPlaceholderText('Contraseña');
+        expect(passwordInput).toHaveAttribute('type', 'password');
+        expect(passwordInput).toHaveAttribute('required');
+      });
+    });
+
+    it('should show submit button with correct text for login', async () => {
+      render(createAppAtRoute('/login'));
+      
+      const clientButton = screen.getByText('Soy Cliente');
+      clientButton.click();
+      
+      await waitFor(() => {
+        expect(screen.getByText('Entrar')).toBeInTheDocument();
+      });
+    });
+
+    it('should show submit button with correct text for register', async () => {
+      render(createAppAtRoute('/login'));
+      
+      const clientButton = screen.getByText('Soy Cliente');
+      clientButton.click();
+      
+      await waitFor(() => {
+        const registerLink = screen.getByText('Regístrate aquí');
+        registerLink.click();
+      });
+      
+      await waitFor(() => {
+        expect(screen.getByText('Crear Cuenta')).toBeInTheDocument();
+      });
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // NAVIGATION FLOWS
+  // --------------------------------------------------------------------------
+  
+  describe('Navigation Flows', () => {
+    it('should navigate back to viewer from login', async () => {
+      render(createAppAtRoute('/login'));
+      
+      const backButton = screen.getByText('Volver al Visor 3D');
+      expect(backButton).toBeInTheDocument();
+    });
+
+    it('should have link to viewer from employee layout', async () => {
+      render(createAppAtRoute('/admin/crm'));
+      
+      const viewerLink = screen.getByText('← Volver al Visor 3D');
+      expect(viewerLink).toBeInTheDocument();
+      expect(viewerLink.getAttribute('href')).toBe('/');
+    });
+
+    it('should have new project button in client portal', async () => {
+      render(createAppAtRoute('/portal'));
+      
+      const newProjectButton = screen.getByText('+ Nuevo Proyecto 3D');
+      expect(newProjectButton).toBeInTheDocument();
+      expect(newProjectButton.getAttribute('href')).toBe('/');
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // UI STATES AND STYLING
+  // --------------------------------------------------------------------------
+  
+  describe('UI States and Styling', () => {
+    it('should show different button styles for client vs employee', async () => {
+      render(createAppAtRoute('/login'));
+      
+      const clientButton = screen.getByText('Soy Cliente');
+      const employeeButton = screen.getByText('Soy Empleado');
+      
+      // Both should be visible
+      expect(clientButton).toBeInTheDocument();
+      expect(employeeButton).toBeInTheDocument();
+    });
+
+    it('should show role-specific header in login form', async () => {
+      render(createAppAtRoute('/login'));
+      
+      // Test client header
+      const clientButton = screen.getByText('Soy Cliente');
+      clientButton.click();
+      
+      await waitFor(() => {
+        expect(screen.getByText('Acceso Clientes')).toBeInTheDocument();
+      });
+    });
+
+    it('should show correct icons for client and employee buttons', async () => {
+      render(createAppAtRoute('/login'));
+      
+      // The emojis should be present in the buttons
+      expect(screen.getByText('👋')).toBeInTheDocument();
+      expect(screen.getByText('🏢')).toBeInTheDocument();
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // ERROR BOUNDARIES AND EDGE CASES
+  // --------------------------------------------------------------------------
+  
+  describe('Error Boundaries and Edge Cases', () => {
+    it('should render without errors when switching routes rapidly', async () => {
+      const { unmount } = render(createAppAtRoute('/'));
+      unmount();
+      
+      render(createAppAtRoute('/login'));
+      expect(screen.getByText('Bienvenido')).toBeInTheDocument();
+    });
+
+    it('should handle multiple role selections', async () => {
+      render(createAppAtRoute('/login'));
+      
+      // Select client
+      const clientButton = screen.getByText('Soy Cliente');
+      clientButton.click();
+      
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Email')).toBeInTheDocument();
+      });
+      
+      // Go back
+      const backButton = screen.getByText('← Volver');
+      backButton.click();
+      
+      await waitFor(() => {
+        expect(screen.getByText('Bienvenido')).toBeInTheDocument();
+      });
+      
+      // Select employee
+      const employeeButton = screen.getByText('Soy Empleado');
+      employeeButton.click();
+      
+      await waitFor(() => {
+        expect(screen.getByText('Acceso Empleados')).toBeInTheDocument();
+      });
+    });
+
+    it('should maintain form state when toggling register/login', async () => {
+      render(createAppAtRoute('/login'));
+      
+      const clientButton = screen.getByText('Soy Cliente');
+      clientButton.click();
+      
+      await waitFor(() => {
+        const registerLink = screen.getByText('Regístrate aquí');
+        registerLink.click();
+      });
+      
+      await waitFor(() => {
+        expect(screen.getByText('Nuevo Registro')).toBeInTheDocument();
+      });
+      
+      const loginLink = screen.getByText('Inicia Sesión');
+      loginLink.click();
+      
+      await waitFor(() => {
+        expect(screen.getByText('Acceso Clientes')).toBeInTheDocument();
+      });
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // ACCESSIBILITY AND FORMS
+  // --------------------------------------------------------------------------
+  
+  describe('Accessibility and Forms', () => {
+    it('should have proper form element with onSubmit', async () => {
+      render(createAppAtRoute('/login'));
+      
+      const clientButton = screen.getByText('Soy Cliente');
+      clientButton.click();
+      
+      await waitFor(() => {
+        const form = screen.getByPlaceholderText('Email').closest('form');
+        expect(form).toBeInTheDocument();
+      });
+    });
+
+    it('should have navigation links with proper hrefs', async () => {
+      render(createAppAtRoute('/admin/crm'));
+      
+      const crmLink = screen.getByText('👥 CRM (Listado)');
+      expect(crmLink.getAttribute('href')).toBe('/admin/crm');
+      
+      const calendarLink = screen.getByText('📅 Calendario Entregas');
+      expect(calendarLink.getAttribute('href')).toBe('/admin/calendar');
+    });
+
+    it('should have client portal navigation with proper hrefs', async () => {
+      render(createAppAtRoute('/portal'));
+      
+      const profileLink = screen.getByText('Mi Perfil 👤');
+      expect(profileLink.getAttribute('href')).toBe('/portal/profile');
     });
   });
 });

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useAuthStore } from '../useAuthStore';
 import type { User, Session } from '@supabase/supabase-js';
+import { RussianRuble } from 'lucide-react';
 
 // Mock de Supabase
 vi.mock('@/lib/supabase', () => ({
@@ -119,4 +120,41 @@ describe('useAuthStore', () => {
     });
     expect(result.current.user).toBeNull();
   });
+ 
 });
+
+  describe('clearAuth', () => {
+    it('should clear user and session', () => {
+      const { result } = renderHook(() => useAuthStore());
+
+      // Set some data first
+      act(() => {
+        result.current.setUser({ id: 'test-id', email: 'test@example.com' } as any);
+        result.current.setSession({ access_token: 'token' } as any);
+      });
+
+      expect(result.current.user).not.toBeNull();
+      expect(result.current.session).not.toBeNull();
+
+      // Clear
+      act(() => {
+        result.current.clearAuth();
+      });
+
+      expect(result.current.user).toBeNull();
+      expect(result.current.session).toBeNull();
+    });
+
+    it('should clear localStorage when clearing auth', () => {
+      const localStorageClearSpy = vi.spyOn(Storage.prototype, 'clear');
+      const { result } = renderHook(() => useAuthStore());
+
+      act(() => {
+        result.current.clearAuth();
+      });
+
+      expect(localStorageClearSpy).toHaveBeenCalled();
+      
+      localStorageClearSpy.mockRestore();
+    });
+  });

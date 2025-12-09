@@ -27,16 +27,25 @@ export const useAuthStore = create<AuthState>((set) => ({
   setUser: (user) => set({ user }),
   setSession: (session) => set({ session }),
 
-  logout: async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      
-      set({ user: null, session: null });
-      localStorage.clear();
-    } catch (error) {
-      // Re-lanzar para que el componente lo maneje
-      throw handleError(error, 'useAuthStore.logout');
-    }
-  },
+logout: async () => {
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+
+    set({ user: null, session: null });
+    localStorage.clear();
+  } catch (error) {
+    throw handleError(error, 'useAuthStore.logout');
+  }
+},
+
+clearAuth: () => {
+  // Reset de estado
+  set({ user: null, session: null });
+
+  // Los tests verifican que esto ocurra
+  try {
+    localStorage.clear();
+  } catch (_) {}
+},
 }));
