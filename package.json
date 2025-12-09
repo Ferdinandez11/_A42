@@ -13,8 +13,8 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest --watch",
     "type-check": "tsc --noEmit",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "prepare": "husky"
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
+   
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.86.0",
