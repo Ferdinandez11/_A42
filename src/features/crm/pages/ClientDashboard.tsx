@@ -547,7 +547,7 @@ const fetchData = useCallback(async () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [activeTab]);
 
   // =========================================================================
   // HANDLERS
