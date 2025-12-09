@@ -546,4 +546,249 @@ describe('useSceneStore', () => {
       expect(result.current.totalPrice).toBe(600);
     });
   });
+
+  // --------------------------------------------------------------------------
+  // NUEVOS TESTS PARA CUBRIR LÍNEAS FALTANTES
+  // --------------------------------------------------------------------------
+
+  describe('updateFloorTexture - Advanced', () => {
+    const mockItem: SceneItem = {
+      uuid: 'test-item-1',
+      type: 'model',
+      name: 'Test Item',
+      productId: 'product-001',
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+      price: 100,
+      modelUrl: 'test.glb',
+    };
+
+    const floorItem: SceneItem = {
+      uuid: 'floor-1',
+      type: 'floor',
+      name: 'Test Floor',
+      productId: 'floor-001',
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+      price: 50,
+      points: [{ x: 0, z: 0 }, { x: 5, z: 0 }, { x: 5, z: 5 }],
+      floorMaterial: 'grass',
+    };
+
+    beforeEach(() => {
+      const { result } = renderHook(() => useSceneStore());
+      act(() => {
+        result.current.resetScene();
+      });
+    });
+
+    it('should update floor texture url and scale', () => {
+      const { result } = renderHook(() => useSceneStore());
+
+      act(() => {
+        result.current.addItem(floorItem);
+      });
+
+      act(() => {
+        result.current.updateFloorTexture('floor-1', 'https://example.com/texture.jpg', 1.5, 45);
+      });
+
+      const updatedFloor = result.current.items.find(item => item.uuid === 'floor-1');
+      expect(updatedFloor?.textureUrl).toBe('https://example.com/texture.jpg');
+      expect(updatedFloor?.textureScale).toBe(1.5);
+      expect(updatedFloor?.textureRotation).toBe(45);
+    });
+
+    it('should clear floor material when setting texture', () => {
+      const { result } = renderHook(() => useSceneStore());
+
+      act(() => {
+        result.current.addItem(floorItem);
+      });
+
+      act(() => {
+        result.current.updateFloorTexture('floor-1', 'https://example.com/texture.jpg', 2, 90);
+      });
+
+      const updatedFloor = result.current.items.find(item => item.uuid === 'floor-1');
+      expect(updatedFloor?.floorMaterial).toBeUndefined();
+    });
+
+    it('should not update non-floor items with texture', () => {
+      const { result } = renderHook(() => useSceneStore());
+
+      act(() => {
+        result.current.addItem(mockItem);
+      });
+
+      act(() => {
+        result.current.updateFloorTexture('test-item-1', 'texture.jpg', 1, 0);
+      });
+
+      const item = result.current.items.find(i => i.uuid === 'test-item-1');
+      expect(item?.textureUrl).toBeUndefined();
+    });
+
+    it('should handle undefined texture url', () => {
+      const { result } = renderHook(() => useSceneStore());
+
+      act(() => {
+        result.current.addItem({ ...floorItem, textureUrl: 'old-texture.jpg' });
+      });
+
+      act(() => {
+        result.current.updateFloorTexture('floor-1', undefined, 1, 0);
+      });
+
+      const updatedFloor = result.current.items.find(item => item.uuid === 'floor-1');
+      expect(updatedFloor?.textureUrl).toBeUndefined();
+    });
+  });
+
+  describe('updateItemFenceConfig - Advanced', () => {
+    const mockItem: SceneItem = {
+      uuid: 'test-item-1',
+      type: 'model',
+      name: 'Test Item',
+      productId: 'product-001',
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+      price: 100,
+      modelUrl: 'test.glb',
+    };
+
+    const fenceItem: SceneItem = {
+      uuid: 'fence-1',
+      type: 'fence',
+      name: 'Test Fence',
+      productId: 'fence-001',
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+      price: 200,
+      points: [{ x: 0, z: 0 }, { x: 10, z: 0 }],
+      fenceConfig: {
+        presetId: 'wood',
+        colors: { primary: '#8B4513', secondary: '#654321' },
+      },
+    };
+
+    beforeEach(() => {
+      const { result } = renderHook(() => useSceneStore());
+      act(() => {
+        result.current.resetScene();
+      });
+    });
+
+    it('should update fence config for specific item', () => {
+      const { result } = renderHook(() => useSceneStore());
+
+      act(() => {
+        result.current.addItem(fenceItem);
+      });
+
+      act(() => {
+        result.current.updateItemFenceConfig('fence-1', {
+          presetId: 'metal',
+          colors: { primary: '#C0C0C0', secondary: '#808080' },
+        });
+      });
+
+      const updatedFence = result.current.items.find(item => item.uuid === 'fence-1');
+      expect(updatedFence?.fenceConfig?.presetId).toBe('metal');
+      expect(updatedFence?.fenceConfig?.colors?.primary).toBe('#C0C0C0');
+    });
+
+    it('should save snapshot when updating fence config', () => {
+      const { result } = renderHook(() => useSceneStore());
+
+      act(() => {
+        result.current.addItem(fenceItem);
+      });
+
+      const pastLengthBefore = result.current.past.length;
+
+      act(() => {
+        result.current.updateItemFenceConfig('fence-1', { presetId: 'vinyl' });
+      });
+
+      expect(result.current.past.length).toBe(pastLengthBefore + 1);
+    });
+
+    it('should not update non-fence items config', () => {
+      const { result } = renderHook(() => useSceneStore());
+
+      act(() => {
+        result.current.addItem(mockItem);
+      });
+
+      act(() => {
+        result.current.updateItemFenceConfig('test-item-1', { presetId: 'metal' });
+      });
+
+      const item = result.current.items.find(i => i.uuid === 'test-item-1');
+      expect(item?.fenceConfig).toBeUndefined();
+    });
+  });
+
+  describe('undo/redo with totalPrice recalculation', () => {
+    const mockItem: SceneItem = {
+      uuid: 'test-item-1',
+      type: 'model',
+      name: 'Test Item',
+      productId: 'product-001',
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+      price: 100,
+      modelUrl: 'test.glb',
+    };
+
+    beforeEach(() => {
+      const { result } = renderHook(() => useSceneStore());
+      act(() => {
+        result.current.resetScene();
+      });
+    });
+
+    it('should recalculate totalPrice correctly on undo', () => {
+      const { result } = renderHook(() => useSceneStore());
+
+      act(() => {
+        result.current.addItem({ ...mockItem, price: 100 });
+        result.current.addItem({ ...mockItem, uuid: 'item-2', productId: 'p2', price: 200 });
+      });
+
+      expect(result.current.totalPrice).toBe(300);
+
+      act(() => {
+        result.current.undo();
+      });
+
+      expect(result.current.totalPrice).toBe(100);
+    });
+
+    it('should recalculate totalPrice correctly on redo', () => {
+      const { result } = renderHook(() => useSceneStore());
+
+      act(() => {
+        result.current.addItem({ ...mockItem, price: 150 });
+      });
+
+      act(() => {
+        result.current.undo();
+      });
+
+      expect(result.current.totalPrice).toBe(0);
+
+      act(() => {
+        result.current.redo();
+      });
+
+      expect(result.current.totalPrice).toBe(150);
+    });
+  });
 });
