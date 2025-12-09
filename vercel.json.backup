@@ -1,3 +1,5 @@
+OJO ESTO ES PARA LOS SECRETOS DE VERCEL (HAY QUE HACERLO PARA DEJARLO PROFESIONAL)
+
 {
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
