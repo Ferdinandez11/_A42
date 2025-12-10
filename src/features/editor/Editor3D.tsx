@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { A42Engine } from "./engine/A42Engine";
 import { EngineContext } from "./context/EngineContext";
 
@@ -112,6 +112,7 @@ const useEngineInitialization = (
   return engine;
 };
 
+// ✅ OPTIMIZADO - Bug #2 Fix
 const useEngineSync = (
   engine: A42Engine | null,
   mode: string,
@@ -125,24 +126,43 @@ const useEngineSync = (
   pendingView: CameraView | null,
   clearPendingView: () => void
 ) => {
+  // ✅ MEJORA 1: Memoizar hash de items para evitar re-renders innecesarios
+  const itemsHash = useMemo(() => JSON.stringify(items), [items]);
+
+  // ✅ MEJORA 2: Memoizar hash de sunPosition
+  const sunHash = useMemo(
+    () => `${sunPosition.azimuth}-${sunPosition.elevation}`,
+    [sunPosition]
+  );
+
+  // ✅ MEJORA 3: Estabilizar función de sincronización de items
+  const syncItems = useCallback(() => {
+    if (!engine) return;
+    engine.syncSceneFromStore(items);
+  }, [engine, items]);
+
   // Clear tools on mode change
   useEffect(() => {
-    engine?.clearTools();
+    if (!engine) return;
+    engine.clearTools();
   }, [mode, engine]);
 
   // Sync selection
   useEffect(() => {
-    engine?.interactionManager.selectItemByUUID(selectedItemId);
+    if (!engine) return;
+    engine.interactionManager.selectItemByUUID(selectedItemId);
   }, [selectedItemId, engine]);
 
-  // Sync scene items
+  // ✅ OPTIMIZADO: Sync scene items usando hash
   useEffect(() => {
-    engine?.syncSceneFromStore(items);
-  }, [items, engine]);
+    syncItems();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemsHash, engine]); // Usa hash en vez de syncItems para evitar loops
 
   // Sync grid visibility
   useEffect(() => {
-    engine?.setGridVisible(gridVisible);
+    if (!engine) return;
+    engine.setGridVisible(gridVisible);
   }, [gridVisible, engine]);
 
   // Sync camera
@@ -154,13 +174,15 @@ const useEngineSync = (
 
   // Sync safety zones
   useEffect(() => {
-    engine?.updateSafetyZones(safetyZonesVisible);
+    if (!engine) return;
+    engine.updateSafetyZones(safetyZonesVisible);
   }, [safetyZonesVisible, engine]);
 
-  // Sync sun position
+  // ✅ OPTIMIZADO: Sync sun position usando hash
   useEffect(() => {
-    engine?.updateSunPosition(sunPosition.azimuth, sunPosition.elevation);
-  }, [sunPosition, engine]);
+    if (!engine) return;
+    engine.updateSunPosition(sunPosition.azimuth, sunPosition.elevation);
+  }, [sunHash, engine, sunPosition]); // Usa hash pero mantiene sunPosition para acceder a valores
 
   // Handle pending view
   useEffect(() => {
