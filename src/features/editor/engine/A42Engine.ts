@@ -374,6 +374,10 @@ export class A42Engine {
         sceneObj.rotation.fromArray(item.rotation);
         sceneObj.scale.fromArray(item.scale);
         sceneItemsMap.delete(item.uuid);
+        // ✅ NO actualizar escala si está animando
+        if (!sceneObj.userData.isAnimating) {
+            sceneObj.scale.fromArray(item.scale);
+        }
       } else {
         // Create new objects
         if (item.type === "model" && item.modelUrl) {
@@ -383,6 +387,7 @@ export class A42Engine {
         } else if (item.type === "fence" && item.points) {
           this.objectManager.recreateFence(item);
         }
+        
       }
     }
 

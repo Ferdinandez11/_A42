@@ -44,6 +44,7 @@ export class ModelLoader {
         isItem: true,
         type: "model",
         uuid: item.uuid,
+        isAnimating: true,
         productId: item.productId,
       };
 
@@ -124,6 +125,7 @@ export class ModelLoader {
         }
       };
       animate();
+      model.userData.isAnimating = false;
 
       afterPlace?.(uuid);
     } catch (error) {
