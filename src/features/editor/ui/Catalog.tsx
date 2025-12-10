@@ -295,7 +295,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ value, onChange, onClear }) => (
 // COMPONENTE PRINCIPAL
 // ============================================================================
 
-export const Catalog: React.FC = () => {
+export const Catalog: React.FC = (() => {
   // ==========================================================================
   // HOOKS Y ESTADO
   // ==========================================================================
@@ -604,7 +604,7 @@ export const Catalog: React.FC = () => {
       </div>
     </div>
   );
-};
+});
 
 // ============================================================================
 // EXPORTS ADICIONALES
