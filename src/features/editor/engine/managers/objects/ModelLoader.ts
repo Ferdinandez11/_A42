@@ -55,83 +55,112 @@ export class ModelLoader {
     }
   }
 
-  public async placeObject(
-    x: number,
-    z: number,
-    product: PlaceableProduct,
-    afterPlace?: (uuid: string) => void
-  ): Promise<void> {
-    if (!product.modelUrl) return;
+public async placeObject(
+  x: number,
+  z: number,
+  product: PlaceableProduct,
+  afterPlace?: (uuid: string) => void
+): Promise<void> {
+  if (!product.modelUrl) return;
 
-    try {
-      const model = await this.loadModel(product.modelUrl);
-      model.position.set(x, 0, z);
+  try {
+    const model = await this.loadModel(product.modelUrl);
+    model.position.set(x, 0, z);
 
-      const initialScale = product.initialScale
-        ? new THREE.Vector3(...product.initialScale)
-        : new THREE.Vector3(1, 1, 1);
-      model.scale.copy(initialScale);
-      model.updateMatrixWorld(true);
-      this.adjustObjectToGround(model);
+    const initialScale = product.initialScale
+      ? new THREE.Vector3(...product.initialScale)
+      : new THREE.Vector3(1, 1, 1);
+    model.scale.copy(initialScale);
+    model.updateMatrixWorld(true);
+    this.adjustObjectToGround(model);
 
-      this.processSafetyZones(model);
+    const editor = useEditorStore.getState();
+    const isZonesVisible = editor.safetyZonesVisible;
+    const safetyMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff0000,
+      transparent: true,
+      opacity: 0.3,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
 
-      // ✅ FIX: Preparar escala de animación ANTES de añadir a la escena
-      const targetScale = model.scale.clone();
-      model.scale.set(0, 0, 0); // Invisible desde el principio
+    // Process safety zones INLINE
+    model.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const mesh = child as THREE.Mesh;
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
 
-      const uuid = THREE.MathUtils.generateUUID();
-      model.uuid = uuid;
-      model.userData = {
-        isItem: true,
-        type: "model",
-        uuid,
-        productId: product.id,
-      };
+        const name = mesh.name.toLowerCase();
+        const materialName =
+          (mesh.material as THREE.Material).name?.toLowerCase() ?? "";
 
-      // ✅ FIX: Añadir al store ANTES de añadir a escena
-      // Esto previene el trigger de syncSceneFromStore que causa la doble colocación
-      const newItem: ModelItem = {
-        uuid,
-        productId: product.id,
-        name: product.name,
-        price: product.price,
-        type: "model",
-        modelUrl: product.modelUrl,
-        position: [x, model.position.y, z],
-        rotation: [0, 0, 0],
-        scale: [initialScale.x, initialScale.y, initialScale.z],
-        url_tech: product.url_tech,
-        url_cert: product.url_cert,
-        url_inst: product.url_inst,
-        description: product.description,
-        data: product,
-      };
+        const isSafetyZone =
+          name.includes("zona") ||
+          name.includes("seguridad") ||
+          name.includes("safety") ||
+          materialName.includes("zona") ||
+          materialName.includes("seguridad") ||
+          materialName.includes("safety");
 
-      useSceneStore.getState().addItem(newItem);
-
-      // ✅ FIX: Añadir a escena con escala 0 (invisible)
-      this.scene.add(model);
-
-      // ✅ FIX: Animar INMEDIATAMENTE después (como en el código original)
-      let t = 0;
-      const animate = (): void => {
-        t += 0.05;
-        if (t < 1) {
-          model.scale.lerpVectors(new THREE.Vector3(0, 0, 0), targetScale, t);
-          requestAnimationFrame(animate);
-        } else {
-          model.scale.copy(targetScale);
+        if (isSafetyZone) {
+          mesh.material = safetyMaterial.clone();
+          mesh.visible = isZonesVisible;
+          mesh.userData.isSafetyZone = true;
+          mesh.castShadow = false;
         }
-      };
-      animate();
-      model.userData.isAnimating = false;
+      }
+    });
 
-      afterPlace?.(uuid);
-    } catch (error) {
-      console.error("Error placing object:", error);
-    }
+    // Animate scale-in
+    const targetScale = model.scale.clone();
+    model.scale.set(0, 0, 0);
+    let t = 0;
+    const animate = (): void => {
+      t += 0.05;
+      if (t < 1) {
+        model.scale.lerpVectors(new THREE.Vector3(0, 0, 0), targetScale, t);
+        requestAnimationFrame(animate);
+      } else {
+        model.scale.copy(targetScale);
+      }
+    };
+    animate();
+
+    const uuid = THREE.MathUtils.generateUUID();
+    model.uuid = uuid;
+    model.userData = {
+      isItem: true,
+      type: "model",
+      uuid,
+      productId: product.id,
+    };
+
+    const newItem: ModelItem = {
+      uuid,
+      productId: product.id,
+      name: product.name,
+      price: product.price,
+      type: "model",
+      modelUrl: product.modelUrl,
+      position: [x, model.position.y, z],
+      rotation: [0, 0, 0],
+      scale: [initialScale.x, initialScale.y, initialScale.z],
+      url_tech: product.url_tech,
+      url_cert: product.url_cert,
+      url_inst: product.url_inst,
+      description: product.description,
+      data: product,
+    };
+
+    useSceneStore.getState().addItem(newItem);
+
+    this.scene.add(model);
+    afterPlace?.(uuid);
+  } catch (error) {
+    console.error("Error placing object:", error);
   }
+}
 
   public adjustObjectToGround(object: THREE.Object3D): void {
     object.updateMatrixWorld();
