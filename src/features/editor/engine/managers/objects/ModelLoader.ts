@@ -75,6 +75,10 @@ export class ModelLoader {
 
       this.processSafetyZones(model);
 
+      // ✅ FIX: Preparar escala de animación ANTES de añadir a la escena
+      const targetScale = model.scale.clone();
+      model.scale.set(0, 0, 0); // Invisible desde el principio
+
       const uuid = THREE.MathUtils.generateUUID();
       model.uuid = uuid;
       model.userData = {
@@ -84,10 +88,8 @@ export class ModelLoader {
         productId: product.id,
       };
 
-      // Add to scene BEFORE animation to avoid "not part of scene graph" errors
-      this.scene.add(model);
-
-      // Add to scene store
+      // ✅ FIX: Añadir al store ANTES de añadir a escena
+      // Esto previene el trigger de syncSceneFromStore que causa la doble colocación
       const newItem: ModelItem = {
         uuid,
         productId: product.id,
@@ -107,9 +109,22 @@ export class ModelLoader {
 
       useSceneStore.getState().addItem(newItem);
 
-      // Animate scale-in AFTER adding to scene
-      this.animateScaleIn(model);
-      
+      // ✅ FIX: Añadir a escena con escala 0 (invisible)
+      this.scene.add(model);
+
+      // ✅ FIX: Animar INMEDIATAMENTE después (como en el código original)
+      let t = 0;
+      const animate = (): void => {
+        t += 0.05;
+        if (t < 1) {
+          model.scale.lerpVectors(new THREE.Vector3(0, 0, 0), targetScale, t);
+          requestAnimationFrame(animate);
+        } else {
+          model.scale.copy(targetScale);
+        }
+      };
+      animate();
+
       afterPlace?.(uuid);
     } catch (error) {
       console.error("Error placing object:", error);
@@ -160,36 +175,5 @@ export class ModelLoader {
         }
       }
     });
-  }
-
-  private animateScaleIn(model: THREE.Group): void {
-    const targetScale = model.scale.clone();
-    model.scale.set(0.01, 0.01, 0.01); // Start from almost 0 instead of 0 to avoid rendering issues
-    
-    const startTime = performance.now();
-    const duration = 300; // 300ms animation
-    
-    const animate = (): void => {
-      const elapsed = performance.now() - startTime;
-      const t = Math.min(elapsed / duration, 1);
-      
-      // Ease-out cubic for smoother animation
-      const eased = 1 - Math.pow(1 - t, 3);
-      
-      model.scale.lerpVectors(
-        new THREE.Vector3(0.01, 0.01, 0.01),
-        targetScale,
-        eased
-      );
-      
-      if (t < 1) {
-        requestAnimationFrame(animate);
-      } else {
-        model.scale.copy(targetScale);
-      }
-    };
-    
-    // Start animation on next frame to ensure object is rendered
-    requestAnimationFrame(animate);
   }
 }
