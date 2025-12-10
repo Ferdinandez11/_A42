@@ -8,12 +8,12 @@ import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 // Layouts
-import { EmployeeLayout } from "./App/layouts/EmployeeLayout";
-import { ClientPortalLayout } from "./App/layouts/ClientPortalLayout";
+import { EmployeeLayout } from "@/App/layouts/EmployeeLayout";
+import { ClientPortalLayout } from "@/App/layouts/ClientPortalLayout";
 
 // Pages
-import { LoginPage } from "./App/pages/LoginPage";
-import { ViewerPage } from "./App/pages/ViewerPage";
+import { LoginPage } from "@/App/pages/LoginPage";
+import { ViewerPage } from "@/App/pages/ViewerPage";
 
 // CRM Pages
 import { CrmDashboard } from "./features/crm/pages/CrmDashboard";
