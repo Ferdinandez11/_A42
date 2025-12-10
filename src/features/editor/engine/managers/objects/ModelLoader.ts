@@ -15,9 +15,6 @@ export class ModelLoader {
   private loader: GLTFLoader;
   private assetCache: Record<string, THREE.Group> = {};
 
-  // Reusable vectors to avoid Garbage Collection stutter
-  private _tempVec0 = new THREE.Vector3(0.001, 0.001, 0.001);
-  
   constructor(scene: THREE.Scene) {
     this.scene = scene;
     this.loader = new GLTFLoader();
@@ -69,19 +66,12 @@ export class ModelLoader {
       const model = await this.loadModel(product.modelUrl);
       model.position.set(x, 0, z);
 
-      // 1. Define target scale
-      const initialScaleVector = product.initialScale
+      const initialScale = product.initialScale
         ? new THREE.Vector3(...product.initialScale)
         : new THREE.Vector3(1, 1, 1);
-
-      // 2. Set scale momentarily to calculate Bounding Box correctly
-      model.scale.copy(initialScaleVector);
+      model.scale.copy(initialScale);
       model.updateMatrixWorld(true);
       this.adjustObjectToGround(model);
-
-      // 3. CRITICAL FIX: Shrink BEFORE adding to scene to prevent "Flash" effect
-      model.scale.set(0.001, 0.001, 0.001);
-      model.updateMatrixWorld(true);
 
       this.processSafetyZones(model);
 
@@ -94,7 +84,7 @@ export class ModelLoader {
         productId: product.id,
       };
 
-      // 4. Add to scene (it's invisible now because scale is ~0)
+      // Add to scene BEFORE animation to avoid "not part of scene graph" errors
       this.scene.add(model);
 
       // Add to scene store
@@ -107,7 +97,7 @@ export class ModelLoader {
         modelUrl: product.modelUrl,
         position: [x, model.position.y, z],
         rotation: [0, 0, 0],
-        scale: [initialScaleVector.x, initialScaleVector.y, initialScaleVector.z],
+        scale: [initialScale.x, initialScale.y, initialScale.z],
         url_tech: product.url_tech,
         url_cert: product.url_cert,
         url_inst: product.url_inst,
@@ -117,8 +107,8 @@ export class ModelLoader {
 
       useSceneStore.getState().addItem(newItem);
 
-      // 5. Start animation passing the target scale explicitly
-      this.animateScaleIn(model, initialScaleVector);
+      // Animate scale-in AFTER adding to scene
+      this.animateScaleIn(model);
       
       afterPlace?.(uuid);
     } catch (error) {
@@ -172,26 +162,23 @@ export class ModelLoader {
     });
   }
 
-  private animateScaleIn(model: THREE.Group, targetScale: THREE.Vector3): void {
-    const startTime = performance.now();
-    const duration = 400; // Increased slightly for smoother feel
+  private animateScaleIn(model: THREE.Group): void {
+    const targetScale = model.scale.clone();
+    model.scale.set(0.01, 0.01, 0.01); // Start from almost 0 instead of 0 to avoid rendering issues
     
-    // Store reference to check if object is still in scene
+    const startTime = performance.now();
+    const duration = 300; // 300ms animation
+    
     const animate = (): void => {
-      if (!model.parent) return; // Stop animation if object was deleted
-
       const elapsed = performance.now() - startTime;
       const t = Math.min(elapsed / duration, 1);
       
-      // Elastic out easing for a nice "pop" effect
-      // const eased = t === 0 || t === 1 ? t : Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * ((2 * Math.PI) / 3)) + 1;
-      
-      // Standard Ease-out cubic (smoother, less bouncy)
+      // Ease-out cubic for smoother animation
       const eased = 1 - Math.pow(1 - t, 3);
       
       model.scale.lerpVectors(
-        this._tempVec0, // Use cached vector 0.001
-        targetScale,    // Target passed as argument
+        new THREE.Vector3(0.01, 0.01, 0.01),
+        targetScale,
         eased
       );
       
@@ -202,6 +189,7 @@ export class ModelLoader {
       }
     };
     
+    // Start animation on next frame to ensure object is rendered
     requestAnimationFrame(animate);
   }
 }
