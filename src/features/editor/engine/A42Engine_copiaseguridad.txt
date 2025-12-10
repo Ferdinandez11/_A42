@@ -333,12 +333,6 @@ export class A42Engine {
             sceneObj.userData.textureRotation !== item.textureRotation;
 
           if (hasChanged) {
-            // FIX: Detach controls before removing object to prevent scene graph error
-            if (this.interactionManager.transformControl?.object === sceneObj) {
-              this.interactionManager.transformControl.detach();
-              this.interactionManager.transformControl.visible = false;
-            }
-
             this.scene.remove(sceneObj);
             this.objectManager.recreateFloor(item);
             sceneItemsMap.delete(item.uuid);
@@ -356,12 +350,6 @@ export class A42Engine {
             JSON.stringify(item.points);
 
           if (hasConfigChanged || hasPointsChanged) {
-            // FIX: Detach controls before removing object to prevent scene graph error
-            if (this.interactionManager.transformControl?.object === sceneObj) {
-              this.interactionManager.transformControl.detach();
-              this.interactionManager.transformControl.visible = false;
-            }
-
             this.scene.remove(sceneObj);
             this.objectManager.recreateFence(item);
             sceneItemsMap.delete(item.uuid);
@@ -388,14 +376,12 @@ export class A42Engine {
 
     // Remove items that are no longer in store
     for (const [uuid, obj] of sceneItemsMap) {
-      // FIX: Detach controls before removing object to prevent scene graph error
+      this.scene.remove(obj);
+
       if (this.interactionManager.transformControl?.object?.uuid === uuid) {
         this.interactionManager.transformControl.detach();
         this.interactionManager.transformControl.visible = false;
       }
-
-      this.scene.remove(obj);
-
       if (this.toolsManager.activeFloorId === uuid) {
         this.toolsManager.activeFloorId = null;
         this.toolsManager.clearFloorEditMarkers();
@@ -465,15 +451,6 @@ export class A42Engine {
     this.recorderManager.update(delta);
 
     this.checkSafetyCollisions();
-
-    // SAFETY GUARD: Check if TransformControl is attached to an object not in scene
-    // This fixes the "attached 3D object must be a part of the scene graph" error loop
-    const tc = this.interactionManager.transformControl;
-    if (tc && tc.object && !tc.object.parent) {
-      console.warn("🧹 A42Engine: Cleaning up orphaned TransformControls attachment.");
-      tc.detach();
-      tc.visible = false;
-    }
 
     if (!this.walkManager.isEnabled) {
       this.sceneManager.controls.update();
