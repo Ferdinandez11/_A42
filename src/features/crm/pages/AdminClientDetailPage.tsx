@@ -444,7 +444,7 @@ export const AdminClientDetailPage: React.FC = () => {
 
   useEffect(() => {
     loadClientData();
-  }, [loadClientData]);
+  }, [id]);
 
   // ==========================================================================
   // HANDLERS
