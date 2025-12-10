@@ -84,7 +84,6 @@ public async placeObject(
       side: THREE.DoubleSide,
     });
 
-    // Process safety zones INLINE
     model.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
@@ -112,20 +111,8 @@ public async placeObject(
       }
     });
 
-    // Animate scale-in
     const targetScale = model.scale.clone();
     model.scale.set(0, 0, 0);
-    let t = 0;
-    const animate = (): void => {
-      t += 0.05;
-      if (t < 1) {
-        model.scale.lerpVectors(new THREE.Vector3(0, 0, 0), targetScale, t);
-        requestAnimationFrame(animate);
-      } else {
-        model.scale.copy(targetScale);
-      }
-    };
-    animate();
 
     const uuid = THREE.MathUtils.generateUUID();
     model.uuid = uuid;
@@ -136,6 +123,7 @@ public async placeObject(
       productId: product.id,
     };
 
+    // ✅ FIX: Añadir al store con scale [0,0,0]
     const newItem: ModelItem = {
       uuid,
       productId: product.id,
@@ -145,7 +133,7 @@ public async placeObject(
       modelUrl: product.modelUrl,
       position: [x, model.position.y, z],
       rotation: [0, 0, 0],
-      scale: [initialScale.x, initialScale.y, initialScale.z],
+      scale: [0, 0, 0],  // ← EMPEZAR EN 0, no en initialScale
       url_tech: product.url_tech,
       url_cert: product.url_cert,
       url_inst: product.url_inst,
@@ -154,8 +142,29 @@ public async placeObject(
     };
 
     useSceneStore.getState().addItem(newItem);
-
     this.scene.add(model);
+
+    // ✅ Animar
+    let t = 0;
+    const animate = (): void => {
+      t += 0.05;
+      if (t < 1) {
+        model.scale.lerpVectors(new THREE.Vector3(0, 0, 0), targetScale, t);
+        requestAnimationFrame(animate);
+      } else {
+        model.scale.copy(targetScale);
+        
+        // ✅ Actualizar store con escala final al terminar
+        useSceneStore.getState().updateItemTransform(
+          uuid,
+          [x, model.position.y, z],
+          [0, 0, 0],
+          [targetScale.x, targetScale.y, targetScale.z]
+        );
+      }
+    };
+    animate();
+
     afterPlace?.(uuid);
   } catch (error) {
     console.error("Error placing object:", error);
