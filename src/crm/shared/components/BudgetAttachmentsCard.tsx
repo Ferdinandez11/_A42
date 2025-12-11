@@ -1,5 +1,5 @@
 // BudgetAttachmentsCard.tsx
-import type { Attachment } from './budgetTypes';
+import type { Attachment } from '@/crm/pages/budgetTypes';
 
 interface BudgetAttachmentsCardProps {
   attachments: Attachment[];

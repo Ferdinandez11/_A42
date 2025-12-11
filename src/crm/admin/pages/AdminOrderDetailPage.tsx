@@ -65,14 +65,14 @@ interface Attachment {
 }
 
 // Importar componentes
-import { OrderHeader } from './OrderHeader';
-import { OrderControlCard } from './OrderControlCard';
-import { ObservationsCard } from './ObservationsCard';
-import { MaterialsBreakdownCard } from './MaterialsBreakdownCard';
-import { AttachmentsCard } from './AttachmentsCard';
-import { ChatPanel } from './ChatPanel';
-import { CatalogModal } from './CatalogModal';
-import { ParametricModal } from './ParametricModal';
+import { OrderHeader } from '../components/OrderHeader';
+import { OrderControlCard } from '../../shared/components/OrderControlCard';
+import { ObservationsCard } from '../../shared/components/ObservationsCard';
+import { MaterialsBreakdownCard } from '../../shared/components/MaterialsBreakdownCard';
+import { AttachmentsCard } from '../../shared/components/AttachmentsCard';
+import { ChatPanel } from '../../shared/components/ChatPanel';
+import { CatalogModal } from '../../shared/components/CatalogModal';
+import { ParametricModal } from '../../shared/components/ParametricModal';
 
 export const AdminOrderDetailPage = () => {
   const { id } = useParams<{ id: string }>();

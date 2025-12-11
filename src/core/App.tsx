@@ -16,13 +16,13 @@ import { LoginPage } from "@/App/pages/LoginPage";
 import { ViewerPage } from "@/App/pages/ViewerPage";
 
 // CRM Pages
-import { CrmDashboard } from "@/features/crm/pages/CrmDashboard";
-import { ClientDashboard } from "@/features/crm/pages/ClientDashboard";
-import { ProfilePage } from "@/features/crm/pages/ProfilePage";
-import { BudgetDetailPage } from "@/features/crm/pages/BudgetDetailPage";
-import { AdminOrderDetailPage } from "@/features/crm/pages/AdminOrderDetailPage";
-import { AdminClientDetailPage } from "@/features/crm/pages/AdminClientDetailPage";
-import { AdminCalendarPage } from "@/features/crm/pages/AdminCalendarPage";
+import { CrmDashboard } from "@/crm/admin/pages/CrmDashboard";
+import { ClientDashboard } from "@/crm//client/pages/ClientDashboard";
+import { ProfilePage } from "@/crm//client/pages/ProfilePage";
+import { BudgetDetailPage } from "@/crm/admin/components/BudgetDetailPage";
+import { AdminOrderDetailPage } from "@/crm/admin/pages/AdminOrderDetailPage";
+import { AdminClientDetailPage } from "@/crm/admin/pages/AdminClientDetailPage";
+import { AdminCalendarPage } from "@/crm/admin/pages/AdminCalendarPage";
 
 /**
  * App Root Component

@@ -1,5 +1,5 @@
 // BudgetObservationsCard.tsx
-import type { Observation } from './budgetTypes';
+import type { Observation } from '@/crm/pages/budgetTypes';
 
 interface BudgetObservationsCardProps {
   observations: Observation[];

@@ -1,6 +1,6 @@
 // BudgetChatPanel.tsx
 import { useRef, useEffect } from 'react';
-import type { Message } from './budgetTypes';
+import type { Message } from '@/crm/pages/budgetTypes';
 
 interface BudgetChatPanelProps {
   messages: Message[];

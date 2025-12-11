@@ -1,5 +1,5 @@
 // BudgetParametricModal.tsx
-import type { CatalogItem } from './budgetTypes';
+import type { CatalogItem } from '@/crm/pages/budgetTypes';
 
 interface BudgetParametricModalProps {
   isOpen: boolean;

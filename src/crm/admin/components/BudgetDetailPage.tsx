@@ -11,19 +11,19 @@ import { useErrorHandler } from '@/core/hooks/useErrorHandler';
 import { AppError, ErrorType, ErrorSeverity } from '@/core/lib/errorHandler';
 
 // Importar tipos y utilidades
-import type { CatalogItem, ModalState } from './budgetTypes';
-import { getStatusBadge } from './budgetUtils';
+import type { CatalogItem, ModalState } from '@/crm/pages/budgetTypes';
+import { getStatusBadge } from '@/crm/pages/budgetUtils';
 
 // Importar componentes
-import { BudgetHeader } from './BudgetHeader';
-import { BudgetInfoCard } from './BudgetInfoCard';
-import { BudgetObservationsCard } from './BudgetObservationsCard';
-import { BudgetAttachmentsCard } from './BudgetAttachmentsCard';
-import { BudgetMaterialsCard } from './BudgetMaterialsCard';
-import { BudgetProjectCard } from './BudgetProjectCard';
-import { BudgetChatPanel } from './BudgetChatPanel';
-import { BudgetCatalogModal } from './BudgetCatalogModal';
-import { BudgetParametricModal } from './BudgetParametricModal';
+import { BudgetHeader } from '../../shared/components/BudgetHeader';
+import { BudgetInfoCard } from '../../shared/components/BudgetInfoCard';
+import { BudgetObservationsCard } from '../../shared/components/BudgetObservationsCard';
+import { BudgetAttachmentsCard } from '../../shared/components/BudgetAttachmentsCard';
+import { BudgetMaterialsCard } from '../../shared/components/BudgetMaterialsCard';
+import { BudgetProjectCard } from '../../shared/components/BudgetProjectCard';
+import { BudgetChatPanel } from '../../shared/components/BudgetChatPanel';
+import { BudgetCatalogModal } from '../../shared/components/BudgetCatalogModal';
+import { BudgetParametricModal } from '../../shared/components/BudgetParametricModal';
 
 // ✅ TIPOS ADICIONALES
 interface Item3D {

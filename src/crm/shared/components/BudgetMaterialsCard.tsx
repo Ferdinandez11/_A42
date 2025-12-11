@@ -1,6 +1,6 @@
 // BudgetMaterialsCard.tsx
-import type { Item3D, ManualItem } from './budgetTypes';
-import { formatMoney } from './budgetUtils';
+import type { Item3D, ManualItem } from '@/crm/pages/budgetTypes';
+import { formatMoney } from '@/crm/pages/budgetUtils';
 
 interface BudgetMaterialsCardProps {
   items3D: Item3D[];

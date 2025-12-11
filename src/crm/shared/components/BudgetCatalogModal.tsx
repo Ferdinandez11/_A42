@@ -1,6 +1,6 @@
 // BudgetCatalogModal.tsx
-import { CATALOG_ITEMS } from './budgetConstants';
-import type { CatalogItem } from './budgetTypes';
+import { CATALOG_ITEMS } from '@/crm/pages/budgetConstants';
+import type { CatalogItem } from '@/crm/pages/budgetTypes';
 
 interface BudgetCatalogModalProps {
   isOpen: boolean;
