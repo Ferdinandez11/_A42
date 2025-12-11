@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/core/lib/supabase';
 
 // ✅ IMPORTS DEL SISTEMA DE ERRORES
-import { useErrorHandler } from '@/hooks/useErrorHandler';
-import { AppError, ErrorType, ErrorSeverity } from '@/lib/errorHandler';
+import { useErrorHandler } from '@/core/hooks/useErrorHandler';
+import { AppError, ErrorType, ErrorSeverity } from '@/core/lib/errorHandler';
 
 // ============================================================================
 // TYPES

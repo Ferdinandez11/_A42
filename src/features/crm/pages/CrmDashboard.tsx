@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
-import { useErrorHandler } from '@/hooks/useErrorHandler';
-import { AppError, ErrorType, ErrorSeverity } from '@/lib/errorHandler';
+import { supabase } from '@/core/lib/supabase';
+import { useErrorHandler } from '@/core/hooks/useErrorHandler';
+import { AppError, ErrorType, ErrorSeverity } from '@/core/lib/errorHandler';
 
 // ============================================================================
 // TYPES

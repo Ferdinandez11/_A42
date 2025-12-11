@@ -1,7 +1,7 @@
 // OrderControlCard.tsx
-import type { OrderData, OrderStatus } from './types';
-import { STATUS_OPTIONS } from './constants';
-import { formatMoney } from './utils';
+import type { OrderData, OrderStatus } from '@/crm/pages/types';
+import { STATUS_OPTIONS } from '@/crm/pages/constants';
+import { formatMoney } from '@/crm/pages/utils';
 
 interface OrderControlCardProps {
   order: OrderData;

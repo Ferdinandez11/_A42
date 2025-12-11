@@ -3,11 +3,11 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Building2, Package, Save, ExternalLink } from 'lucide-react';
 
-import { supabase } from '../../../lib/supabase';
+import { supabase } from '@/core/lib/supabase';
 
 // ✅ IMPORTS DEL SISTEMA DE ERRORES
-import { useErrorHandler } from '@/hooks/useErrorHandler';
-import { AppError, ErrorType, ErrorSeverity } from '@/lib/errorHandler';
+import { useErrorHandler } from '@/core/hooks/useErrorHandler';
+import { AppError, ErrorType, ErrorSeverity } from '@/core/lib/errorHandler';
 
 // ============================================================================
 // TIPOS E INTERFACES

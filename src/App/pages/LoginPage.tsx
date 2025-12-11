@@ -1,9 +1,9 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
-import { useAuthStore } from "@/stores/auth/useAuthStore";
-import { useErrorHandler } from '@/hooks/useErrorHandler';
-import { AppError, ErrorType, ErrorSeverity } from "@/lib/errorHandler";
+import { supabase } from "@/core/lib/supabase";
+import { useAuthStore } from "@/core/stores/auth/useAuthStore";
+import { useErrorHandler } from '@/core/hooks/useErrorHandler';
+import { AppError, ErrorType, ErrorSeverity } from "@/core/lib/errorHandler";
 import type { AuthStep, TargetRole, Profile} from "@/App/utils/types";
 
 export const LoginPage: React.FC = () => {

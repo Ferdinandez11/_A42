@@ -1,9 +1,9 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
-import { Editor3D } from "@/features/editor/Editor3D";
-import { useAuthStore } from "@/stores/auth/useAuthStore";
-import { useProjectStore } from "@/stores/project/useProjectStore";
+import { supabase } from "@/core/lib/supabase";
+import { Editor3D } from "@/editor/Editor3D";
+import { useAuthStore } from "@/core/stores/auth/useAuthStore";
+import { useProjectStore } from "@/editor/stores/project/useProjectStore";
 import type { ExtendedUser } from "@/App/utils/types";
 
 export const ViewerPage: React.FC = () => {

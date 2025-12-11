@@ -1,5 +1,5 @@
 // BudgetInfoCard.tsx
-import type { Order } from '../../../types/types';
+import type { Order } from '@/domain/types/types';
 
 interface BudgetInfoCardProps {
   order: Order;

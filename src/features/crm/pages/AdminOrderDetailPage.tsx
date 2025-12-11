@@ -1,18 +1,18 @@
 // AdminOrderDetailPage.tsx
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { supabase } from '../../../lib/supabase';
-import { PriceCalculator, PRICES } from '../../../utils/PriceCalculator';
-import { generateBillOfMaterials } from '../../../utils/budgetUtils';
-import { generateBudgetPDF } from '../../../utils/pdfGenerator';
+import { supabase } from '@/core/lib/supabase';
+import { PriceCalculator, PRICES } from '@/pdf/utils/PriceCalculator';
+import { generateBillOfMaterials } from '@/pdf/utils/budgetUtils';
+import { generateBudgetPDF } from '@/pdf/utils/pdfGenerator';
 
 // ✅ IMPORTS DEL SISTEMA DE ERRORES
-import { useErrorHandler } from '@/hooks/useErrorHandler';
-import { AppError, ErrorType, ErrorSeverity } from '@/lib/errorHandler';
+import { useErrorHandler } from '@/core/hooks/useErrorHandler';
+import { AppError, ErrorType, ErrorSeverity } from '@/core/lib/errorHandler';
 
 // Importar tipos
-import type { OrderData, OrderStatus, CatalogItem } from './types';
-import { formatMoney, calculateDeliveryDate } from './utils';
+import type { OrderData, OrderStatus, CatalogItem } from '@/crm/pages/types';
+import { formatMoney, calculateDeliveryDate } from '@/crm/pages/utils';
 
 // ✅ TIPOS ADICIONALES NECESARIOS
 interface BillOfMaterialsLine {

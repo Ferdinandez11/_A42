@@ -1,6 +1,6 @@
 // CatalogModal.tsx
-import { CATALOG_ITEMS } from './constants';
-import type { CatalogItem } from './types';
+import { CATALOG_ITEMS } from '@/crm/pages/constants';
+import type { CatalogItem } from '@/crm/pages/types';
 
 interface CatalogModalProps {
   isOpen: boolean;

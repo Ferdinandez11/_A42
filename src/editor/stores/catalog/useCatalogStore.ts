@@ -1,0 +1,36 @@
+// --- VERSIÓN CORREGIDA DE useCatalogStore.ts ---
+import { create } from "zustand";
+import type { CatalogProduct } from "@/domain/types/catalog";
+
+/**
+ * Catalog store state
+ * Manages catalog modal visibility and product selection
+ */
+interface CatalogState {
+  isOpen: boolean;
+  selectedProduct: CatalogProduct | null;
+
+  openCatalog: () => void;
+  closeCatalog: () => void;
+  toggleCatalog: () => void;
+
+  selectProduct: (product: CatalogProduct | null) => void;
+}
+
+/**
+ * Zustand store for catalog management
+ * 
+ * This is a simple UI state store with no async operations,
+ * so it doesn't require error handling.
+ */
+export const useCatalogStore = create<CatalogState>((set) => ({
+  isOpen: false,
+  selectedProduct: null,
+
+  openCatalog: () => set({ isOpen: true }),
+  closeCatalog: () => set({ isOpen: false }),
+  toggleCatalog: () => set((s) => ({ isOpen: !s.isOpen })),
+
+  selectProduct: (product) => set({ selectedProduct: product }),
+}));
+// --- END OF FILE ---

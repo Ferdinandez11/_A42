@@ -15,12 +15,12 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 
-import { supabase } from '../../../lib/supabase';
-import { ConfirmModal } from '../../../components/ui/ConfirmModal';
+import { supabase } from '@/core/lib/supabase';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 
 // ✅ IMPORTS DEL SISTEMA DE ERRORES
-import { useErrorHandler } from '@/hooks/useErrorHandler';
-import { AppError, ErrorType, ErrorSeverity } from '@/lib/errorHandler';
+import { useErrorHandler } from '@/core/hooks/useErrorHandler';
+import { AppError, ErrorType, ErrorSeverity } from '@/core/lib/errorHandler';
 
 // ============================================================================
 // TIPOS E INTERFACES

@@ -1,6 +1,6 @@
 // ChatPanel.tsx
 import { useRef, useEffect } from 'react';
-import type { Message } from './types';
+import type { Message } from '@/crm/pages/types';
 
 interface ChatPanelProps {
   messages: Message[];

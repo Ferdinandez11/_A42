@@ -1,5 +1,5 @@
 // AttachmentsCard.tsx
-import type { Attachment } from './types';
+import type { Attachment } from '@/crm/pages/types';
 
 interface AttachmentsCardProps {
   attachments: Attachment[];

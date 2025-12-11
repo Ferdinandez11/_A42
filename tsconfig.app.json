@@ -22,14 +22,15 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
 
-    "baseUrl": "./src",
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["*"],
-      "@features/*": ["features/*"],
-      "@stores/*": ["stores/*"],
-      "@lib/*": ["lib/*"],
-      "@utils/*": ["utils/*"],
-      "@components/*": ["components/*"]
+      "@/*": ["./src/*"],
+      "@/core/*": ["./src/core/*"],
+      "@/domain/*": ["./src/domain/*"],
+      "@/editor/*": ["./src/editor/*"],
+      "@/crm/*": ["./src/crm/*"],
+      "@/pdf/*": ["./src/pdf/*"],
+      "@/erp/*": ["./src/erp/*"]
     }
   },
 

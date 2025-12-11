@@ -12,7 +12,7 @@ export default defineConfig({
     globals: true,
     
     // Archivo de setup que se ejecuta antes de cada test
-    setupFiles: ['./src/tests/setup.ts'],
+    setupFiles: ['./src/core/tests/setup.ts'],
     
     // Configuración de coverage (cobertura de código)
     coverage: {

@@ -1,5 +1,5 @@
 // ParametricModal.tsx
-import type { CatalogItem } from './types';
+import type { CatalogItem } from '@/crm/pages/types';
 
 interface ParametricModalProps {
   isOpen: boolean;

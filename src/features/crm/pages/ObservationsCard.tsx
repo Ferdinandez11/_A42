@@ -1,5 +1,5 @@
 // ObservationsCard.tsx
-import type { Observation } from './types';
+import type { Observation } from '@/crm/pages/types';
 
 interface ObservationsCardProps {
   observations: Observation[];

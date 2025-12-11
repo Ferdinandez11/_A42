@@ -1,5 +1,5 @@
 // budgetConstants.ts
-import { PRICES } from '../../../utils/PriceCalculator';
+import { PRICES } from '@/pdf/utils/PriceCalculator';
 import type { CatalogItem } from './budgetTypes';
 
 export const CATALOG_ITEMS: CatalogItem[] = [

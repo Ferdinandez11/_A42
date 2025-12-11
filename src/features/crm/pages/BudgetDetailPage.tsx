@@ -1,14 +1,14 @@
 // BudgetDetailPage.tsx
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '../../../lib/supabase';
+import { supabase } from '@/core/lib/supabase';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
-import { PriceCalculator, PRICES } from '../../../utils/PriceCalculator';
-import type { Order, OrderStatus } from '../../../types/types';
+import { PriceCalculator, PRICES } from '@/pdf/utils/PriceCalculator';
+import type { Order, OrderStatus } from '@/domain/types/types';
 
 // ✅ IMPORTS DEL SISTEMA DE ERRORES
-import { useErrorHandler } from '@/hooks/useErrorHandler';
-import { AppError, ErrorType, ErrorSeverity } from '@/lib/errorHandler';
+import { useErrorHandler } from '@/core/hooks/useErrorHandler';
+import { AppError, ErrorType, ErrorSeverity } from '@/core/lib/errorHandler';
 
 // Importar tipos y utilidades
 import type { CatalogItem, ModalState } from './budgetTypes';

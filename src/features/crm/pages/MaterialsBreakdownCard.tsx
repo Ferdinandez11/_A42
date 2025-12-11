@@ -1,6 +1,6 @@
 // MaterialsBreakdownCard.tsx
-import type { Item3D, ManualItem } from './types';
-import { formatMoney } from './utils';
+import type { Item3D, ManualItem } from '@/crm/pages/types';
+import { formatMoney } from '@/crm/pages/utils';
 
 interface MaterialsBreakdownCardProps {
   items3D: Item3D[];
