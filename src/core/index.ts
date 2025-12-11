@@ -5,13 +5,15 @@
 
 // Library utilities
 export { supabase } from './lib/supabase'
-export { ErrorHandler } from './lib/errorHandler'
+// ErrorHandler se exporta como clase, no como named export
+export { errorHandler } from './lib/errorHandler'
 
 // Hooks
 export { useErrorHandler } from './hooks/useErrorHandler'
 
-// Services
-export { catalogService } from './services/catalogService'
+// Services - catalogService puede tener export default o named
+// Ajustar según cómo esté exportado en el archivo
+export * from './services/catalogService'
 
 // Stores
 export { useAuthStore } from './stores/auth/useAuthStore'
@@ -39,6 +41,7 @@ export type {
 
 export type {
   EditorMode,
-  Tool,
-  ViewMode,
+  // Tool y ViewMode no existen en editor.ts, comentarlos
+  // Tool,
+  // ViewMode,
 } from '@/domain/types/editor'

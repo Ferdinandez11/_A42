@@ -4,7 +4,7 @@
 // ============================================================================
 
 // Main Editor Component
-export { default as Editor3D } from './Editor3D'
+export { Editor3D } from './Editor3D'
 
 // Context
 export { EngineContext, useEngine } from './context/EngineContext'
