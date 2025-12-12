@@ -5,7 +5,7 @@ import type { User, Session } from '@supabase/supabase-js';
 //import { RussianRuble } from 'lucide-react';
 
 // Mock de Supabase
-vi.mock('@/lib/supabase', () => ({
+vi.mock('@/core/lib/supabase', () => ({
   supabase: {
     auth: {
       signOut: vi.fn().mockResolvedValue({ error: null }),
