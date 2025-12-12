@@ -1,14 +1,29 @@
 import * as THREE from "three";
+import { useSceneStore } from "@/editor/stores/scene/useSceneStore";
 import { useCADStore } from "@/editor/stores/cad/useCADStore";
 
 /**
- * CAD Tool for vertex selection and measurement
- * Manages visual markers and calculates distances/angles between points
- * Extended in Sprint 5.5 - Phase 2 with advanced selection and geometry modification
+ * Edit Marker Controller
+ * Manages edit markers for floor and fence items
+ * Allows visual editing of polygon/polyline vertices
+ * Extracted from ToolsManager.ts (Sprint 5.5 - Phase 2)
  */
-export class CADTool {
+
+interface Point2D {
+  x: number;
+  z: number;
+}
+
+interface MarkerUserData {
+  isFloorMarker?: boolean;
+  pointIndex?: number;
+  parentUuid?: string;
+}
+
+export class EditMarkerController {
   private scene: THREE.Scene;
-  private markers: THREE.Mesh[] = [];
+  public editMarkers: THREE.Mesh[] = [];
+  public activeItemId: string | null = null;
   private selectedIndices: number[] = [];
 
   constructor(scene: THREE.Scene) {
@@ -16,87 +31,106 @@ export class CADTool {
   }
 
   /**
-   * Resets all markers and clears selection
+   * Shows edit markers for a floor or fence item
+   * Creates visual markers at each vertex that can be moved to edit the shape
+   * 
+   * @param itemUuid - UUID of the item to edit
+   * @param points - Array of 2D points (local coordinates)
    */
-  public reset(): void {
-    this.markers.forEach((marker) => this.scene.remove(marker));
-    this.markers = [];
-    this.selectedIndices = [];
+  public showEditMarkers(itemUuid: string, points: Point2D[]): void {
+    this.clearEditMarkers();
+    this.activeItemId = itemUuid;
 
-    useCADStore.getState().setSelectedVertices([], null, null);
-  }
+    const parentObj = this.scene.getObjectByProperty("uuid", itemUuid);
+    if (!parentObj) {
+      console.warn(`Object with UUID ${itemUuid} not found`);
+      return;
+    }
 
-  /**
-   * Creates visual markers at specified world positions
-   * @param itemUuid - UUID of the item (unused but kept for future use)
-   * @param worldPositions - Array of 3D positions for markers
-   */
-  public setMarkers(itemUuid: string, worldPositions: THREE.Vector3[]): void {
-    void itemUuid; // Prevents unused variable warning
+    // Create a marker for each point
+    points.forEach((point, index) => {
+      const markerGeometry = new THREE.BoxGeometry(0.4, 0.4, 0.4);
+      const markerMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+      const marker = new THREE.Mesh(markerGeometry, markerMaterial);
 
-    this.reset();
+      // Convert local point to world space
+      const localPos = new THREE.Vector3(point.x, 0, point.z);
+      localPos.applyMatrix4(parentObj.matrixWorld);
+      marker.position.copy(localPos);
 
-    worldPositions.forEach((pos, index) => {
-      const marker = new THREE.Mesh(
-        new THREE.BoxGeometry(0.4, 0.4, 0.4),
-        new THREE.MeshBasicMaterial({ color: 0x00ff00 })
-      );
-      marker.position.copy(pos);
-      marker.userData.pointIndex = index;
+      // Store metadata
+      const userData: MarkerUserData = {
+        isFloorMarker: true,
+        pointIndex: index,
+        parentUuid: itemUuid,
+      };
+      marker.userData = userData;
+
       this.scene.add(marker);
-      this.markers.push(marker);
+      this.editMarkers.push(marker);
     });
   }
 
   /**
-   * Updates distance and angle measurements based on selected vertices
-   * - 2 vertices: calculates distance
-   * - 3 vertices: calculates distance and angle
+   * Synchronizes marker positions with the parent object's transform
+   * Called when the parent object is moved/rotated/scaled
+   * 
+   * @param parentObj - The parent object (floor or fence)
    */
-  public updateDistances(): void {
-    const store = useCADStore.getState();
-    const indices = store.selectedVertices;
+  public syncMarkersWithObject(parentObj: THREE.Object3D): void {
+    if (this.activeItemId !== parentObj.userData.uuid) return;
 
-    let distance: number | null = null;
-    let angle: number | null = null;
+    const scene = useSceneStore.getState();
+    const item = scene.items.find((i) => i.uuid === parentObj.userData.uuid);
+    if (!item || (item.type !== "floor" && item.type !== "fence")) return;
 
-    // Calculate distance between first two points
-    if (indices.length >= 2) {
-      const markerA = this.getMarker(indices[0]);
-      const markerB = this.getMarker(indices[1]);
-      if (markerA && markerB) {
-        distance = markerA.position.distanceTo(markerB.position);
-      }
-    }
+    this.editMarkers.forEach((marker) => {
+      const userData = marker.userData as MarkerUserData;
+      const idx = userData.pointIndex;
+      if (idx === undefined) return;
 
-    // Calculate angle between three points
-    if (indices.length === 3) {
-      const p0 = this.getMarker(indices[0])?.position;
-      const p1 = this.getMarker(indices[1])?.position;
-      const p2 = this.getMarker(indices[2])?.position;
-
-      if (p0 && p1 && p2) {
-        const v1 = new THREE.Vector3().subVectors(p0, p1).normalize();
-        const v2 = new THREE.Vector3().subVectors(p2, p1).normalize();
-        angle = THREE.MathUtils.radToDeg(v1.angleTo(v2));
-      }
-    }
-
-    store.setSelectedVertices([...indices], distance, angle);
+      const pointData = item.points[idx];
+      const worldPos = new THREE.Vector3(pointData.x, 0, pointData.z);
+      worldPos.applyMatrix4(parentObj.matrixWorld);
+      marker.position.copy(worldPos);
+    });
   }
 
   /**
-   * Gets a marker by its index
-   * @param idx - Index of the marker to retrieve
-   * @returns The marker mesh or undefined
+   * Updates the item's points when a marker is moved
+   * Converts marker world position back to local coordinates
+   * 
+   * @param marker - The marker that was moved
    */
-  private getMarker(idx: number): THREE.Mesh | undefined {
-    return this.markers.find((m) => m.userData.pointIndex === idx);
-  }
+  public updateItemFromMarker(marker: THREE.Object3D): void {
+    const userData = marker.userData as MarkerUserData;
+    const uuid = userData.parentUuid;
+    const idx = userData.pointIndex;
 
-  // ========================================================================
-  // ADVANCED FUNCTIONALITY - Added in Phase 2
-  // ========================================================================
+    if (!uuid || idx === undefined) return;
+
+    const parentObj = this.scene.getObjectByProperty("uuid", uuid);
+    if (!parentObj) return;
+
+    const scene = useSceneStore.getState();
+    const item = scene.items.find((i) => i.uuid === uuid);
+
+    if (item && (item.type === "floor" || item.type === "fence")) {
+      // Convert world position to local coordinates
+      const localPos = marker.position.clone();
+      const inverseMatrix = parentObj.matrixWorld.clone().invert();
+      localPos.applyMatrix4(inverseMatrix);
+
+      const newPoints = item.points.map((p) => ({ ...p }));
+      newPoints[idx] = { x: localPos.x, z: localPos.z };
+
+      if (item.type === "floor") {
+        scene.updateFloorPoints(uuid, newPoints);
+      } else if (item.type === "fence") {
+        scene.updateFencePoints(uuid, newPoints);
+      }
+    }
+  }
 
   /**
    * Selects a vertex for CAD operations
@@ -139,20 +173,13 @@ export class CADTool {
   }
 
   /**
-   * Gets the currently selected vertex indices
-   * @returns Array of selected indices
-   */
-  public getSelectedIndices(): number[] {
-    return [...this.selectedIndices];
-  }
-
-  /**
    * Updates marker colors based on selection state
    * Blue (first), Red (second), Yellow (third), Green (unselected)
    */
-  public updateMarkerColors(): void {
-    this.markers.forEach((m) => {
-      const idx = m.userData.pointIndex;
+  private updateMarkerColors(): void {
+    this.editMarkers.forEach((m) => {
+      const userData = m.userData as MarkerUserData;
+      const idx = userData.pointIndex;
       if (idx === undefined) return;
 
       const mat = m.material as THREE.MeshBasicMaterial;
@@ -206,17 +233,27 @@ export class CADTool {
   }
 
   /**
+   * Gets a marker by its point index
+   * @param index - Point index to find
+   * @returns The marker or undefined
+   */
+  private getMarker(index: number): THREE.Mesh | undefined {
+    return this.editMarkers.find((m) => {
+      const userData = m.userData as MarkerUserData;
+      return userData.pointIndex === index;
+    });
+  }
+
+  /**
    * Sets the length of a segment by moving one vertex
    * @param newLength - Target length in meters
    * @param indexToMove - Index of the vertex to move
    * @param indexAnchor - Index of the fixed vertex
-   * @param updateCallback - Callback to update the parent object
    */
   public setSegmentLength(
     newLength: number,
     indexToMove: number,
-    indexAnchor: number,
-    updateCallback?: (marker: THREE.Mesh) => void
+    indexAnchor: number
   ): void {
     const markerMove = this.getMarker(indexToMove);
     const markerAnchor = this.getMarker(indexAnchor);
@@ -232,11 +269,7 @@ export class CADTool {
       .add(direction.multiplyScalar(newLength));
 
     markerMove.position.copy(newPos);
-    
-    if (updateCallback) {
-      updateCallback(markerMove);
-    }
-    
+    this.updateItemFromMarker(markerMove);
     this.calculateAndSyncData();
   }
 
@@ -245,12 +278,8 @@ export class CADTool {
    * Rotates the third vertex around the second (pivot)
    * 
    * @param targetAngleDeg - Target angle in degrees
-   * @param updateCallback - Callback to update the parent object
    */
-  public setVertexAngle(
-    targetAngleDeg: number,
-    updateCallback?: (marker: THREE.Mesh) => void
-  ): void {
+  public setVertexAngle(targetAngleDeg: number): void {
     if (this.selectedIndices.length !== 3) return;
 
     const idxRef = this.selectedIndices[0];
@@ -279,11 +308,26 @@ export class CADTool {
     const newZ = mPiv.position.z + distMov * Math.sin(newAngleAbs);
 
     mMov.position.set(newX, 0, newZ);
-    
-    if (updateCallback) {
-      updateCallback(mMov);
-    }
-    
+    this.updateItemFromMarker(mMov);
     this.calculateAndSyncData();
+  }
+
+  /**
+   * Clears all edit markers and resets state
+   */
+  public clearEditMarkers(): void {
+    this.editMarkers.forEach((m) => this.scene.remove(m));
+    this.editMarkers = [];
+    this.selectedIndices = [];
+    this.activeItemId = null;
+    useCADStore.getState().setSelectedVertices([], null, null);
+  }
+
+  /**
+   * Gets the currently selected vertex indices
+   * @returns Array of selected indices
+   */
+  public getSelectedIndices(): number[] {
+    return [...this.selectedIndices];
   }
 }

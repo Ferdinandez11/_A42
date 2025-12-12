@@ -23,6 +23,7 @@ type FenceConfig = BaseFenceConfig & {
 
 /**
  * Tool for creating fences by placing points and generating geometry
+ * Extended in Sprint 5.5 - Phase 2 with public accessors for ToolsManager compatibility
  */
 export class FenceTool {
   private scene: THREE.Scene;
@@ -379,5 +380,51 @@ export class FenceTool {
     instancedMesh.instanceMatrix.needsUpdate = true;
 
     group.add(instancedMesh);
+  }
+
+  // ========================================================================
+  // PUBLIC ACCESSORS - Added in Phase 2 for ToolsManager compatibility
+  // ========================================================================
+
+  /**
+   * Gets the current points array
+   * Used by ToolsManager to maintain backward compatibility
+   * @returns Copy of the points array
+   */
+  public getPoints(): THREE.Vector3[] {
+    return [...this.points];
+  }
+
+  /**
+   * Gets the current markers array
+   * Used by ToolsManager to maintain backward compatibility
+   * @returns Copy of the markers array
+   */
+  public getMarkers(): THREE.Mesh[] {
+    return [...this.markers];
+  }
+
+  /**
+   * Checks if the tool has any points
+   * @returns True if at least one point has been placed
+   */
+  public hasPoints(): boolean {
+    return this.points.length > 0;
+  }
+
+  /**
+   * Gets the number of points currently placed
+   * @returns Number of points
+   */
+  public getPointCount(): number {
+    return this.points.length;
+  }
+
+  /**
+   * Checks if the fence can be created (needs at least 2 points)
+   * @returns True if fence can be finalized
+   */
+  public canFinalize(): boolean {
+    return this.points.length >= 2;
   }
 }
