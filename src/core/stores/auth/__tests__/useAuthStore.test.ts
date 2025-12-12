@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useAuthStore } from '../useAuthStore';
 import type { User, Session } from '@supabase/supabase-js';
-import { RussianRuble } from 'lucide-react';
+//import { RussianRuble } from 'lucide-react';
 
 // Mock de Supabase
 vi.mock('@/lib/supabase', () => ({

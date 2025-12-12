@@ -14,6 +14,7 @@ interface AuthState {
   setUser: (user: User | null) => void;
   setSession: (session: Session | null) => void;
   logout: () => Promise<void>;
+  clearAuth: () => void;
 }
 
 /**
