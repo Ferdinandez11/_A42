@@ -1,70 +1,27 @@
 // AdminOrderDetailPage.tsx
+// ✅ Refactorizado - Usa hooks para gestión de datos
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/core/lib/supabase';
-import { PriceCalculator, PRICES } from '@/pdf/utils/PriceCalculator';
-import { generateBillOfMaterials } from '@/pdf/utils/budgetUtils';
 import { generateBudgetPDF } from '@/pdf/utils/pdfGenerator';
-
-// ✅ IMPORTS DEL SISTEMA DE ERRORES
 import { useErrorHandler } from '@/core/hooks/useErrorHandler';
-import { AppError, ErrorType, ErrorSeverity } from '@/core/lib/errorHandler';
 
-// Importar tipos
-import type { OrderData, OrderStatus, CatalogItem } from '@/crm/pages/types';
-import { formatMoney, calculateDeliveryDate } from '@/crm/pages/utils';
+// Hooks
+import { useOrderData } from '@/crm/hooks/useOrderData';
+import { useOrderMessages } from '@/crm/hooks/useOrderMessages';
+import { useOrderObservations } from '@/crm/hooks/useOrderObservations';
+import { useOrderAttachments } from '@/crm/hooks/useOrderAttachments';
+import { useOrderItems } from '@/crm/hooks/useOrderItems';
 
-// ✅ TIPOS ADICIONALES NECESARIOS
-interface BillOfMaterialsLine {
-  name: string;
-  quantity: number;
-  totalPrice: number;
-  info?: string;
-}
+// Utils
+import { applyClientDiscount, copyBasePriceToTotal, formatDiscountConfirmation } from '../utils/orderPriceUtils';
+import { calculateDeliveryDate } from '@/crm/pages/utils';
+import { formatMoney } from '@/crm/pages/utils';
 
-interface ManualItem {
-  id: string;
-  product_id: string;
-  name: string;
-  quantity: number;
-  total_price: number;
-  dimensions: string;
-}
+// Tipos
+import type { OrderStatus, CatalogItem } from '@/crm/pages/types';
 
-interface OrderMessage {
-  id: string;
-  order_id: string;
-  user_id: string;
-  content: string;
-  created_at: string;
-  profiles?: {
-    full_name: string;
-    role: string;
-  };
-}
-
-interface Observation {
-  id: string;
-  order_id: string;
-  user_id: string;
-  content: string;
-  created_at: string;
-  profiles?: {
-    full_name: string;
-    role: string;
-  };
-}
-
-interface Attachment {
-  id: string;
-  order_id: string;
-  file_name: string;
-  file_url: string;
-  uploader_id: string;
-  created_at: string;
-}
-
-// Importar componentes
+// Componentes
 import { OrderHeader } from '../components/OrderHeader';
 import { OrderControlCard } from '../../shared/components/OrderControlCard';
 import { ObservationsCard } from '../../shared/components/ObservationsCard';
@@ -76,34 +33,30 @@ import { ParametricModal } from '../../shared/components/ParametricModal';
 
 export const AdminOrderDetailPage = () => {
   const { id } = useParams<{ id: string }>();
-  
-  // ✅ AÑADIR ERROR HANDLER
   const { handleError, showSuccess, showLoading, dismissToast } = useErrorHandler({
-    context: 'AdminOrderDetailPage'
+    context: 'AdminOrderDetailPage',
   });
-  
-  const [order, setOrder] = useState<OrderData | null>(null);
-  
-  // Items
-  const [items3D, setItems3D] = useState<BillOfMaterialsLine[]>([]); 
-  const [manualItems, setManualItems] = useState<ManualItem[]>([]); 
-  const [calculatedBasePrice, setCalculatedBasePrice] = useState(0); 
 
-  // Chat y Datos
-  const [messages, setMessages] = useState<OrderMessage[]>([]);
+  // Hooks
+  const {
+    order,
+    items3D,
+    manualItems,
+    calculatedBasePrice,
+    loadOrderData,
+    updateOrder,
+  } = useOrderData();
+  const { messages, fetchMessages, sendMessage } = useOrderMessages();
+  const { observations, fetchObservations, addObservation } = useOrderObservations();
+  const { attachments, uploading, fetchAttachments, uploadFile, deleteAttachment } =
+    useOrderAttachments();
+  const { fetchItems, addItem, addParametricItem, deleteItem } = useOrderItems();
+
+  // UI State
   const [newMessage, setNewMessage] = useState('');
-  const [newDate, setNewDate] = useState(''); 
-  
-  // Observaciones
-  const [observations, setObservations] = useState<Observation[]>([]);
   const [newObservation, setNewObservation] = useState('');
-
-  // Archivos
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [uploading, setUploading] = useState(false);
+  const [newDate, setNewDate] = useState('');
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
-
-  // UI
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [parametricModal, setParametricModal] = useState<{
     isOpen: boolean;
@@ -111,153 +64,69 @@ export const AdminOrderDetailPage = () => {
     value: string;
   }>({ isOpen: false, item: null, value: '' });
 
-  useEffect(() => { loadData(); }, [id]);
+  // ==========================================================================
+  // EFECTOS
+  // ==========================================================================
 
-  const loadData = async () => {
+  useEffect(() => {
     if (!id) return;
-    
-    const loadingToast = showLoading('Cargando pedido...');
-    
-    try {
-      // 1. Cargar Pedido
-      const { data: o, error: orderError } = await supabase
-        .from('orders')
-        .select('*, projects(*), profiles(*)')
-        .eq('id', id)
-        .single();
-      
-      if (orderError) throw orderError;
-      
-      if (!o) {
-        throw new AppError(
-          ErrorType.NOT_FOUND,
-          'Order not found',
-          { 
-            userMessage: 'Pedido no encontrado',
-            severity: ErrorSeverity.MEDIUM 
-          }
-        );
-      }
-      
-      setOrder(o as OrderData);
-      
-      if (o.estimated_delivery_date) {
-        setNewDate(new Date(o.estimated_delivery_date).toISOString().slice(0, 16));
-      } else {
-        setNewDate('');
-      }
-      
-      // 1.1 Procesar Items 3D
-      let total3D = 0;
-      let processed3DItems: BillOfMaterialsLine[] = [];
-      const raw3DItems = o.projects?.data?.items || o.projects?.items || [];
 
-      if (raw3DItems.length > 0) {
-        const itemsWithRealPrices = raw3DItems.map((item: Record<string, unknown>) => ({
-          ...item,
-          // @ts-expect-error - PriceCalculator expects SceneItem but we have dynamic project data
-          price: PriceCalculator.getItemPrice(item) 
-        }));
-        processed3DItems = generateBillOfMaterials(itemsWithRealPrices);
-        total3D = processed3DItems.reduce((acc, line) => acc + line.totalPrice, 0);
-      }
-      setItems3D(processed3DItems);
+    const loadAllData = async () => {
+      await Promise.all([
+        loadOrderData(id),
+        fetchMessages(id),
+        fetchObservations(id),
+        fetchAttachments(id),
+        fetchItems(id),
+      ]);
+    };
 
-      // 1.2 Cargar Items Manuales
-      const { data: mItems, error: itemsError } = await supabase
-        .from('order_items')
-        .select('*')
-        .eq('order_id', id);
-      
-      if (itemsError) throw itemsError;
-      
-      const manual = mItems || [];
-      setManualItems(manual);
+    loadAllData();
+  }, [id, loadOrderData, fetchMessages, fetchObservations, fetchAttachments, fetchItems]);
 
-      // 1.3 Calcular Total Base Real
-      const totalManual = manual.reduce((acc: number, item: ManualItem) => acc + item.total_price, 0);
-      setCalculatedBasePrice(total3D + totalManual);
-
-      // 2. Chat
-      const { data: m, error: messagesError } = await supabase
-        .from('order_messages')
-        .select('*, profiles(full_name, role)')
-        .eq('order_id', id)
-        .order('created_at', { ascending: true });
-      
-      if (messagesError) throw messagesError;
-      setMessages(m || []);
-
-      // 3. Adjuntos
-      const { data: att, error: attachmentsError } = await supabase
-        .from('order_attachments')
-        .select('*')
-        .eq('order_id', id);
-      
-      if (attachmentsError) throw attachmentsError;
-      setAttachments(att || []);
-
-      // 4. Observaciones
-      const { data: obs, error: observationsError } = await supabase
-        .from('order_observations')
-        .select('*, profiles(full_name, role)')
-        .eq('order_id', id)
-        .order('created_at', { ascending: false });
-      
-      if (observationsError) throw observationsError;
-      setObservations(obs || []);
-
-      dismissToast(loadingToast);
-    } catch (error) {
-      dismissToast(loadingToast);
-      handleError(error);
+  // Set initial date when order loads
+  useEffect(() => {
+    if (order?.estimated_delivery_date) {
+      setNewDate(new Date(order.estimated_delivery_date).toISOString().slice(0, 16));
     }
-  };
+  }, [order?.estimated_delivery_date]);
 
-  // --- ACTUALIZAR PEDIDO Y GENERAR PDF ---
+  // =========================================================================
+  // HANDLERS
+  // =========================================================================
+
   const handleUpdateOrder = async () => {
-    if (!order) return;
-    
+    if (!order || !id) return;
+
     const loadingToast = showLoading('Guardando cambios...');
     setIsGeneratingPDF(true);
 
     try {
       const dateToSave = newDate ? new Date(newDate).toISOString() : null;
 
-      // 1. Guardar cambios en la Base de Datos
-      const { error } = await supabase.from('orders').update({
+      await updateOrder({
         status: order.status,
-        custom_name: order.custom_name, 
+        custom_name: order.custom_name,
         estimated_delivery_date: dateToSave,
-        total_price: order.total_price 
-      }).eq('id', id);
+        total_price: order.total_price,
+      });
 
-      if (error) throw error;
-
-      // 2. Si el estado es "presupuestado", generar PDF automático
+      // Si el estado es "presupuestado", generar PDF automático
       if (order.status === 'presupuestado') {
         dismissToast(loadingToast);
         const pdfToast = showLoading('Generando PDF de presupuesto...');
-        
+
         try {
-          // Convertir OrderData a formato compatible con generateBudgetPDF
-          const orderForPDF: Partial<OrderData> = {
-            ...order,
-            custom_name: order.custom_name ?? undefined,
-            estimated_delivery_date: order.estimated_delivery_date ?? undefined,
-            project_id: order.project_id ?? undefined,
-          };
-          
           // @ts-expect-error - Type mismatch between OrderData and PDF generator expected type
-          const pdfBlob = await generateBudgetPDF(orderForPDF, items3D, manualItems);
-          
+          const pdfBlob = await generateBudgetPDF(order, items3D, manualItems);
+
           const fileName = `Presupuesto_${order.order_ref}_${Date.now()}.pdf`;
           const filePath = `${id}/${fileName}`;
 
           const { error: uploadError } = await supabase.storage
             .from('attachments')
             .upload(filePath, pdfBlob);
-          
+
           if (uploadError) throw uploadError;
 
           const { data: { publicUrl } } = supabase.storage
@@ -265,27 +134,38 @@ export const AdminOrderDetailPage = () => {
             .getPublicUrl(filePath);
 
           const { data: { user } } = await supabase.auth.getUser();
-          const { error: dbError } = await supabase.from('order_attachments').insert([{
-            order_id: id,
-            file_name: `📄 ${fileName}`,
-            file_url: publicUrl,
-            uploader_id: user?.id
-          }]);
+          const { error: dbError } = await supabase.from('order_attachments').insert([
+            {
+              order_id: id,
+              file_name: `📄 ${fileName}`,
+              file_url: publicUrl,
+              uploader_id: user?.id,
+            },
+          ]);
 
           if (dbError) throw dbError;
-          
+
           dismissToast(pdfToast);
-          showSuccess("✅ Cambios guardados y PDF de Presupuesto enviado al cliente");
+          showSuccess('✅ Cambios guardados y PDF de Presupuesto enviado al cliente');
         } catch (pdfError) {
           dismissToast(pdfToast);
           throw pdfError;
         }
       } else {
         dismissToast(loadingToast);
-        showSuccess("✅ Pedido actualizado correctamente");
+        showSuccess('✅ Pedido actualizado correctamente');
       }
 
-      loadData();
+      // Reload all data
+      if (id) {
+        await Promise.all([
+          loadOrderData(id),
+          fetchMessages(id),
+          fetchObservations(id),
+          fetchAttachments(id),
+          fetchItems(id),
+        ]);
+      }
     } catch (error) {
       dismissToast(loadingToast);
       handleError(error);
@@ -295,266 +175,125 @@ export const AdminOrderDetailPage = () => {
   };
 
   const handleStatusChange = (status: OrderStatus) => {
+    if (!order) return;
     const calculatedDate = calculateDeliveryDate(status, newDate);
     setNewDate(calculatedDate);
-    setOrder(order ? {...order, status} : null);
+    updateOrder({ status });
   };
 
-  const applyClientDiscount = () => {
+  const handleApplyDiscount = () => {
     if (!order) return;
     const discount = order.profiles?.discount_rate || 0;
     const discountAmount = calculatedBasePrice * (discount / 100);
-    const finalPrice = calculatedBasePrice - discountAmount;
-    
-    if (confirm(
-      `Base: ${formatMoney(calculatedBasePrice)}\n` +
-      `Dto (${discount}%): -${formatMoney(discountAmount)}\n\n` +
-      `Total: ${formatMoney(finalPrice)}`
-    )) {
-      setOrder({ ...order, total_price: finalPrice });
+    const finalPrice = applyClientDiscount(calculatedBasePrice, discount);
+
+    if (
+      confirm(
+        formatDiscountConfirmation(
+          calculatedBasePrice,
+          discount,
+          discountAmount,
+          finalPrice
+        )
+      )
+    ) {
+      updateOrder({ total_price: finalPrice });
       showSuccess(`✅ Descuento del ${discount}% aplicado`);
     }
   };
 
-  const copyBasePrice = () => {
-    if (order) {
-      setOrder({ ...order, total_price: calculatedBasePrice });
-      showSuccess('✅ Precio base copiado al total');
-    }
+  const handleCopyBasePrice = () => {
+    if (!order) return;
+    const updatedOrder = copyBasePriceToTotal(order, calculatedBasePrice);
+    updateOrder({ total_price: updatedOrder.total_price });
+    showSuccess('✅ Precio base copiado al total');
   };
 
-  // --- OBSERVACIONES ---
   const handleAddObservation = async () => {
-    if (!newObservation.trim()) {
-      handleError(
-        new AppError(
-          ErrorType.VALIDATION,
-          'Empty observation',
-          { 
-            userMessage: 'La observación no puede estar vacía',
-            severity: ErrorSeverity.LOW 
-          }
-        )
-      );
-      return;
-    }
-    
-    const loadingToast = showLoading('Añadiendo observación...');
-    
+    if (!id) return;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from('order_observations').insert([{
-        order_id: id, 
-        user_id: user?.id, 
-        content: newObservation
-      }]);
-      
-      if (error) throw error;
-      
-      dismissToast(loadingToast);
-      showSuccess('✅ Observación añadida');
-      setNewObservation(''); 
-      loadData();
+      await addObservation(id, newObservation);
+      setNewObservation('');
     } catch (error) {
-      dismissToast(loadingToast);
-      handleError(error);
+      // Error ya manejado en el hook
     }
   };
 
-  // --- ITEMS MANUALES ---
-  const handleAddItem = (item: CatalogItem) => {
+  const handleAddItem = async (item: CatalogItem) => {
+    if (!id) return;
     if (item.type === 'fence' || item.type === 'floor') {
       setParametricModal({ isOpen: true, item, value: '' });
     } else {
-      saveManualItem(item.id, item.name, 1, item.price, '1 ud');
+      try {
+        await addItem(id, item, 1);
+        setIsCatalogOpen(false);
+      } catch (error) {
+        // Error ya manejado en el hook
+      }
     }
   };
 
-  const confirmParametricItem = () => {
+  const handleConfirmParametricItem = async () => {
+    if (!id || !parametricModal.item) return;
     const val = parseFloat(parametricModal.value);
-    
-    if (!val || val <= 0) {
-      handleError(
-        new AppError(
-          ErrorType.VALIDATION,
-          'Invalid value',
-          { 
-            userMessage: 'El valor debe ser mayor que 0',
-            severity: ErrorSeverity.LOW 
-          }
-        )
-      );
-      return;
-    }
-    
-    const item = parametricModal.item;
-    if (!item) return;
-    
-    let price = 0;
-    let dimensions = '';
-    
-    if (item.type === 'fence') { 
-      price = val * PRICES.FENCE_M; 
-      dimensions = `${val} ml`; 
-    } else { 
-      price = val * PRICES.FLOOR_M2; 
-      dimensions = `${val} m²`; 
-    }
-    
-    saveManualItem(item.id, item.name, 1, price, dimensions);
-    setParametricModal({ isOpen: false, item: null, value: '' });
-  };
 
-  const saveManualItem = async (
-    prodId: string, 
-    name: string, 
-    qty: number, 
-    total: number, 
-    dims: string
-  ) => {
-    const loadingToast = showLoading('Añadiendo elemento...');
-    
     try {
-      const { error } = await supabase.from('order_items').insert([{
-        order_id: id, 
-        product_id: prodId, 
-        name, 
-        quantity: qty, 
-        total_price: total, 
-        dimensions: dims
-      }]);
-      
-      if (error) throw error;
-      
-      dismissToast(loadingToast);
-      showSuccess(`✅ ${name} añadido correctamente`);
+      await addParametricItem(id, parametricModal.item, val);
+      setParametricModal({ isOpen: false, item: null, value: '' });
       setIsCatalogOpen(false);
-      loadData();
     } catch (error) {
-      dismissToast(loadingToast);
-      handleError(error);
+      // Error ya manejado en el hook
     }
   };
 
   const handleDeleteManualItem = async (itemId: string) => {
-    if (!confirm("¿Borrar línea?")) return;
-    
-    const loadingToast = showLoading('Eliminando elemento...');
-    
+    if (!confirm('¿Borrar línea?')) return;
     try {
-      const { error } = await supabase
-        .from('order_items')
-        .delete()
-        .eq('id', itemId);
-      
-      if (error) throw error;
-      
-      dismissToast(loadingToast);
-      showSuccess('✅ Elemento eliminado');
-      loadData();
+      await deleteItem(itemId);
     } catch (error) {
-      dismissToast(loadingToast);
-      handleError(error);
+      // Error ya manejado en el hook
     }
   };
 
-  // --- CHAT & FILES ---
   const handleSendMessage = async () => {
-    if (!newMessage.trim()) return;
-    
-    const loadingToast = showLoading('Enviando mensaje...');
-    
+    if (!id) return;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from('order_messages').insert([{ 
-        order_id: id, 
-        user_id: user?.id, 
-        content: newMessage 
-      }]);
-      
-      if (error) throw error;
-      
-      dismissToast(loadingToast);
-      showSuccess('✅ Mensaje enviado');
-      setNewMessage(''); 
-      loadData();
+      await sendMessage(id, newMessage);
+      setNewMessage('');
     } catch (error) {
-      dismissToast(loadingToast);
-      handleError(error);
+      // Error ya manejado en el hook
     }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    
-    const loadingToast = showLoading('Subiendo archivo...');
-    setUploading(true);
-    
+    if (!file || !id) return;
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `${id}/${fileName}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('attachments')
-        .upload(filePath, file);
-      
-      if (uploadError) throw uploadError;
-      
-      const { data: { publicUrl } } = supabase.storage
-        .from('attachments')
-        .getPublicUrl(filePath);
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error: insertError } = await supabase.from('order_attachments').insert([{
-        order_id: id, 
-        file_name: file.name, 
-        file_url: publicUrl, 
-        uploader_id: user?.id
-      }]);
-      
-      if (insertError) throw insertError;
-      
-      dismissToast(loadingToast);
-      showSuccess(`✅ ${file.name} subido correctamente`);
-      loadData();
+      await uploadFile(id, file);
     } catch (error) {
-      dismissToast(loadingToast);
-      handleError(error);
-    } finally { 
-      setUploading(false); 
+      // Error ya manejado en el hook
     }
   };
 
   const handleDeleteAttachment = async (attId: string) => {
-    if (!confirm("¿Borrar archivo?")) return;
-    
-    const loadingToast = showLoading('Eliminando archivo...');
-    
+    if (!confirm('¿Borrar archivo?')) return;
     try {
-      const { error } = await supabase
-        .from('order_attachments')
-        .delete()
-        .eq('id', attId);
-      
-      if (error) throw error;
-      
-      dismissToast(loadingToast);
-      showSuccess('✅ Archivo eliminado');
-      loadData();
+      await deleteAttachment(attId);
     } catch (error) {
-      dismissToast(loadingToast);
-      handleError(error);
+      // Error ya manejado en el hook
     }
   };
+
+  // ==========================================================================
+  // RENDER
+  // ==========================================================================
 
   if (!order) return <p className="text-white">Cargando...</p>;
 
   return (
     <div className="p-5 h-screen flex flex-col bg-black">
       <OrderHeader orderRef={order.order_ref} />
-      
+
       <div className="grid grid-cols-[2fr_1fr] gap-5 h-full text-gray-300 font-sans">
         {/* COLUMNA IZQUIERDA */}
         <div className="flex flex-col gap-2.5 overflow-y-auto">
@@ -563,11 +302,11 @@ export const AdminOrderDetailPage = () => {
             newDate={newDate}
             calculatedBasePrice={calculatedBasePrice}
             isGeneratingPDF={isGeneratingPDF}
-            onOrderChange={setOrder}
+            onOrderChange={updateOrder}
             onDateChange={setNewDate}
             onStatusChange={handleStatusChange}
-            onApplyDiscount={applyClientDiscount}
-            onCopyBasePrice={copyBasePrice}
+            onApplyDiscount={handleApplyDiscount}
+            onCopyBasePrice={handleCopyBasePrice}
             onUpdate={handleUpdateOrder}
           />
 
@@ -615,9 +354,13 @@ export const AdminOrderDetailPage = () => {
         isOpen={parametricModal.isOpen}
         item={parametricModal.item}
         value={parametricModal.value}
-        onValueChange={(value) => setParametricModal({...parametricModal, value})}
-        onConfirm={confirmParametricItem}
-        onCancel={() => setParametricModal({ isOpen: false, item: null, value: '' })}
+        onValueChange={(value) =>
+          setParametricModal({ ...parametricModal, value })
+        }
+        onConfirm={handleConfirmParametricItem}
+        onCancel={() =>
+          setParametricModal({ isOpen: false, item: null, value: '' })
+        }
       />
     </div>
   );
