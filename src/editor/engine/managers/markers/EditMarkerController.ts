@@ -43,7 +43,7 @@ export class EditMarkerController {
 
     const parentObj = this.scene.getObjectByProperty("uuid", itemUuid);
     if (!parentObj) {
-      console.warn(`Object with UUID ${itemUuid} not found`);
+      // Object not found - silently return (no error needed for this case)
       return;
     }
 

@@ -39,7 +39,8 @@ export class TransformController {
       this.transformControl.detach();
       this.transformControl.visible = false;
     } catch (error) {
-      console.error("ERROR: TransformControls", error);
+      // Error initializing TransformControls - handled silently
+      // The control will remain null and operations will check for it
       this.transformControl = null;
     }
   }

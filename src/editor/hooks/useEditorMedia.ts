@@ -1,6 +1,8 @@
 // --- START OF FILE src/hooks/useEditorMedia.ts ---
 import { useState, useCallback } from 'react';
 import { useEngine } from '@/editor/context/EngineContext';
+import { useErrorHandler } from '@/core/hooks/useErrorHandler';
+import { AppError, ErrorType, ErrorSeverity } from '@/core/lib/errorHandler';
 
 // ============================================================================
 // TIPOS E INTERFACES
@@ -33,6 +35,9 @@ interface UseEditorMediaReturn extends EditorMediaActions, EditorMediaState {}
 export const useEditorMedia = (): UseEditorMediaReturn => {
   const engine = useEngine();
   const [isRecording, setIsRecording] = useState<boolean>(false);
+  const { handleError: handleErrorHook } = useErrorHandler({
+    context: 'useEditorMedia',
+  });
 
   // ==========================================================================
   // HELPERS PRIVADOS
@@ -40,7 +45,13 @@ export const useEditorMedia = (): UseEditorMediaReturn => {
 
   const ensureEngine = (): boolean => {
     if (!engine) {
-      console.error('[useEditorMedia] Engine no disponible');
+      handleErrorHook(
+        new AppError(ErrorType.INTERNAL, 'Engine no disponible', {
+          severity: ErrorSeverity.MEDIUM,
+          userMessage: 'El motor 3D no está disponible',
+        }),
+        { showToast: false }
+      );
       return false;
     }
     return true;
@@ -48,7 +59,14 @@ export const useEditorMedia = (): UseEditorMediaReturn => {
 
   const handleError = (operation: string, error: unknown): MediaOperationResult => {
     const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-    console.error(`[useEditorMedia] Error en ${operation}:`, errorMessage);
+    handleErrorHook(
+      new AppError(ErrorType.INTERNAL, `Error en ${operation}`, {
+        severity: ErrorSeverity.MEDIUM,
+        userMessage: `Error al ${operation}`,
+        metadata: { operation, originalError: error },
+      }),
+      { showToast: false }
+    );
     return {
       success: false,
       error: errorMessage,
@@ -108,7 +126,13 @@ export const useEditorMedia = (): UseEditorMediaReturn => {
         setIsRecording(true);
       }
     } catch (error) {
-      console.error('[useEditorMedia] Error al alternar grabación:', error);
+      handleErrorHook(
+        new AppError(ErrorType.INTERNAL, 'Error al alternar grabación', {
+          severity: ErrorSeverity.MEDIUM,
+          userMessage: 'No se pudo alternar la grabación',
+          metadata: { originalError: error },
+        })
+      );
       // Resetear estado en caso de error
       setIsRecording(false);
     }

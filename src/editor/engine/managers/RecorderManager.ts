@@ -184,7 +184,11 @@ export class RecorderManager {
     try {
       this.mediaRecorder = new MediaRecorder(stream, options);
     } catch (error) {
-      console.error("Error creating MediaRecorder:", error);
+      editorErrorHandler.handleError(error, {
+        userMessage: 'Error al crear el grabador de video',
+        severity: ErrorSeverity.MEDIUM,
+        showToast: false,
+      });
       return;
     }
 
@@ -203,7 +207,7 @@ export class RecorderManager {
 
     this.mediaRecorder.onstop = this.saveVideo;
     this.mediaRecorder.start();
-    console.log("🎥 Grabación iniciada...");
+    // Grabación iniciada (sin log para evitar ruido en consola)
   }
 
   /**
@@ -217,7 +221,7 @@ export class RecorderManager {
     if (this.recIndicator) {
       this.recIndicator.style.display = "none";
     }
-    console.log("🛑 Grabación detenida.");
+    // Grabación detenida (sin log para evitar ruido en consola)
   }
 
   /**

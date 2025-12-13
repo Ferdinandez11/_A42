@@ -4,6 +4,8 @@ import { useEditorStore } from "@/editor/stores/editor/useEditorStore";
 import { useSceneStore } from "@//editor/stores/scene/useSceneStore";
 import type { SceneItem, ModelItem } from "@/domain/types/editor";
 import type { Product } from "@/core/services/catalogService";
+import { editorErrorHandler } from "@/editor/services/EditorErrorHandler";
+import { ErrorType, ErrorSeverity } from "@/core/lib/errorHandler";
 
 type PlaceableProduct = Product & { initialScale?: [number, number, number] };
 
@@ -51,7 +53,11 @@ export class ModelLoader {
       this.processSafetyZones(model);
       this.scene.add(model);
     } catch (error) {
-      console.error("Error recreating model:", error);
+      editorErrorHandler.handleError(error, {
+        userMessage: 'Error al recrear modelo',
+        severity: ErrorSeverity.MEDIUM,
+        showToast: false,
+      });
     }
   }
 
@@ -167,7 +173,11 @@ public async placeObject(
 
     afterPlace?.(uuid);
   } catch (error) {
-    console.error("Error placing object:", error);
+    editorErrorHandler.handleError(error, {
+      userMessage: 'Error al colocar objeto',
+      severity: ErrorSeverity.MEDIUM,
+      showToast: false,
+    });
   }
 }
 

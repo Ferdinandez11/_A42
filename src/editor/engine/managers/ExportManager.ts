@@ -2,6 +2,8 @@ import * as THREE from "three";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import type { A42Engine } from "@/editor/engine/A42Engine";
 import { useEditorStore } from "@/editor/stores/editor/useEditorStore";
+import { editorErrorHandler } from "@/editor/services/EditorErrorHandler";
+import { ErrorType, ErrorSeverity } from "@/core/lib/errorHandler";
 
 /**
  * Manages scene export functionality to various formats (GLB, DXF)
@@ -51,7 +53,11 @@ export class ExportManager {
         this.downloadFile(blob, `${name}.glb`);
       },
       (error) => {
-        console.error("Error exportando GLB:", error);
+        editorErrorHandler.handleError(error, {
+          userMessage: 'Error al exportar GLB',
+          severity: ErrorSeverity.MEDIUM,
+          showToast: false,
+        });
         alert("Error al exportar GLB.");
       },
       { binary: true }

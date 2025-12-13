@@ -71,7 +71,13 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
   duplicateSelection: () => {
     const { isReadOnlyMode } = useProjectStore.getState();
     if (isReadOnlyMode) {
-      console.warn("🚫 Cannot duplicate in read-only mode.");
+      editorErrorHandler.handleError(
+        editorErrorHandler.createError(ErrorType.VALIDATION, 'Cannot duplicate in read-only mode', {
+          severity: ErrorSeverity.LOW,
+          userMessage: 'No se puede duplicar en modo de solo lectura',
+        }),
+        { showToast: false }
+      );
       return;
     }
 
@@ -101,7 +107,13 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
   removeSelection: () => {
     const { isReadOnlyMode } = useProjectStore.getState();
     if (isReadOnlyMode) {
-      console.warn("🚫 Cannot delete in read-only mode.");
+      editorErrorHandler.handleError(
+        editorErrorHandler.createError(ErrorType.VALIDATION, 'Cannot delete in read-only mode', {
+          severity: ErrorSeverity.LOW,
+          userMessage: 'No se puede eliminar en modo de solo lectura',
+        }),
+        { showToast: false }
+      );
       return;
     }
 

@@ -1,6 +1,8 @@
 // --- START OF FILE src/hooks/useSceneTools.ts ---
 import { useCallback } from 'react';
 import { useEngine } from '@/editor/context/EngineContext';
+import { useErrorHandler } from '@/core/hooks/useErrorHandler';
+import { AppError, ErrorType, ErrorSeverity } from '@/core/lib/errorHandler';
 
 // ============================================================================
 // TIPOS E INTERFACES
@@ -46,6 +48,7 @@ const ERROR_MESSAGES = {
 
 export const useSceneTools = (): SceneToolsActions => {
   const engine = useEngine();
+  const { handleError } = useErrorHandler({ context: 'useSceneTools' });
 
   // ==========================================================================
   // HELPERS PRIVADOS
@@ -53,7 +56,13 @@ export const useSceneTools = (): SceneToolsActions => {
 
   const ensureEngine = (): boolean => {
     if (!engine) {
-      console.error('[useSceneTools]', ERROR_MESSAGES.ENGINE_UNAVAILABLE);
+      handleError(
+        new AppError(ErrorType.INTERNAL, ERROR_MESSAGES.ENGINE_UNAVAILABLE, {
+          severity: ErrorSeverity.MEDIUM,
+          userMessage: 'El motor 3D no está disponible',
+        }),
+        { showToast: false }
+      );
       return false;
     }
     return true;
@@ -62,7 +71,13 @@ export const useSceneTools = (): SceneToolsActions => {
   const ensureWalkManager = (): boolean => {
     if (!ensureEngine()) return false;
     if (!engine!.walkManager) {
-      console.error('[useSceneTools]', ERROR_MESSAGES.WALK_MANAGER_UNAVAILABLE);
+      handleError(
+        new AppError(ErrorType.INTERNAL, ERROR_MESSAGES.WALK_MANAGER_UNAVAILABLE, {
+          severity: ErrorSeverity.MEDIUM,
+          userMessage: 'El modo paseo no está disponible',
+        }),
+        { showToast: false }
+      );
       return false;
     }
     return true;
@@ -71,7 +86,13 @@ export const useSceneTools = (): SceneToolsActions => {
   const ensureToolsManager = (): boolean => {
     if (!ensureEngine()) return false;
     if (!engine!.toolsManager) {
-      console.error('[useSceneTools]', ERROR_MESSAGES.TOOLS_MANAGER_UNAVAILABLE);
+      handleError(
+        new AppError(ErrorType.INTERNAL, ERROR_MESSAGES.TOOLS_MANAGER_UNAVAILABLE, {
+          severity: ErrorSeverity.MEDIUM,
+          userMessage: 'Las herramientas no están disponibles',
+        }),
+        { showToast: false }
+      );
       return false;
     }
     return true;
@@ -102,7 +123,14 @@ export const useSceneTools = (): SceneToolsActions => {
       return createSuccessResult();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-      console.error('[useSceneTools] Error al activar walk mode:', error);
+      handleError(
+        new AppError(ErrorType.INTERNAL, 'Error al activar modo paseo', {
+          severity: ErrorSeverity.MEDIUM,
+          userMessage: 'No se pudo activar el modo paseo',
+          metadata: { originalError: errorMessage },
+        }),
+        { showToast: false }
+      );
       return createErrorResult(errorMessage);
     }
   }, [engine]);
@@ -120,7 +148,14 @@ export const useSceneTools = (): SceneToolsActions => {
       return createSuccessResult();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-      console.error('[useSceneTools] Error al desactivar walk mode:', error);
+      handleError(
+        new AppError(ErrorType.INTERNAL, 'Error al desactivar modo paseo', {
+          severity: ErrorSeverity.MEDIUM,
+          userMessage: 'No se pudo desactivar el modo paseo',
+          metadata: { originalError: errorMessage },
+        }),
+        { showToast: false }
+      );
       return createErrorResult(errorMessage);
     }
   }, [engine]);
@@ -143,7 +178,14 @@ export const useSceneTools = (): SceneToolsActions => {
       return createSuccessResult();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-      console.error('[useSceneTools] Error al alternar walk mode:', error);
+      handleError(
+        new AppError(ErrorType.INTERNAL, 'Error al alternar modo paseo', {
+          severity: ErrorSeverity.MEDIUM,
+          userMessage: 'No se pudo alternar el modo paseo',
+          metadata: { originalError: errorMessage },
+        }),
+        { showToast: false }
+      );
       return createErrorResult(errorMessage);
     }
   }, [engine]);
@@ -181,7 +223,14 @@ export const useSceneTools = (): SceneToolsActions => {
         indexAnchor < 0 ||
         indexToMove === indexAnchor
       ) {
-        console.error('[useSceneTools] Parámetros inválidos:', params);
+        handleError(
+          new AppError(ErrorType.VALIDATION, ERROR_MESSAGES.INVALID_SEGMENT_PARAMS, {
+            severity: ErrorSeverity.LOW,
+            userMessage: 'Parámetros de segmento inválidos',
+            metadata: { params },
+          }),
+          { showToast: false }
+        );
         return createErrorResult(ERROR_MESSAGES.INVALID_SEGMENT_PARAMS);
       }
 
@@ -190,11 +239,18 @@ export const useSceneTools = (): SceneToolsActions => {
         return createSuccessResult();
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-        console.error('[useSceneTools] Error al establecer segmento CAD:', error);
+        handleError(
+          new AppError(ErrorType.INTERNAL, 'Error al establecer segmento CAD', {
+            severity: ErrorSeverity.MEDIUM,
+            userMessage: 'No se pudo establecer el segmento',
+            metadata: { originalError: errorMessage },
+          }),
+          { showToast: false }
+        );
         return createErrorResult(errorMessage);
       }
     },
-    [engine]
+    [engine, handleError]
   );
 
   /**
@@ -208,7 +264,14 @@ export const useSceneTools = (): SceneToolsActions => {
 
       // Validar ángulo
       if (typeof angle !== 'number' || !isFinite(angle)) {
-        console.error('[useSceneTools] Ángulo inválido:', angle);
+        handleError(
+          new AppError(ErrorType.VALIDATION, ERROR_MESSAGES.INVALID_ANGLE, {
+            severity: ErrorSeverity.LOW,
+            userMessage: 'Ángulo inválido',
+            metadata: { angle },
+          }),
+          { showToast: false }
+        );
         return createErrorResult(ERROR_MESSAGES.INVALID_ANGLE);
       }
 
@@ -217,11 +280,18 @@ export const useSceneTools = (): SceneToolsActions => {
         return createSuccessResult();
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-        console.error('[useSceneTools] Error al establecer ángulo CAD:', error);
+        handleError(
+          new AppError(ErrorType.INTERNAL, 'Error al establecer ángulo CAD', {
+            severity: ErrorSeverity.MEDIUM,
+            userMessage: 'No se pudo establecer el ángulo',
+            metadata: { originalError: errorMessage },
+          }),
+          { showToast: false }
+        );
         return createErrorResult(errorMessage);
       }
     },
-    [engine]
+    [engine, handleError]
   );
 
   /**
@@ -237,7 +307,14 @@ export const useSceneTools = (): SceneToolsActions => {
       return createSuccessResult();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-      console.error('[useSceneTools] Error al intercambiar selección CAD:', error);
+      handleError(
+        new AppError(ErrorType.INTERNAL, 'Error al intercambiar selección CAD', {
+          severity: ErrorSeverity.MEDIUM,
+          userMessage: 'No se pudo intercambiar la selección',
+          metadata: { originalError: errorMessage },
+        }),
+        { showToast: false }
+      );
       return createErrorResult(errorMessage);
     }
   }, [engine]);

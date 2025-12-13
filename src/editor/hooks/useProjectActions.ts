@@ -5,6 +5,8 @@ import { useEditorStore } from '@/editor/stores/editor/useEditorStore';
 import { useSceneStore } from '@/editor/stores/scene/useSceneStore';
 import { useProjectStore } from '@/editor/stores/project/useProjectStore';
 import { useEngine } from '@/editor/context/EngineContext';
+import { useErrorHandler } from '@/core/hooks/useErrorHandler';
+import { AppError, ErrorType, ErrorSeverity } from '@/core/lib/errorHandler';
 
 // ============================================================================
 // TIPOS E INTERFACES
@@ -73,6 +75,9 @@ const MESSAGES = {
 export const useProjectActions = (): ProjectActionsReturn => {
   const engine = useEngine();
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const { handleError, showSuccess, showError } = useErrorHandler({
+    context: 'useProjectActions',
+  });
 
   // Stores
   const { requestInput, cameraType } = useEditorStore();
@@ -241,7 +246,7 @@ export const useProjectActions = (): ProjectActionsReturn => {
     // Validar permisos
     const validation = validateSavePermissions();
     if (!validation.valid) {
-      alert(validation.error);
+      showError(validation.error || 'Error de validación');
       return { success: false, error: validation.error };
     }
 
@@ -268,22 +273,27 @@ export const useProjectActions = (): ProjectActionsReturn => {
           projectData,
           thumbnailBase64
         );
-        alert(MESSAGES.UPDATE_SUCCESS);
+        showSuccess(MESSAGES.UPDATE_SUCCESS);
       } else {
         result = await createNewProject(
           operation.name,
           projectData,
           thumbnailBase64
         );
-        alert(MESSAGES.CREATE_SUCCESS);
+        showSuccess(MESSAGES.CREATE_SUCCESS);
       }
 
       return result;
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Error desconocido';
-      console.error('[useProjectActions] Error al guardar:', error);
-      alert(MESSAGES.SAVE_ERROR(errorMessage));
+      handleError(
+        new AppError(ErrorType.INTERNAL, 'Error al guardar proyecto', {
+          severity: ErrorSeverity.HIGH,
+          userMessage: MESSAGES.SAVE_ERROR(errorMessage),
+          metadata: { originalError: error },
+        })
+      );
 
       return {
         success: false,
@@ -304,6 +314,9 @@ export const useProjectActions = (): ProjectActionsReturn => {
     cameraType,
     requestInput,
     setProjectInfo,
+    handleError,
+    showSuccess,
+    showError,
   ]);
 
   // ==========================================================================
@@ -349,8 +362,13 @@ export const useProjectActions = (): ProjectActionsReturn => {
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : 'Error desconocido';
-        console.error('[useProjectActions] Error al importar GLB:', error);
-        alert(MESSAGES.IMPORT_ERROR(errorMessage));
+        handleError(
+          new AppError(ErrorType.INTERNAL, 'Error al importar GLB', {
+            severity: ErrorSeverity.MEDIUM,
+            userMessage: MESSAGES.IMPORT_ERROR(errorMessage),
+            metadata: { originalError: error },
+          })
+        );
 
         return {
           success: false,
