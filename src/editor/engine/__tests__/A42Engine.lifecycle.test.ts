@@ -5,12 +5,58 @@
 // ============================================================================
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import "@/editor/engine/__tests__/webgl-mock"; // Import mock before Three.js
 import { A42Engine } from "@/editor/engine/A42Engine";
 
-// Mock stores
-vi.mock("@/editor/stores/editor/useEditorStore");
-vi.mock("@/editor/stores/scene/useSceneStore");
-vi.mock("@/editor/stores/selection/useSelectionStore");
+// Mock stores with implementation
+vi.mock("@/editor/stores/editor/useEditorStore", () => ({
+  useEditorStore: Object.assign(
+    vi.fn(() => ({
+      safetyZonesVisible: true,
+      gridVisible: true,
+      mode: "idle" as const,
+    })),
+    {
+      getState: () => ({
+        safetyZonesVisible: true,
+        gridVisible: true,
+        mode: "idle" as const,
+      }),
+    }
+  ),
+}));
+
+vi.mock("@/editor/stores/scene/useSceneStore", () => ({
+  useSceneStore: Object.assign(
+    vi.fn(() => ({
+      items: [],
+      undo: vi.fn(),
+      removeItem: vi.fn(),
+    })),
+    {
+      getState: () => ({
+        items: [],
+        undo: vi.fn(),
+        removeItem: vi.fn(),
+      }),
+    }
+  ),
+}));
+
+vi.mock("@/editor/stores/selection/useSelectionStore", () => ({
+  useSelectionStore: Object.assign(
+    vi.fn(() => ({
+      selectedItem: null,
+      selectItem: vi.fn(),
+    })),
+    {
+      getState: () => ({
+        selectedItem: null,
+        selectItem: vi.fn(),
+      }),
+    }
+  ),
+}));
 
 describe("A42Engine - Lifecycle", () => {
   let container: HTMLDivElement;
@@ -174,28 +220,33 @@ describe("A42Engine - Render Loop", () => {
       expect(engine.interactionManager.transformControl?.visible).toBe(false);
     });
 
-it("should update controls when walk mode disabled", () => {
-  engine.walkManager.disable();
+    it("should update controls when walk mode disabled", () => {
+      // Mock isEnabled getter to return false
+      vi.spyOn(engine.walkManager, "isEnabled", "get").mockReturnValue(false);
 
-  const updateSpy = vi.spyOn(engine.sceneManager.controls, "update");
+      const updateSpy = vi.spyOn(engine.sceneManager.controls, "update");
 
-  // @ts-ignore
-  engine.render();
+      // @ts-ignore - accessing private method
+      engine.render();
 
-  expect(updateSpy).toHaveBeenCalled();
-});
+      expect(updateSpy).toHaveBeenCalled();
 
-it("should not update controls when walk mode enabled", () => {
-  engine.walkManager.enable();
+      updateSpy.mockRestore();
+    });
 
-  const updateSpy = vi.spyOn(engine.sceneManager.controls, "update");
+    it("should not update controls when walk mode enabled", () => {
+      // Mock isEnabled getter to return true
+      vi.spyOn(engine.walkManager, "isEnabled", "get").mockReturnValue(true);
 
-  // @ts-ignore
-  engine.render();
+      const updateSpy = vi.spyOn(engine.sceneManager.controls, "update");
 
-  expect(updateSpy).not.toHaveBeenCalled();
-});
+      // @ts-ignore - accessing private method
+      engine.render();
 
+      expect(updateSpy).not.toHaveBeenCalled();
+
+      updateSpy.mockRestore();
+    });
 
     it("should call renderer.render", () => {
       const renderSpy = vi.spyOn(engine.sceneManager.renderer, "render");
