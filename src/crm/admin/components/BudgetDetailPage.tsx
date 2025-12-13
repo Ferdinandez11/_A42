@@ -11,7 +11,8 @@ import { useErrorHandler } from '@/core/hooks/useErrorHandler';
 import { AppError, ErrorType, ErrorSeverity } from '@/core/lib/errorHandler';
 
 // Importar tipos y utilidades
-import type { CatalogItem, ModalState } from '@/crm/pages/budgetTypes';
+import type { CatalogItem } from '@/crm/pages/types';
+import type { ModalState } from '@/crm/pages/budgetTypes';
 import { getStatusBadge } from '@/crm/pages/budgetUtils';
 
 // Importar componentes
@@ -22,8 +23,9 @@ import { BudgetAttachmentsCard } from '../../shared/components/BudgetAttachments
 import { BudgetMaterialsCard } from '../../shared/components/BudgetMaterialsCard';
 import { BudgetProjectCard } from '../../shared/components/BudgetProjectCard';
 import { BudgetChatPanel } from '../../shared/components/BudgetChatPanel';
-import { BudgetCatalogModal } from '../../shared/components/BudgetCatalogModal';
-import { BudgetParametricModal } from '../../shared/components/BudgetParametricModal';
+// ✅ Usando componentes unificados
+import { CatalogModal } from '../../shared/components/CatalogModal';
+import { ParametricModal } from '../../shared/components/ParametricModal';
 
 // ✅ TIPOS ADICIONALES
 interface Item3D {
@@ -703,13 +705,13 @@ export const BudgetDetailPage = () => {
       </div>
 
       {/* MODALES */}
-      <BudgetCatalogModal
+      <CatalogModal
         isOpen={isCatalogOpen}
         onClose={() => setIsCatalogOpen(false)}
         onSelectItem={handleAddItem}
       />
 
-      <BudgetParametricModal
+      <ParametricModal
         isOpen={parametricModal.isOpen}
         item={parametricModal.item}
         value={parametricModal.value}

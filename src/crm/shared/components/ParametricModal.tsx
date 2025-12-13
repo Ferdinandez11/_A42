@@ -1,4 +1,5 @@
 // ParametricModal.tsx
+// ✅ Componente unificado - Eliminada duplicación con BudgetParametricModal
 import type { CatalogItem } from '@/crm/pages/types';
 
 interface ParametricModalProps {
@@ -10,6 +11,10 @@ interface ParametricModalProps {
   onCancel: () => void;
 }
 
+/**
+ * Modal unificado para ingresar valores paramétricos
+ * Reemplaza tanto ParametricModal como BudgetParametricModal
+ */
 export const ParametricModal = ({
   isOpen,
   item,

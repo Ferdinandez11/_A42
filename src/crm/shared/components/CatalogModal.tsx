@@ -1,4 +1,5 @@
 // CatalogModal.tsx
+// ✅ Componente unificado - Eliminada duplicación con BudgetCatalogModal
 import { CATALOG_ITEMS } from '@/crm/pages/constants';
 import type { CatalogItem } from '@/crm/pages/types';
 
@@ -8,6 +9,10 @@ interface CatalogModalProps {
   onSelectItem: (item: CatalogItem) => void;
 }
 
+/**
+ * Modal unificado para seleccionar items del catálogo
+ * Reemplaza tanto CatalogModal como BudgetCatalogModal
+ */
 export const CatalogModal = ({ isOpen, onClose, onSelectItem }: CatalogModalProps) => {
   if (!isOpen) return null;
 

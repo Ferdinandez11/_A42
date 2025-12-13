@@ -1,4 +1,7 @@
 // budgetTypes.ts
+// ✅ CatalogItem movido a types.ts para eliminar duplicación
+// Este archivo ahora solo contiene tipos específicos de presupuestos
+
 export interface Item3D {
   uuid: string;
   name: string;
@@ -17,12 +20,8 @@ export interface ManualItem {
   product_id: string;
 }
 
-export interface CatalogItem {
-  id: string;
-  name: string;
-  type: 'model' | 'fence' | 'floor';
-  price: number;
-}
+// ✅ CatalogItem ahora se importa desde '@/crm/pages/types'
+// export interface CatalogItem { ... } // Movido a types.ts
 
 export interface Message {
   id: string;
