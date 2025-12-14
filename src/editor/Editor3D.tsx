@@ -2,6 +2,14 @@ import React, { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import { A42Engine } from "./engine/A42Engine";
 import { EngineContext } from "./context/EngineContext";
 
+// Import modular engine sync hooks
+import { useEngineModeSync } from "./hooks/useEngineModeSync";
+import { useEngineSelectionSync } from "./hooks/useEngineSelectionSync";
+import { useEngineSceneSync } from "./hooks/useEngineSceneSync";
+import { useEngineEnvironmentSync } from "./hooks/useEngineEnvironmentSync";
+import { useEngineCameraSync } from "./hooks/useEngineCameraSync";
+import { useEngineSafetyZonesSync } from "./hooks/useEngineSafetyZonesSync";
+
 import { Toolbar } from "./ui/Toolbar";
 import { BudgetPanel } from "./ui/BudgetPanel";
 import { EnvironmentPanel } from "./ui/EnvironmentPanel";
@@ -112,7 +120,10 @@ const useEngineInitialization = (
   return engine;
 };
 
-// ✅ OPTIMIZADO - Bug #2 Fix
+/**
+ * Composed hook that syncs all engine state
+ * Now uses smaller, focused hooks for better maintainability
+ */
 const useEngineSync = (
   engine: A42Engine | null,
   mode: string,
@@ -126,81 +137,13 @@ const useEngineSync = (
   pendingView: CameraView | null,
   clearPendingView: () => void
 ) => {
-  // ✅ MEJORA 1: Memoizar hash de items para evitar re-renders innecesarios
-  const itemsHash = useMemo(() => JSON.stringify(items), [items]);
-
-  // ✅ MEJORA 2: Memoizar hash de sunPosition
-  const sunHash = useMemo(
-    () => `${sunPosition.azimuth}-${sunPosition.elevation}`,
-    [sunPosition]
-  );
-
-  // ✅ MEJORA 3: Estabilizar función de sincronización de items
-  const syncItems = useCallback(() => {
-    if (!engine) return;
-    engine.syncSceneFromStore(items);
-  }, [engine, items]);
-
-  // Clear tools on mode change
-  useEffect(() => {
-    if (!engine) return;
-    engine.clearTools();
-  }, [mode, engine]);
-
-  // Sync selection
-  useEffect(() => {
-    if (!engine) return;
-    engine.interactionManager.selectItemByUUID(selectedItemId);
-  }, [selectedItemId, engine]);
-
-  // ✅ OPTIMIZADO: Sync scene items usando hash
-  useEffect(() => {
-    syncItems();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [itemsHash, engine]); // Usa hash en vez de syncItems para evitar loops
-
-  // Sync grid visibility
-  useEffect(() => {
-    if (!engine) return;
-    engine.setGridVisible(gridVisible);
-  }, [gridVisible, engine]);
-
-  // Sync camera
-  useEffect(() => {
-    if (!engine) return;
-    engine.switchCamera(cameraType);
-    engine.interactionManager.updateCamera(engine.activeCamera);
-  }, [cameraType, engine]);
-
-  // Sync safety zones
-  useEffect(() => {
-    if (!engine) return;
-    engine.updateSafetyZones(safetyZonesVisible);
-  }, [safetyZonesVisible, engine]);
-
-  // ✅ OPTIMIZADO: Sync sun position usando hash
-  useEffect(() => {
-    if (!engine) return;
-    engine.updateSunPosition(sunPosition.azimuth, sunPosition.elevation);
-  }, [sunHash, engine, sunPosition]); // Usa hash pero mantiene sunPosition para acceder a valores
-
-  // Handle pending view
-  useEffect(() => {
-    if (!pendingView || !engine) return;
-    engine.setView(pendingView);
-    clearPendingView();
-  }, [pendingView, clearPendingView, engine]);
-
-  // Sync background
-  useEffect(() => {
-    if (!engine) return;
-    
-    if (backgroundColor === SKY_BACKGROUND_COLOR) {
-      engine.setSkyVisible(true);
-    } else {
-      engine.setBackgroundColor(backgroundColor);
-    }
-  }, [backgroundColor, engine]);
+  // Use modular hooks for each concern
+  useEngineModeSync(engine, mode);
+  useEngineSelectionSync(engine, selectedItemId);
+  useEngineSceneSync(engine, items);
+  useEngineEnvironmentSync(engine, gridVisible, sunPosition, backgroundColor);
+  useEngineCameraSync(engine, cameraType, pendingView, clearPendingView);
+  useEngineSafetyZonesSync(engine, safetyZonesVisible);
 };
 
 // 🎨 Sub-Components
