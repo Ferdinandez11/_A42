@@ -34,7 +34,7 @@ const getSupabaseConfig = (): SupabaseConfig => {
   }
 
   // Validate URL format (optional but recommended)
-  if (!url.startsWith('https://')) {
+  if (!url.startsWith('https://') && import.meta.env.DEV) {
     console.warn('Warning: Supabase URL should start with https://');
   }
 
@@ -64,7 +64,9 @@ try {
   supabaseInstance = createSupabaseClient(config);
 } catch (error) {
   // Log error for debugging but allow the module to load
-  console.error('Failed to initialize Supabase client:', error);
+  if (import.meta.env.DEV) {
+    console.error('Failed to initialize Supabase client:', error);
+  }
   throw error;
 }
 

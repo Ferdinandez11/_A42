@@ -12,12 +12,7 @@ export default defineConfig({
       // Mantener this para evitar varias copias de Three
       three: path.resolve(__dirname, './node_modules/three'),
 
-      '@': path.resolve(__dirname, './src'),
-      '@features': path.resolve(__dirname, './src/features'),
-      '@stores': path.resolve(__dirname, './src/stores'),
-      '@lib': path.resolve(__dirname, './src/lib'),
-      '@utils': path.resolve(__dirname, './src/utils'),
-      '@components': path.resolve(__dirname, './src/components')
+      '@': path.resolve(__dirname, './src')
     }
   },
 

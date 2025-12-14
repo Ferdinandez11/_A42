@@ -71,7 +71,7 @@ const MaterialSelector: React.FC<{
               ? CLASSES.materialButton.active
               : CLASSES.materialButton.inactive
           }`}
-          style={{ backgroundColor: mat.color }}
+          style={{ backgroundColor: mat.color } as React.CSSProperties}
           title={mat.name}
           aria-label={`Material ${mat.name}`}
         />

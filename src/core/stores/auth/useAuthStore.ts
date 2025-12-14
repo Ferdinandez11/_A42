@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { supabase } from "@/core/lib/supabase";
 import type { User, Session } from "@supabase/supabase-js";
 import { handleError } from '@/core/lib/errorHandler';
+import { AppError, ErrorType, ErrorSeverity } from '@/core/lib/errorHandler';
 
 /**
  * Authentication store state
@@ -36,7 +37,15 @@ logout: async () => {
     set({ user: null, session: null });
     localStorage.clear();
   } catch (error) {
-    throw handleError(error, 'useAuthStore.logout');
+    // Handle error but don't block logout - clear state anyway
+    const appError = handleError(error, 'useAuthStore.logout', { showToast: true });
+    
+    // Clear state even if signOut failed
+    set({ user: null, session: null });
+    localStorage.clear();
+    
+    // Re-throw for caller to handle if needed
+    throw appError;
   }
 },
 

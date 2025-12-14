@@ -184,7 +184,7 @@ const ColorSwatch: React.FC<ColorSwatchProps> = ({
           : 'border-transparent hover:border-white/20 hover:scale-105'
       }
     `}
-    style={{ backgroundColor: color.value }}
+    style={{ backgroundColor: color.value } as React.CSSProperties}
     title={color.name}
     aria-label={`Seleccionar color ${color.name}`}
     aria-pressed={isSelected}

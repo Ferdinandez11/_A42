@@ -3,7 +3,7 @@ import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import type { A42Engine } from "@/editor/engine/A42Engine";
 import { useEditorStore } from "@/editor/stores/editor/useEditorStore";
 import { editorErrorHandler } from "@/editor/services/EditorErrorHandler";
-import { ErrorType, ErrorSeverity } from "@/core/lib/errorHandler";
+import { ErrorSeverity } from "@/core/lib/errorHandler";
 
 /**
  * Manages scene export functionality to various formats (GLB, DXF)

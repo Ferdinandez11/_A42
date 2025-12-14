@@ -138,7 +138,10 @@ export const generateBudgetPDF = async (
       doc.addImage(img, "JPEG", 120, 50, 70, 45);
       tableStartY = 110; // Move table down to leave space
     } catch (error) {
-      console.warn("Could not load PDF image", error);
+      // Image loading failure is non-critical, continue without image
+      if (import.meta.env.DEV) {
+        console.warn("Could not load PDF image", error);
+      }
     }
   }
 

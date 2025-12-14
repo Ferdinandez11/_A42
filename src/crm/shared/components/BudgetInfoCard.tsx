@@ -26,7 +26,7 @@ export const BudgetInfoCard = ({
         <h2 className="m-0 text-white">Ref: {order.order_ref}</h2>
         <span 
           className="py-1 px-2.5 rounded font-bold text-white"
-          style={{ backgroundColor: statusBadge.color }}
+          style={{ backgroundColor: statusBadge.color } as React.CSSProperties}
         >
           {statusBadge.label}
         </span>

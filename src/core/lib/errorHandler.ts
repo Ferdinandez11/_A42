@@ -357,14 +357,16 @@ class ErrorHandler {
   private logToConsole(error: AppError): void {
     const style = this.getConsoleStyle(error.severity);
     
-    console.group(`%c[${error.type}] ${error.message}`, style);
-    console.log('Severity:', error.severity);
-    console.log('User Message:', error.userMessage);
-    console.log('Metadata:', error.metadata);
-    if (error.originalError) {
-      console.log('Original Error:', error.originalError);
+    if (import.meta.env.DEV) {
+      console.group(`%c[${error.type}] ${error.message}`, style);
+      console.log('Severity:', error.severity);
+      console.log('User Message:', error.userMessage);
+      console.log('Metadata:', error.metadata);
+      if (error.originalError) {
+        console.log('Original Error:', error.originalError);
+      }
+      console.groupEnd();
     }
-    console.groupEnd();
   }
 
   /**

@@ -17,7 +17,7 @@ export const CatalogModal = ({ isOpen, onClose, onSelectItem }: CatalogModalProp
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex justify-center items-center z-[999]">
+    <div className={`fixed inset-0 bg-black/80 flex justify-center items-center`} style={{ zIndex: 999 } as React.CSSProperties}>
       <div className="bg-zinc-900 w-[600px] max-h-[80vh] rounded-xl border border-zinc-700 flex flex-col">
         <div className="p-5 border-b border-zinc-800 flex justify-between items-center">
           <h3 className="m-0 text-white">Añadir Extra</h3>

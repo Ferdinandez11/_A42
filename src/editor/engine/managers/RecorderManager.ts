@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import type { A42Engine } from "../A42Engine";
 import { useEditorStore } from "@/editor/stores/editor/useEditorStore";
+import { editorErrorHandler } from "@/editor/services/EditorErrorHandler";
+import { ErrorSeverity } from "@/core/lib/errorHandler";
 
 /**
  * Manages screen recording and screenshot capture

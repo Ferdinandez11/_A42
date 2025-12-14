@@ -194,7 +194,7 @@ const CategoryCard: React.FC<CategoryCardProps> = ({
     {imageUrl ? (
       <div
         className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110"
-        style={{ backgroundImage: `url(${imageUrl})` }}
+        style={{ backgroundImage: `url(${imageUrl})` } as React.CSSProperties}
       />
     ) : (
       <div className="absolute inset-0 bg-neutral-800" />
@@ -219,7 +219,7 @@ const LineCard: React.FC<LineCardProps> = ({ name, imageUrl, onClick }) => (
     {imageUrl ? (
       <div
         className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
-        style={{ backgroundImage: `url(${imageUrl})` }}
+        style={{ backgroundImage: `url(${imageUrl})` } as React.CSSProperties}
       />
     ) : (
       <div className="absolute inset-0 bg-gradient-to-br from-neutral-800 to-neutral-700" />
@@ -442,7 +442,7 @@ export const Catalog: React.FC = (() => {
           </h2>
           <div
             className={`grid ${GRID_CONFIGS.PRODUCTS} gap-6 custom-scrollbar pr-2 pb-20`}
-            style={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}
+            className="max-h-[calc(100vh-200px)] overflow-y-auto"
           >
             {filteredProducts.map((product) => (
               <ProductCard
@@ -476,7 +476,7 @@ export const Catalog: React.FC = (() => {
           </h2>
           <div
             className={`grid ${GRID_CONFIGS.PRODUCTS} gap-6 custom-scrollbar pr-2 pb-20`}
-            style={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}
+            className="max-h-[calc(100vh-200px)] overflow-y-auto"
           >
             {products.map((product) => (
               <ProductCard

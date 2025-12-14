@@ -26,7 +26,7 @@ export const ParametricModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex justify-center items-center z-[1000]">
+    <div className={`fixed inset-0 bg-black/80 flex justify-center items-center`} style={{ zIndex: 1000 } as React.CSSProperties}>
       <div className="bg-zinc-900 p-8 rounded-xl w-[350px] border border-zinc-700">
         <h3 className="m-0 mb-4 text-white">{item?.name}</h3>
         <input 

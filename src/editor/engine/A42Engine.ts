@@ -16,8 +16,6 @@ import { SafetyZoneManager } from "@/editor/engine/services/SafetyZoneManager";
 import { EventHandlers } from "@/editor/engine/services/EventHandlers";
 import { ARManager } from "@/editor/engine/services/ARManager";
 import { SceneSynchronizer } from "@/editor/engine/services/SceneSynchronizer";
-import { editorErrorHandler } from "@/editor/services/EditorErrorHandler";
-import { ErrorType, ErrorSeverity } from "@/core/lib/errorHandler";
 
 export class A42Engine {
   // Core managers (public API - unchanged)

@@ -220,7 +220,9 @@ const addProductToDB = (
  * Fetches and parses the CSV data from Google Sheets
  */
 const fetchAndParseCsv = async (): Promise<CatalogDB> => {
-  console.log('[CatalogService] Descargando CSV...');
+  if (import.meta.env.DEV) {
+    console.log('[CatalogService] Descargando CSV...');
+  }
   
   const response = await fetch(GOOGLE_SHEET_CSV_URL);
   
@@ -281,10 +283,15 @@ export const loadCatalogData = async (): Promise<void> => {
     isLoaded = true;
     loadError = null;
     
-    console.log('[CatalogService] CSV procesado correctamente. Datos cargados:', catalogData);
+    if (import.meta.env.DEV) {
+      console.log('[CatalogService] CSV procesado correctamente. Datos cargados:', catalogData);
+    }
   } catch (err: any) {
     loadError = `Error CSV: ${err.message || err}`;
-    console.error('[CatalogService]', err);
+    // Error is stored in loadError and can be retrieved via getCatalogLoadStatus
+    if (import.meta.env.DEV) {
+      console.error('[CatalogService]', err);
+    }
     isLoaded = false;
     catalogData = null;
   }

@@ -200,10 +200,7 @@ const ProjectActions: React.FC<{
         disabled={isSaveDisabled}
         className={isSaving ? 'text-yellow-400' : ''}
         title={getSaveTitle()}
-        style={{
-          opacity: isSaveDisabled ? 0.5 : 1,
-          cursor: isSaveDisabled ? 'not-allowed' : 'pointer',
-        }}
+        className={`${isSaveDisabled ? 'opacity-50 cursor-not-allowed' : 'opacity-100 cursor-pointer'}`}
       />
       <ToolButton
         icon={<Upload size={20} />}
@@ -336,14 +333,14 @@ const UndoRedo: React.FC<{
       label="Undo"
       onClick={onUndo}
       disabled={!canUndo}
-      style={{ opacity: canUndo ? 1 : 0.3 }}
+      className={canUndo ? 'opacity-100' : 'opacity-30'}
     />
     <ToolButton
       icon={<Redo2 size={20} />}
       label="Redo"
       onClick={onRedo}
       disabled={!canRedo}
-      style={{ opacity: canRedo ? 1 : 0.3 }}
+      className={canRedo ? 'opacity-100' : 'opacity-30'}
     />
   </>
 );

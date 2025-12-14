@@ -4,6 +4,8 @@ import { supabase } from "@/core/lib/supabase";
 import { Editor3D } from "@/editor/Editor3D";
 import { useAuthStore } from "@/core/stores/auth/useAuthStore";
 import { useProjectStore } from "@/editor/stores/project/useProjectStore";
+import { useErrorHandler } from "@/core/hooks/useErrorHandler";
+import { AppError, ErrorType, ErrorSeverity } from "@/core/lib/errorHandler";
 import type { ExtendedUser } from "@/App/utils/types";
 
 export const ViewerPage: React.FC = () => {
@@ -14,34 +16,52 @@ export const ViewerPage: React.FC = () => {
 
   const { user, setUser } = useAuthStore();
   const navigate = useNavigate();
+  const { handleError } = useErrorHandler({ context: 'ViewerPage' });
 
   // 🚀 Cargar usuario y sincronizar DOS STORES:
   // useAuthStore → useProjectStore
   React.useEffect(() => {
     const loadUser = async (): Promise<void> => {
-      const { data } = await supabase.auth.getUser();
-      const authUser = data.user;
+      try {
+        const { data, error: userError } = await supabase.auth.getUser();
+        
+        if (userError) throw userError;
+        
+        const authUser = data.user;
 
-      if (authUser) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", authUser.id)
-          .single();
+        if (authUser) {
+          const { data: profile, error: profileError } = await supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", authUser.id)
+            .single();
 
-        const extended =
-          profile
-            ? ({ ...authUser, role: profile.role } as ExtendedUser)
-            : authUser;
+          if (profileError && profileError.code !== 'PGRST116') {
+            // PGRST116 = not found, which is acceptable (user might not have profile yet)
+            throw profileError;
+          }
 
-        // Guardar en ambos stores
-        setUser(extended);          // Auth
-        setProjectUser(extended);   // Project  <-- 🔥 NECESARIO para toolbar y guardado
+          const extended =
+            profile
+              ? ({ ...authUser, role: profile.role } as ExtendedUser)
+              : authUser;
+
+          // Guardar en ambos stores
+          setUser(extended);          // Auth
+          setProjectUser(extended);   // Project  <-- 🔥 NECESARIO para toolbar y guardado
+        }
+      } catch (error) {
+        // Silently handle auth errors - user might not be logged in
+        if (error instanceof AppError && error.type === ErrorType.AUTH) {
+          // User not authenticated is expected in viewer mode
+          return;
+        }
+        handleError(error, { showToast: false });
       }
     };
 
     loadUser();
-  }, [setUser, setProjectUser]);
+  }, [setUser, setProjectUser, handleError]);
 
   // Cargar proyecto desde URL
   React.useEffect(() => {
@@ -50,11 +70,15 @@ export const ViewerPage: React.FC = () => {
     const isClone = params.get("mode") === "clone";
 
     if (projectId) {
-      loadProjectFromURL(projectId).then(() => {
-        if (isClone) resetProject();
-      });
+      loadProjectFromURL(projectId)
+        .then(() => {
+          if (isClone) resetProject();
+        })
+        .catch((error) => {
+          handleError(error);
+        });
     }
-  }, [loadProjectFromURL, resetProject]);
+  }, [loadProjectFromURL, resetProject, handleError]);
 
   const isAdminOrEmployee =
     user?.role === "admin" || user?.role === "employee";

@@ -28,11 +28,8 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   <div className="bg-neutral-900 border border-neutral-700 rounded-xl hover:border-blue-500 transition-all duration-300 flex flex-col">
     <div
       className="h-40 bg-neutral-800 flex items-center justify-center text-6xl text-neutral-600 bg-cover bg-center bg-no-repeat"
-      style={{
-        backgroundImage: project.thumbnail_url
-          ? `url(${project.thumbnail_url})`
-          : 'none',
-      }}
+      className={project.thumbnail_url ? 'bg-cover bg-center bg-no-repeat' : ''}
+      style={project.thumbnail_url ? { backgroundImage: `url(${project.thumbnail_url})` } as React.CSSProperties : undefined}
     >
       {!project.thumbnail_url && <ImageIcon size={48} />}
     </div>
