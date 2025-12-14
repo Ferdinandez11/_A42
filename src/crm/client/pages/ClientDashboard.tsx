@@ -96,28 +96,28 @@ export const ClientDashboard: React.FC = () => {
   useEffect(() => {
     const loadUserAndData = async () => {
       try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError) throw userError;
-
-        if (!user) {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError) throw userError;
+    
+    if (!user) {
           throw new AppError(ErrorType.AUTH, 'No hay sesión activa', {
             severity: ErrorSeverity.MEDIUM,
           });
-        }
+    }
+    
+    setUserId(user.id);
 
-        setUserId(user.id);
-
-        if (activeTab === 'projects') {
+    if (activeTab === 'projects') {
           await fetchProjects(user.id);
-        } else {
+    } else {
           await fetchOrders(activeTab);
-        }
-      } catch (error) {
-        handleError(error);
-        if (error instanceof AppError && error.type === ErrorType.AUTH) {
-          navigate('/login');
-        }
       }
+  } catch (error) {
+    handleError(error);
+    if (error instanceof AppError && error.type === ErrorType.AUTH) {
+      navigate('/login');
+    }
+  }
     };
 
     loadUserAndData();
@@ -129,11 +129,11 @@ export const ClientDashboard: React.FC = () => {
 
   const handleCreateManualBudget = useCallback(async () => {
     const loadingToast = showLoading('Creando presupuesto...');
-
+    
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError) throw userError;
-
+      
       const ref = 'MAN-' + Math.floor(10000 + Math.random() * 90000);
 
       const { data, error } = await supabase
@@ -151,10 +151,10 @@ export const ClientDashboard: React.FC = () => {
         .select();
 
       if (error) throw error;
-
+      
       dismissToast(loadingToast);
       showSuccess('✅ Presupuesto creado correctamente');
-
+      
       if (data) navigate(`/portal/order/${data[0].id}`);
     } catch (error) {
       dismissToast(loadingToast);
@@ -167,7 +167,7 @@ export const ClientDashboard: React.FC = () => {
   }, []);
 
   const handleEditProject = useCallback((projectId: string) => {
-    window.location.href = `/?project_id=${projectId}`;
+      window.location.href = `/?project_id=${projectId}`;
   }, []);
 
   const handleRequestQuote = useCallback(
@@ -179,12 +179,12 @@ export const ClientDashboard: React.FC = () => {
         isDestructive: false,
         onConfirm: async () => {
           const loadingToast = showLoading('Creando solicitud de presupuesto...');
-
+          
           try {
             const estimatedDate = new Date();
             estimatedDate.setHours(estimatedDate.getHours() + 48);
             const ref = 'SOL-' + Math.floor(10000 + Math.random() * 90000);
-
+            
             const { data, error } = await supabase
               .from('orders')
               .insert([
@@ -200,7 +200,7 @@ export const ClientDashboard: React.FC = () => {
               .select();
 
             if (error) throw error;
-
+            
             dismissToast(loadingToast);
             showSuccess('✅ Solicitud de presupuesto enviada');
 

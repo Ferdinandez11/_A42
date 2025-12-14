@@ -36,7 +36,7 @@ export const AdminOrderDetailPage = () => {
   const { handleError, showSuccess, showLoading, dismissToast } = useErrorHandler({
     context: 'AdminOrderDetailPage',
   });
-
+  
   // Hooks
   const {
     order,
@@ -70,7 +70,7 @@ export const AdminOrderDetailPage = () => {
 
   useEffect(() => {
     if (!id) return;
-
+    
     const loadAllData = async () => {
       await Promise.all([
         loadOrderData(id),
@@ -97,7 +97,7 @@ export const AdminOrderDetailPage = () => {
 
   const handleUpdateOrder = async () => {
     if (!order || !id) return;
-
+    
     const loadingToast = showLoading('Guardando cambios...');
     setIsGeneratingPDF(true);
 
@@ -106,7 +106,7 @@ export const AdminOrderDetailPage = () => {
 
       await updateOrder({
         status: order.status,
-        custom_name: order.custom_name,
+        custom_name: order.custom_name, 
         estimated_delivery_date: dateToSave,
         total_price: order.total_price,
       });
@@ -115,18 +115,18 @@ export const AdminOrderDetailPage = () => {
       if (order.status === 'presupuestado') {
         dismissToast(loadingToast);
         const pdfToast = showLoading('Generando PDF de presupuesto...');
-
+        
         try {
           // @ts-expect-error - Type mismatch between OrderData and PDF generator expected type
           const pdfBlob = await generateBudgetPDF(order, items3D, manualItems);
-
+          
           const fileName = `Presupuesto_${order.order_ref}_${Date.now()}.pdf`;
           const filePath = `${id}/${fileName}`;
 
           const { error: uploadError } = await supabase.storage
             .from('attachments')
             .upload(filePath, pdfBlob);
-
+          
           if (uploadError) throw uploadError;
 
           const { data: { publicUrl } } = supabase.storage
@@ -136,15 +136,15 @@ export const AdminOrderDetailPage = () => {
           const { data: { user } } = await supabase.auth.getUser();
           const { error: dbError } = await supabase.from('order_attachments').insert([
             {
-              order_id: id,
-              file_name: `📄 ${fileName}`,
-              file_url: publicUrl,
+            order_id: id,
+            file_name: `📄 ${fileName}`,
+            file_url: publicUrl,
               uploader_id: user?.id,
             },
           ]);
 
           if (dbError) throw dbError;
-
+          
           dismissToast(pdfToast);
           showSuccess('✅ Cambios guardados y PDF de Presupuesto enviado al cliente');
         } catch (pdfError) {
@@ -186,7 +186,7 @@ export const AdminOrderDetailPage = () => {
     const discount = order.profiles?.discount_rate || 0;
     const discountAmount = calculatedBasePrice * (discount / 100);
     const finalPrice = applyClientDiscount(calculatedBasePrice, discount);
-
+    
     if (
       confirm(
         formatDiscountConfirmation(
@@ -206,14 +206,14 @@ export const AdminOrderDetailPage = () => {
     if (!order) return;
     const updatedOrder = copyBasePriceToTotal(order, calculatedBasePrice);
     updateOrder({ total_price: updatedOrder.total_price });
-    showSuccess('✅ Precio base copiado al total');
+      showSuccess('✅ Precio base copiado al total');
   };
 
   const handleAddObservation = async () => {
     if (!id) return;
     try {
       await addObservation(id, newObservation);
-      setNewObservation('');
+      setNewObservation(''); 
     } catch (error) {
       // Error ya manejado en el hook
     }
@@ -236,10 +236,10 @@ export const AdminOrderDetailPage = () => {
   const handleConfirmParametricItem = async () => {
     if (!id || !parametricModal.item) return;
     const val = parseFloat(parametricModal.value);
-
+    
     try {
       await addParametricItem(id, parametricModal.item, val);
-      setParametricModal({ isOpen: false, item: null, value: '' });
+    setParametricModal({ isOpen: false, item: null, value: '' });
       setIsCatalogOpen(false);
     } catch (error) {
       // Error ya manejado en el hook
@@ -259,7 +259,7 @@ export const AdminOrderDetailPage = () => {
     if (!id) return;
     try {
       await sendMessage(id, newMessage);
-      setNewMessage('');
+      setNewMessage(''); 
     } catch (error) {
       // Error ya manejado en el hook
     }
@@ -293,7 +293,7 @@ export const AdminOrderDetailPage = () => {
   return (
     <div className="p-5 h-screen flex flex-col bg-black">
       <OrderHeader orderRef={order.order_ref} />
-
+      
       <div className="grid grid-cols-[2fr_1fr] gap-5 h-full text-gray-300 font-sans">
         {/* COLUMNA IZQUIERDA */}
         <div className="flex flex-col gap-2.5 overflow-y-auto">

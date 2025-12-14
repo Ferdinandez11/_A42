@@ -74,47 +74,47 @@ export const CrmDashboard: React.FC = () => {
   const handleApproveClient = async (clientId: string): Promise<void> => {
     try {
       await approveClient(clientId);
-    } catch (error) {
+  } catch (error) {
       // Error ya manejado en el hook
-    }
-  };
+  }
+};
 
-  const handleCreateClient = async (): Promise<void> => {
-    try {
+const handleCreateClient = async (): Promise<void> => {
+  try {
       await createClient(newClientData);
-      setShowCreateModal(false);
-      setNewClientData(EMPTY_CLIENT_DATA);
-    } catch (error) {
+    setShowCreateModal(false);
+    setNewClientData(EMPTY_CLIENT_DATA);
+  } catch (error) {
       // Error ya manejado en el hook
-    }
-  };
+  }
+};
 
-  const handleDeleteClient = async (id: string): Promise<void> => {
-    if (!confirm('¿Borrar cliente?')) return;
-    try {
+const handleDeleteClient = async (id: string): Promise<void> => {
+  if (!confirm('¿Borrar cliente?')) return;
+  try {
       await deleteClient(id);
-    } catch (error) {
+  } catch (error) {
       // Error ya manejado en el hook
-    }
-  };
+  }
+};
 
-  const handleDeleteOrder = async (id: string): Promise<void> => {
-    if (!confirm('¿Borrar registro?')) return;
+const handleDeleteOrder = async (id: string): Promise<void> => {
+  if (!confirm('¿Borrar registro?')) return;
     try {
       await deleteOrder(id);
-    } catch (error) {
+  } catch (error) {
       // Error ya manejado en el hook
-    }
-  };
+  }
+};
 
   const handleStatusUpdate = async (
     id: string,
     newStatus: OrderStatus
   ): Promise<void> => {
-    if (!confirm(`¿Cambiar estado a "${newStatus.toUpperCase()}"?`)) return;
+  if (!confirm(`¿Cambiar estado a "${newStatus.toUpperCase()}"?`)) return;
 
-    try {
-      const deliveryDate = calculateEstimatedDelivery(newStatus);
+  try {
+    const deliveryDate = calculateEstimatedDelivery(newStatus);
       await updateOrderStatus(id, newStatus, deliveryDate || undefined);
     } catch (error) {
       // Error ya manejado en el hook
@@ -126,8 +126,8 @@ export const CrmDashboard: React.FC = () => {
       fetchClients();
     } else {
       fetchOrders(activeTab);
-    }
-  };
+  }
+};
 
   // ==========================================================================
   // RENDER
@@ -141,7 +141,7 @@ export const CrmDashboard: React.FC = () => {
           <h2 className="text-white text-2xl font-bold m-0">Panel de Control 🟢</h2>
           <small className="text-neutral-500">Vista Administrador</small>
         </div>
-
+        
         <div className="flex gap-2">
           <CrmTabButton
             active={activeTab === 'clients'}
@@ -149,21 +149,21 @@ export const CrmDashboard: React.FC = () => {
           >
             👥 Clientes
           </CrmTabButton>
-
+          
           <CrmTabButton
             active={activeTab === 'budgets'}
             onClick={() => setActiveTab('budgets')}
           >
             📄 Presupuestos
           </CrmTabButton>
-
+          
           <CrmTabButton
             active={activeTab === 'orders'}
             onClick={() => setActiveTab('orders')}
           >
             📦 Pedidos
           </CrmTabButton>
-
+          
           <CrmTabButton active={false} onClick={handleRefresh} variant="success">
             🔄
           </CrmTabButton>
@@ -193,14 +193,14 @@ export const CrmDashboard: React.FC = () => {
                     <th className="text-left p-3 text-neutral-500">Acciones</th>
                   </tr>
                 </thead>
-
+                
                 <tbody>
                   {orders.map((order) => (
                     <tr key={order.id} className="border-b border-neutral-800">
                       <td className="p-3 text-center align-middle">
                         <AlertIndicator order={order} />
                       </td>
-
+                      
                       <td className="p-3 align-middle">
                         <strong>{order.order_ref}</strong>
                         {order.custom_name && (
@@ -209,7 +209,7 @@ export const CrmDashboard: React.FC = () => {
                           </div>
                         )}
                       </td>
-
+                      
                       <td className="p-3 align-middle text-blue-400">
                         {order.profiles ? (
                           order.profiles.company_name || order.profiles.email
@@ -217,7 +217,7 @@ export const CrmDashboard: React.FC = () => {
                           <span className="text-neutral-600">Eliminado</span>
                         )}
                       </td>
-
+                      
                       <td className="p-3 align-middle">
                         <StatusSelect
                           value={order.status}
@@ -225,11 +225,11 @@ export const CrmDashboard: React.FC = () => {
                           isBudget={activeTab === 'budgets'}
                         />
                       </td>
-
+                      
                       <td className="p-3 align-middle">
                         {new Date(order.created_at).toLocaleDateString()}
                       </td>
-
+                      
                       <td className="p-3 align-middle">
                         {order.estimated_delivery_date ? (
                           <span
@@ -245,14 +245,14 @@ export const CrmDashboard: React.FC = () => {
                           '--'
                         )}
                       </td>
-
+                      
                       <td className="p-3 align-middle">
                         <PriceCell
                           price={order.total_price || 0}
                           discountRate={order.profiles?.discount_rate || 0}
                         />
                       </td>
-
+                      
                       <td className="p-3 align-middle">
                         <button
                           onClick={() => navigate(`/admin/order/${order.id}`)}
@@ -269,7 +269,7 @@ export const CrmDashboard: React.FC = () => {
                       </td>
                     </tr>
                   ))}
-
+                  
                   {orders.length === 0 && (
                     <tr>
                       <td colSpan={8} className="p-8 text-center text-neutral-600">
@@ -304,7 +304,7 @@ export const CrmDashboard: React.FC = () => {
                     <th className="text-left p-3 text-neutral-500">Acciones</th>
                   </tr>
                 </thead>
-
+                
                 <tbody>
                   {clients.map((client) => (
                     <tr key={client.id} className="border-b border-neutral-800">
@@ -320,17 +320,17 @@ export const CrmDashboard: React.FC = () => {
                           </button>
                         )}
                       </td>
-
+                      
                       <td className="p-3 align-middle font-bold">
                         {client.company_name || '---'}
                       </td>
-
+                      
                       <td className="p-3 align-middle">{client.email}</td>
-
+                      
                       <td className="p-3 align-middle text-green-500 font-bold">
                         {client.discount_rate}%
                       </td>
-
+                      
                       <td className="p-3 align-middle">
                         <button
                           onClick={() => navigate(`/admin/client/${client.id}`)}
