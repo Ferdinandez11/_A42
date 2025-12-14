@@ -96,32 +96,33 @@ export const ClientDashboard: React.FC = () => {
   useEffect(() => {
     const loadUserAndData = async () => {
       try {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError) throw userError;
-    
-    if (!user) {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError) throw userError;
+        
+        if (!user) {
           throw new AppError(ErrorType.AUTH, 'No hay sesión activa', {
             severity: ErrorSeverity.MEDIUM,
           });
-    }
-    
-    setUserId(user.id);
+        }
+        
+        setUserId(user.id);
 
-    if (activeTab === 'projects') {
+        if (activeTab === 'projects') {
           await fetchProjects(user.id);
-    } else {
+        } else {
           await fetchOrders(activeTab);
+        }
+      } catch (error) {
+        handleError(error);
+        if (error instanceof AppError && error.type === ErrorType.AUTH) {
+          navigate('/login');
+        }
       }
-  } catch (error) {
-    handleError(error);
-    if (error instanceof AppError && error.type === ErrorType.AUTH) {
-      navigate('/login');
-    }
-  }
     };
 
     loadUserAndData();
-  }, [activeTab, fetchProjects, fetchOrders, handleError, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]); // Solo activeTab como dependencia, las funciones están memoizadas
 
   // =========================================================================
   // HANDLERS

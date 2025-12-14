@@ -65,7 +65,8 @@ export const CrmDashboard: React.FC = () => {
     } else {
       fetchOrders(activeTab);
     }
-  }, [activeTab, fetchClients, fetchOrders]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]); // Solo activeTab como dependencia, las funciones están memoizadas
 
   // =========================================================================
   // HANDLERS

@@ -125,7 +125,8 @@ export const useErrorHandler = (
       
       return appError;
     },
-    [context, defaultShowToast, defaultOnError, defaultOptions]
+    // Solo incluir propiedades primitivas, no el objeto completo
+    [context, defaultShowToast, defaultOnError]
   );
 
   /**
