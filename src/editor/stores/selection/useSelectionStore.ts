@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { useSceneStore } from "../scene/useSceneStore";
 import { useProjectStore } from "../project/useProjectStore";
+import { editorErrorHandler } from "@/editor/services/EditorErrorHandler";
+import { ErrorType, ErrorSeverity } from "@/core/lib/errorHandler";
 import type { SceneItem } from "@/domain/types/editor";
 
 /**
