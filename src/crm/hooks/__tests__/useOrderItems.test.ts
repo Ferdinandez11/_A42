@@ -11,6 +11,8 @@ vi.mock('@/core/lib/supabase');
 vi.mock('@/core/hooks/useErrorHandler');
 vi.mock('@/pdf/utils/PriceCalculator', () => ({
   PRICES: {
+    FENCE_M: 10,
+    FLOOR_M2: 20,
     parametric: {
       per_meter: 10,
     },
@@ -126,12 +128,12 @@ describe('useOrderItems', () => {
   it('should add parametric item', async () => {
     const mockParametricItem = {
       ...mockCatalogItem,
-      type: 'parametric' as const,
+      type: 'fence' as const,
     };
 
+    const mockInsertFn = vi.fn().mockResolvedValue({ data: null, error: null });
     const mockInsert = {
-      from: vi.fn().mockReturnThis(),
-      insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+      insert: mockInsertFn,
     };
 
     const mockFetch = {
@@ -142,10 +144,13 @@ describe('useOrderItems', () => {
       }),
     };
 
+    let callCount = 0;
     (supabase.from as any).mockImplementation((table) => {
-      if (table === 'order_items') {
+      callCount++;
+      if (table === 'order_items' && callCount === 1) {
         return mockInsert;
       }
+      // Para fetchItems después de insertar
       return mockFetch;
     });
 
@@ -157,23 +162,42 @@ describe('useOrderItems', () => {
 
     await waitFor(() => {
       expect(mockShowSuccess).toHaveBeenCalled();
+      expect(mockInsertFn).toHaveBeenCalled();
     });
   });
 
   it('should delete item', async () => {
-    const mockDelete = {
-      from: vi.fn().mockReturnThis(),
-      delete: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+    // Primero cargar los items
+    const mockQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockResolvedValue({
+        data: [mockItem],
+        error: null,
+      }),
     };
 
-    (supabase.from as any).mockReturnValue(mockDelete);
+    const mockEq = vi.fn().mockResolvedValue({ data: null, error: null });
+    const mockDelete = vi.fn().mockReturnValue({ eq: mockEq });
+
+    let callCount = 0;
+    (supabase.from as any).mockImplementation((table) => {
+      callCount++;
+      if (callCount === 1) {
+        // Primera llamada: fetchItems
+        return mockQuery;
+      }
+      // Segunda llamada: deleteItem
+      return { delete: mockDelete };
+    });
 
     const { result } = renderHook(() => useOrderItems());
 
-    // Set initial items
     await act(async () => {
-      result.current.manualItems.push(mockItem);
+      await result.current.fetchItems('order-1');
+    });
+
+    await waitFor(() => {
+      expect(result.current.manualItems).toHaveLength(1);
     });
 
     await act(async () => {
@@ -182,6 +206,7 @@ describe('useOrderItems', () => {
 
     await waitFor(() => {
       expect(mockShowSuccess).toHaveBeenCalledWith('✅ Elemento eliminado');
+      expect(result.current.manualItems).toHaveLength(0);
     });
   });
 

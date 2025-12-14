@@ -1,0 +1,1957 @@
+﻿
+> a42-app@0.0.0 test:coverage
+> vitest run --coverage
+
+
+ RUN  v4.0.15 C:/Users/Fernando/a42-app
+      Coverage enabled with v8
+
+ ÔØ» src/core/hooks/__tests__/useErrorHandler.test.ts (12 tests | 1 failed) 100ms
+       Ô£ô should handle errors and show toast by default 51ms
+       Ô£ô should not show toast when showToast is false 4ms
+       Ô£ô should show different toast styles based on severity 6ms
+       Ô£ô should call onError callback when provided 6ms
+       Ô£ô should use custom message when provided 5ms
+       Ô£ô should return AppError instance 6ms
+       Ô£ô should show success toast 3ms
+       Ô£ô should show error toast 2ms
+       ├ù should show info toast 5ms
+       Ô£ô should show loading toast and return toast ID 3ms
+       Ô£ô should dismiss specific toast 3ms
+       Ô£ô should dismiss all toasts 2ms
+ ÔØ» src/editor/hooks/__tests__/useEditorMedia.test.ts (8 tests | 4 failed) 98ms
+       ├ù should take photo successfully 66ms
+       Ô£ô should return error when engine is unavailable 4ms
+       ├ù should start 360 video successfully 6ms
+       ├ù should toggle recording 5ms
+       Ô£ô should export GLB successfully 4ms
+       Ô£ô should export DXF successfully 4ms
+       Ô£ô should generate PDF successfully 3ms
+       ├ù should reflect recording state 3ms
+ ÔØ» src/editor/hooks/__tests__/useSceneTools.test.ts (11 tests | 3 failed) 105ms
+       Ô£ô should activate walk mode 45ms
+       Ô£ô should return error when engine is unavailable 9ms
+       Ô£ô should deactivate walk mode 4ms
+       Ô£ô should toggle walk mode on 3ms
+       Ô£ô should toggle walk mode off 3ms
+       Ô£ô should return walk mode status 2ms
+       ├ù should set CAD segment with valid params 17ms
+       Ô£ô should return error with invalid params 3ms
+       ├ù should set CAD angle with valid angle 7ms
+       Ô£ô should return error with invalid angle 3ms
+       ├ù should swap CAD selection 6ms
+ ÔØ» src/editor/hooks/__tests__/useEngineSync.test.ts (10 tests | 1 failed) 81ms
+     Ô£ô should call clearTools when mode changes 39ms
+     ├ù should not call clearTools when engine is null 11ms
+     Ô£ô should call selectItemByUUID when selectedItemId changes 7ms
+     Ô£ô should call syncSceneFromStore when items change 3ms
+     Ô£ô should sync grid visibility 3ms
+     Ô£ô should sync sun position 2ms
+     Ô£ô should set sky visible when background is sky color 5ms
+     Ô£ô should switch camera when cameraType changes 3ms
+     Ô£ô should set view when pendingView is set 3ms
+     Ô£ô should update safety zones visibility 2ms
+node.exe : stderr | src/crm/hooks/__tests__/useOrders.test.ts > useOrders > fetchOrders > should fetch budgets 
+correctly
+En línea: 1 Carácter: 1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (stderr | src/cr...dgets correctly:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+ ÔØ» src/crm/hooks/__tests__/useClients.test.ts (7 tests | 3 failed) 94ms
+     Ô£ô should initialize with empty clients and loading false 37ms
+     Ô£ô should fetch clients successfully 15ms
+     Ô£ô should handle fetch error 13ms
+     ├ù should approve client 14ms
+     ├ù should create client 4ms
+     Ô£ô should not create client without email 3ms
+     ├ù should delete client 4ms
+ ÔØ» src/editor/hooks/__tests__/useProjectActions.test.ts (6 tests | 1 failed) 71ms
+       ├ù should save new project when user is logged in 50ms
+       Ô£ô should not save in read-only mode 4ms
+       Ô£ô should require login to save 3ms
+       Ô£ô should import GLB file successfully 6ms
+       Ô£ô should handle no file selected 3ms
+       Ô£ô should track saving state 2ms
+ ÔØ» src/crm/hooks/__tests__/useOrderItems.test.ts (6 tests | 1 failed) 121ms
+     Ô£ô should initialize with empty items and loading false 35ms
+     Ô£ô should fetch items successfully 20ms
+     Ô£ô should add item successfully 15ms
+     ├ù should add parametric item 9ms
+     Ô£ô should delete item 22ms
+     Ô£ô should handle fetch error 16ms
+ ÔØ» src/editor/ui/__tests__/FloorProperties.test.tsx (8 tests | 8 failed) 63ms
+     ├ù should not render when no floor is selected 38ms
+     ├ù should not render when selected item is not a floor 3ms
+     ├ù should render floor properties panel when floor is selected 3ms
+     ├ù should render material selector buttons 3ms
+     ├ù should call updateFloorMaterial when material is selected 6ms
+     ├ù should render upload button for texture 2ms
+     ├ù should render texture controls when texture is present 2ms
+     ├ù should render CAD control component 3ms
+stderr | src/crm/hooks/__tests__/useOrders.test.ts > useOrders > fetchOrders > should fetch orders correctly
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stdout | src/core/services/__tests__/catalogService.test.ts > catalogService > loadCatalogData > should load and parse CSV data successfully
+[CatalogService] Descargando CSV...
+
+stdout | src/core/services/__tests__/catalogService.test.ts > catalogService > loadCatalogData > should load and parse CSV data successfully
+[CatalogService] CSV procesado correctamente. Datos cargados: {
+  lines: {
+    'Linea 1': { categories: [Object] },
+    'Linea 2': { categories: [Object] }
+  }
+}
+
+stdout | src/editor/stores/__tests__/useProjectStore.test.ts > useProjectStore > loadProjectFromURL > should throw error when project not found
+[NOT_FOUND_ERROR] Project not found
+  Severity: medium
+  User Message: Proyecto no encontrado
+  Metadata: {
+    timestamp: 1765746621370,
+    stack: 'AppError: Project not found\n' +
+      '    at Object.loadProjectFromURL (C:/Users/Fernando/a42-app/src/editor/stores/project/useProjectStore.ts:84:15)\n' +
+      '    at processTicksAndRejections (node:internal/process/task_queues:103:5)'
+  }
+
+stdout | src/editor/stores/__tests__/useProjectStore.test.ts > useProjectStore > loadProjectFromURL > should handle database errors
+[PERMISSION_ERROR] Not found
+  Severity: medium
+  User Message: No tienes permisos para realizar esta acci├│n.
+  Metadata: {
+    component: 'useProjectStore.loadProjectFromURL',
+    code: 'PGRST116',
+    timestamp: 1765746621375,
+    stack: 'AppError: Not found\n' +
+      '    at ErrorHandler.handleSupabaseError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:318:14)\n' +
+      '    at ErrorHandler.normalizeError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:250:19)\n' +
+      '    at ErrorHandler.handle (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:219:27)\n' +
+      '    at handleError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:435:23)\n' +
+      '    at Object.loadProjectFromURL (C:/Users/Fernando/a42-app/src/editor/stores/project/useProjectStore.ts:130:13)\n' +
+      '    at processTicksAndRejections (node:internal/process/task_queues:103:5)'
+  }
+  Original Error: { code: 'PGRST116', message: 'Not found' }
+
+ ÔØ» src/editor/stores/__tests__/useSelectionStore.test.ts (11 tests | 2 failed) 25ms
+       Ô£ô should select an item by UUID 4ms
+       Ô£ô should clear selection when set to null 0ms
+       Ô£ô should clear all selection state 1ms
+       Ô£ô should set selected vertices with measurements 1ms
+       Ô£ô should clear measurements when set to null 0ms
+       ├ù should duplicate selected item 10ms
+       Ô£ô should not duplicate in read-only mode 1ms
+       Ô£ô should not duplicate when no item is selected 0ms
+       ├ù should remove selected item 3ms
+       Ô£ô should not remove in read-only mode 1ms
+       Ô£ô should not remove when no item is selected 0ms
+ ÔØ» src/core/services/__tests__/catalogService.test.ts (10 tests | 4 failed) 38ms
+       Ô£ô should load and parse CSV data successfully 9ms
+       ├ù should handle HTTP errors 17ms
+       ├ù should handle empty CSV 1ms
+       Ô£ô should not reload if already loaded 1ms
+       Ô£ô should return catalog database when loaded 0ms
+       Ô£ô should return null when not loaded 1ms
+       Ô£ô should return loading status 1ms
+       ├ù should return proxied URL for external images 4ms
+       Ô£ô should return original URL for data URLs 0ms
+       ├ù should return empty string for null/undefined 1ms
+ ÔØ» src/editor/stores/__tests__/useProjectStore.test.ts (9 tests | 1 failed) 37ms
+       Ô£ô should set the user 6ms
+       Ô£ô should clear user when set to null 0ms
+       Ô£ô should set project ID and name 1ms
+       Ô£ô should clear project info when set to null 1ms
+       ├ù should reset project and clear scene 10ms
+       Ô£ô should load project from database 1ms
+       Ô£ô should throw error when project not found 5ms
+       Ô£ô should handle database errors 4ms
+       Ô£ô should handle empty project data 4ms
+stderr | src/crm/hooks/__tests__/useOrders.test.ts > useOrders > fetchOrders > should fetch archived orders correctly
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+ ÔØ» src/crm/hooks/__tests__/useAdminOrders.test.ts (7 tests | 4 failed) 2138ms
+     Ô£ô should initialize with empty orders and loading false 45ms
+     ├ù should fetch budgets when activeTab is budgets 1035ms
+     ├ù should fetch orders when activeTab is orders 1016ms
+     Ô£ô should clear orders when activeTab is clients 8ms
+     Ô£ô should handle fetch error 21ms
+     ├ù should update order status 5ms
+     ├ù should delete order 4ms
+ ÔØ» src/crm/hooks/__tests__/useOrderData.test.ts (6 tests | 2 failed) 2129ms
+     Ô£ô should initialize with null order and empty arrays 34ms
+     Ô£ô should load order data successfully 15ms
+     Ô£ô should process 3D items and calculate price 16ms
+     Ô£ô should handle order not found error 15ms
+     ├ù should update order 1028ms
+     ├ù should handle update error 1018ms
+22:10:21 [vite] (client) warning: Duplicate "className" attribute in JSX element
+201 |          className={isSaving ? 'text-yellow-400' : ''}
+202 |          title={getSaveTitle()}
+203 |          className={`${isSaveDisabled ? 'opacity-50 cursor-not-allowed' : 'opacity-100 cursor-pointer'}`}
+    |          ^
+204 |        />
+205 |        <ToolButton
+
+  Plugin: vite:esbuild
+  File: C:/Users/Fernando/a42-app/src/editor/ui/Toolbar.tsx
+ ÔØ» src/editor/ui/__tests__/FenceProperties.test.tsx (10 tests | 10 failed) 88ms
+     ├ù should not render when no fence is selected 50ms
+     ├ù should not render when selected item is not a fence 3ms
+     ├ù should render fence properties panel when fence is selected 4ms
+     ├ù should render preset selector buttons 5ms
+     ├ù should render selected preset 4ms
+     ├ù should call updateItemFenceConfig when preset is changed 5ms
+     ├ù should render color controls 5ms
+     ├ù should render additional color controls for multi-color presets 2ms
+     ├ù should render CAD control component 3ms
+     ├ù should render help text 4ms
+stderr | src/crm/hooks/__tests__/useOrders.test.ts > useOrders > fetchOrders > should handle fetch error
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/crm/hooks/__tests__/useOrders.test.ts > useOrders > reactivateOrder > should reactivate order successfully
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+ ÔØ» src/crm/hooks/__tests__/useOrders.test.ts (6 tests | 4 failed) 3149ms
+       ├ù should fetch budgets correctly 1076ms
+       ├ù should fetch orders correctly 1013ms
+       ├ù should fetch archived orders correctly 1021ms
+       ├ù should handle fetch error 16ms
+       Ô£ô should reactivate order successfully 13ms
+       Ô£ô should handle reactivate error 6ms
+ Ô£ô src/editor/engine/__tests__/A42Engine.collision.test.ts (13 tests | 2 skipped) 1646ms
+       Ô£ô should show safety zones when visible = true  525ms
+22:10:24 [vite] (client) warning: Duplicate "className" attribute in JSX element
+443 |            <div
+444 |              className={`grid ${GRID_CONFIGS.PRODUCTS} gap-6 custom-scrollbar pr-2 pb-20`}
+445 |              className="max-h-[calc(100vh-200px)] overflow-y-auto"
+    |              ^
+446 |            >
+447 |              {filteredProducts.map((product) => (
+
+  Plugin: vite:esbuild
+  File: C:/Users/Fernando/a42-app/src/editor/ui/Catalog.tsx
+22:10:24 [vite] (client) warning: Duplicate "className" attribute in JSX element
+477 |            <div
+478 |              className={`grid ${GRID_CONFIGS.PRODUCTS} gap-6 custom-scrollbar pr-2 pb-20`}
+479 |              className="max-h-[calc(100vh-200px)] overflow-y-auto"
+    |              ^
+480 |            >
+481 |              {products.map((product) => (
+
+  Plugin: vite:esbuild
+  File: C:/Users/Fernando/a42-app/src/editor/ui/Catalog.tsx
+ Ô£ô src/editor/engine/__tests__/A42Engine.lifecycle.test.ts (14 tests) 1924ms
+       Ô£ô should initialize all managers  508ms
+ Ô£ô src/editor/engine/__tests__/InteractionManager.transform.test.ts (15 tests) 2051ms
+       Ô£ô should initialize transform controls  517ms
+ Ô£ô src/editor/ui/__tests__/Toolbar.test.tsx (18 tests) 2207ms
+     Ô£ô should call setMode when tool is clicked  411ms
+     Ô£ô should show views panel when views button is clicked  353ms
+stderr | src/editor/ui/__tests__/Catalog.test.tsx > Catalog > should show loading state initially
+An update to Catalog inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+22:10:25 [vite] (client) warning: Duplicate "className" attribute in JSX element
+29 |      <div
+30 |        className="h-40 bg-neutral-800 flex items-center justify-center text-6xl text-neutral-600 bg-cover 
+bg-center bg...
+31 |        className={project.thumbnail_url ? 'bg-cover bg-center bg-no-repeat' : ''}
+   |        ^
+32 |        style={project.thumbnail_url ? { backgroundImage: `url(${project.thumbnail_url})` } as React.CSSProperties 
+: un...
+33 |      >
+
+  Plugin: vite:esbuild
+  File: C:/Users/Fernando/a42-app/src/crm/client/components/ProjectCard.tsx
+ Ô£ô src/editor/ui/__tests__/Catalog.test.tsx (8 tests) 792ms
+     Ô£ô should navigate to category when line is clicked  431ms
+ Ô£ô src/editor/engine/__tests__/A42Engine.sync.test.ts (9 tests | 4 skipped) 1117ms
+       Ô£ô should add new floor item to scene  592ms
+ Ô£ô src/crm/client/components/__tests__/OrderTable.test.tsx (6 tests) 771ms
+     Ô£ô should call onViewOrder when view button is clicked  448ms
+ Ô£ô src/editor/engine/__tests__/InteractionManager.raycast.test.ts (9 tests | 2 skipped) 1337ms
+       Ô£ô should select an object and attach gizmo  607ms
+ Ô£ô src/editor/engine/__tests__/InteractionManager.selection.test.ts (9 tests | 2 skipped) 1359ms
+       Ô£ô should select an object and attach gizmo  604ms
+stderr | src/core/__tests__/App.test.tsx > App > LoginPage Interactions > should switch to form step when clicking 
+client role
+An update to LoginPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/core/__tests__/App.test.tsx > App > LoginPage Interactions > should switch to form step when clicking 
+employee role
+An update to LoginPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+An update to LoginPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/core/__tests__/App.test.tsx > App > LoginPage Interactions > should show registration form when toggling 
+to register
+An update to LoginPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/core/__tests__/App.test.tsx > App > LoginPage Interactions > should go back to role selection when 
+clicking back button
+An update to LoginPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/core/__tests__/App.test.tsx > App > LoginPage Interactions > should go back to role selection when 
+clicking back button
+An update to LoginPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/core/__tests__/App.test.tsx > App > LoginPage Interactions > should show loading state when submitting 
+form
+An update to LoginPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/core/__tests__/App.test.tsx > App > LoginPage Interactions > should have required attribute on email and 
+password inputs
+An update to LoginPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/core/__tests__/App.test.tsx > App > LoginPage Interactions > should not show register option for employees
+An update to LoginPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+An update to LoginPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/core/__tests__/App.test.tsx > App > LoginPage Interactions > should toggle between login and register 
+modes
+An update to LoginPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/core/__tests__/App.test.tsx > App > LoginPage Interactions > should toggle between login and register 
+modes
+An update to LoginPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/core/__tests__/App.test.tsx > App > LoginPage Interactions > should toggle between login and register 
+modes
+An update to LoginPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+ Ô£ô src/crm/client/components/__tests__/ProjectCard.test.tsx (6 tests) 698ms
+     Ô£ô should call onEdit when edit button is clicked  347ms
+stderr | src/core/__tests__/App.test.tsx > App > Form State Management > should have email input with correct type and 
+attributes
+An update to LoginPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/core/__tests__/App.test.tsx > App > Form State Management > should have password input with correct type 
+and attributes
+An update to LoginPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/core/__tests__/App.test.tsx > App > Form State Management > should show submit button with correct text 
+for login
+An update to LoginPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/core/__tests__/App.test.tsx > App > Form State Management > should show submit button with correct text 
+for register
+An update to LoginPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/core/__tests__/App.test.tsx > App > UI States and Styling > should show role-specific header in login form
+An update to LoginPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/core/__tests__/App.test.tsx > App > Error Boundaries and Edge Cases > should handle multiple role 
+selections
+An update to LoginPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/core/__tests__/App.test.tsx > App > Error Boundaries and Edge Cases > should handle multiple role 
+selections
+An update to LoginPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/core/__tests__/App.test.tsx > App > Error Boundaries and Edge Cases > should handle multiple role 
+selections
+An update to LoginPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+An update to LoginPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/core/__tests__/App.test.tsx > App > Error Boundaries and Edge Cases > should maintain form state when 
+toggling register/login
+An update to LoginPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/core/__tests__/App.test.tsx > App > Error Boundaries and Edge Cases > should maintain form state when 
+toggling register/login
+An update to LoginPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/core/__tests__/App.test.tsx > App > Accessibility and Forms > should have proper form element with 
+onSubmit
+An update to LoginPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+ Ô£ô src/core/__tests__/App.test.tsx (52 tests) 1208ms
+ Ô£ô src/crm/client/components/__tests__/DashboardHeader.test.tsx (3 tests) 501ms
+     Ô£ô should call onCreateBudget when button is clicked  334ms
+ Ô£ô src/crm/admin/components/__tests__/StatusSelect.test.tsx (3 tests) 508ms
+     Ô£ô should call onChange when value changes  433ms
+ Ô£ô src/crm/admin/components/__tests__/CrmTabButton.test.tsx (4 tests) 430ms
+     Ô£ô should call onClick when clicked  350ms
+ Ô£ô src/crm/client/components/__tests__/TabNavigation.test.tsx (3 tests) 541ms
+     Ô£ô should call onTabChange when tab is clicked  410ms
+stderr | src/crm/hooks/__tests__/useDashboardTabs.test.ts > useDashboardTabs > should update tab and sync with URL
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+ Ô£ô src/crm/hooks/__tests__/useDashboardTabs.test.ts (4 tests) 124ms
+ Ô£ô src/editor/stores/scene/__tests__/useSceneStore.test.ts (49 tests) 347ms
+ Ô£ô src/components/__tests__/ConfirmModal.test.tsx (13 tests) 187ms
+stderr | src/crm/hooks/__tests__/useProjects.test.ts > useProjects > fetchProjects > should fetch projects successfully
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/crm/hooks/__tests__/useProjects.test.ts > useProjects > fetchProjects > should fetch projects successfully
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/crm/hooks/__tests__/useProjects.test.ts > useProjects > fetchProjects > should handle fetch error
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/crm/hooks/__tests__/useProjects.test.ts > useProjects > fetchProjects > should handle fetch error
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/crm/hooks/__tests__/useProjects.test.ts > useProjects > deleteProject > should delete project successfully
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/crm/hooks/__tests__/useProjects.test.ts > useProjects > refreshProjects > should refresh projects
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+stderr | src/crm/hooks/__tests__/useProjects.test.ts > useProjects > refreshProjects > should refresh projects
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at 
+https://react.dev/link/wrap-tests-with-act
+
+ Ô£ô src/crm/hooks/__tests__/useOrderMessages.test.ts (5 tests) 109ms
+ Ô£ô src/crm/hooks/__tests__/useProjects.test.ts (5 tests) 242ms
+ Ô£ô src/crm/hooks/__tests__/useOrderObservations.test.ts (5 tests) 117ms
+ Ô£ô src/crm/client/components/__tests__/OrderStatusBadge.test.tsx (4 tests) 94ms
+ Ô£ô src/crm/admin/components/__tests__/PriceCell.test.tsx (3 tests) 104ms
+ Ô£ô src/core/stores/auth/__tests__/useAuthStore.test.ts (8 tests) 67ms
+ Ô£ô src/crm/hooks/__tests__/useOrderAttachments.test.ts (5 tests) 112ms
+ Ô£ô src/editor/hooks/__tests__/useEngineEnvironmentSync.test.ts (5 tests) 47ms
+stdout | src/core/lib/__tests__/errorHandler.test.ts > errorHandler > handleError > should handle AppError
+[NETWORK_ERROR] Network failed
+  Severity: medium
+  User Message: Error de conexi├│n. Verifica tu internet.
+  Metadata: {
+    timestamp: 1765746631171,
+    stack: 'AppError: Network failed\n' +
+      '    at C:/Users/Fernando/a42-app/src/core/lib/__tests__/errorHandler.test.ts:102:29\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:145:11\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:915:26\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1240:20\n' +
+      '    at new Promise (<anonymous>)\n' +
+      '    at runWithTimeout (file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1206:10)\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1650:37\n' +
+      '    at Traces.$ (file:///C:/Users/Fernando/a42-app/node_modules/vitest/dist/chunks/traces.U4xDYhzZ.js:115:27)\n' +
+      '    at trace (file:///C:/Users/Fernando/a42-app/node_modules/vitest/dist/chunks/test.BT8LKgU9.js:239:21)\n' +
+      '    at runTest (file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1650:12)'
+  }
+
+stdout | src/core/lib/__tests__/errorHandler.test.ts > errorHandler > handleError > should convert Error to AppError
+[UNKNOWN_ERROR] Standard error
+  Severity: medium
+  User Message: Error inesperado. Contacta a soporte si persiste.
+  Metadata: {
+    component: 'TestComponent',
+    stack: 'AppError: Standard error\n' +
+      '    at ErrorHandler.normalizeError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:268:14)\n' +
+      '    at ErrorHandler.handle (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:219:27)\n' +
+      '    at handleError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:435:23)\n' +
+      '    at C:/Users/Fernando/a42-app/src/core/lib/__tests__/errorHandler.test.ts:115:22\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:145:11\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:915:26\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1240:20\n' +
+      '    at new Promise (<anonymous>)\n' +
+      '    at runWithTimeout (file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1206:10)\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1650:37',
+    timestamp: 1765746631175
+  }
+  Original Error: Error: Standard error
+      at C:/Users/Fernando/a42-app/src/core/lib/__tests__/errorHandler.test.ts:114:29
+      at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:145:11
+      at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:915:26
+      at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1240:20
+      at new Promise (<anonymous>)
+      at runWithTimeout (file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1206:10)
+      at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1650:37
+      at Traces.$ (file:///C:/Users/Fernando/a42-app/node_modules/vitest/dist/chunks/traces.U4xDYhzZ.js:115:27)
+      at trace (file:///C:/Users/Fernando/a42-app/node_modules/vitest/dist/chunks/test.BT8LKgU9.js:239:21)
+      at runTest (file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1650:12)
+
+stdout | src/core/lib/__tests__/errorHandler.test.ts > errorHandler > handleError > should handle string errors
+[UNKNOWN_ERROR] Something went wrong
+  Severity: medium
+  User Message: Error inesperado. Contacta a soporte si persiste.
+  Metadata: {
+    component: undefined,
+    timestamp: 1765746631177,
+    stack: 'AppError: Something went wrong\n' +
+      '    at ErrorHandler.normalizeError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:279:12)\n' +
+      '    at ErrorHandler.handle (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:219:27)\n' +
+      '    at handleError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:435:23)\n' +
+      '    at C:/Users/Fernando/a42-app/src/core/lib/__tests__/errorHandler.test.ts:124:22\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:145:11\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:915:26\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1240:20\n' +
+      '    at new Promise (<anonymous>)\n' +
+      '    at runWithTimeout (file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1206:10)\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1650:37'
+  }
+  Original Error: Something went wrong
+
+ Ô£ô src/pdf/utils/__tests__/budgetUtils.test.ts (45 tests) 58ms
+stdout | src/core/lib/__tests__/errorHandler.test.ts > errorHandler > handleError > should handle network errors
+[NETWORK_ERROR] Network request failed
+  Severity: high
+  User Message: Error de conexi├│n. Verifica tu internet.
+  Metadata: {
+    component: undefined,
+    timestamp: 1765746631179,
+    stack: 'AppError: Network request failed\n' +
+      '    at ErrorHandler.normalizeError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:255:14)\n' +
+      '    at ErrorHandler.handle (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:219:27)\n' +
+      '    at handleError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:435:23)\n' +
+      '    at C:/Users/Fernando/a42-app/src/core/lib/__tests__/errorHandler.test.ts:132:22\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:145:11\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:915:26\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1240:20\n' +
+      '    at new Promise (<anonymous>)\n' +
+      '    at runWithTimeout (file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1206:10)\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1650:37'
+  }
+  Original Error: TypeError: fetch failed
+      at C:/Users/Fernando/a42-app/src/core/lib/__tests__/errorHandler.test.ts:131:28
+      at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:145:11
+      at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:915:26
+      at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1240:20
+      at new Promise (<anonymous>)
+      at runWithTimeout (file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1206:10)
+      at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1650:37
+      at Traces.$ (file:///C:/Users/Fernando/a42-app/node_modules/vitest/dist/chunks/traces.U4xDYhzZ.js:115:27)
+      at trace (file:///C:/Users/Fernando/a42-app/node_modules/vitest/dist/chunks/test.BT8LKgU9.js:239:21)
+      at runTest (file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1650:12)
+
+stdout | src/core/lib/__tests__/errorHandler.test.ts > errorHandler > handleError > should handle Supabase auth errors
+[AUTH_ERROR] Invalid credentials
+  Severity: high
+  User Message: Sesi├│n expirada. Inicia sesi├│n nuevamente.
+  Metadata: {
+    component: undefined,
+    code: '401',
+    timestamp: 1765746631180,
+    stack: 'AppError: Invalid credentials\n' +
+      '    at ErrorHandler.handleSupabaseError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:304:14)\n' +
+      '    at ErrorHandler.normalizeError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:250:19)\n' +
+      '    at ErrorHandler.handle (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:219:27)\n' +
+      '    at handleError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:435:23)\n' +
+      '    at C:/Users/Fernando/a42-app/src/core/lib/__tests__/errorHandler.test.ts:144:22\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:145:11\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:915:26\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1240:20\n' +
+      '    at new Promise (<anonymous>)\n' +
+      '    at runWithTimeout (file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1206:10)'
+  }
+  Original Error: { code: '401', message: 'Invalid credentials' }
+
+stdout | src/core/lib/__tests__/errorHandler.test.ts > errorHandler > handleError > should handle Supabase permission errors
+[PERMISSION_ERROR] Permission denied
+  Severity: medium
+  User Message: No tienes permisos para realizar esta acci├│n.
+  Metadata: {
+    component: undefined,
+    code: '403',
+    timestamp: 1765746631182,
+    stack: 'AppError: Permission denied\n' +
+      '    at ErrorHandler.handleSupabaseError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:318:14)\n' +
+      '    at ErrorHandler.normalizeError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:250:19)\n' +
+      '    at ErrorHandler.handle (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:219:27)\n' +
+      '    at handleError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:435:23)\n' +
+      '    at C:/Users/Fernando/a42-app/src/core/lib/__tests__/errorHandler.test.ts:156:22\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:145:11\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:915:26\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1240:20\n' +
+      '    at new Promise (<anonymous>)\n' +
+      '    at runWithTimeout (file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1206:10)'
+  }
+  Original Error: { code: '403', message: 'Permission denied' }
+
+stdout | src/core/lib/__tests__/errorHandler.test.ts > errorHandler > handleError > should handle Supabase not found errors
+[NOT_FOUND_ERROR] Resource not found
+  Severity: low
+  User Message: No se encontr├│ el recurso solicitado.
+  Metadata: {
+    component: undefined,
+    code: '404',
+    timestamp: 1765746631183,
+    stack: 'AppError: Resource not found\n' +
+      '    at ErrorHandler.handleSupabaseError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:331:14)\n' +
+      '    at ErrorHandler.normalizeError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:250:19)\n' +
+      '    at ErrorHandler.handle (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:219:27)\n' +
+      '    at handleError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:435:23)\n' +
+      '    at C:/Users/Fernando/a42-app/src/core/lib/__tests__/errorHandler.test.ts:167:22\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:145:11\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:915:26\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1240:20\n' +
+      '    at new Promise (<anonymous>)\n' +
+      '    at runWithTimeout (file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1206:10)'
+  }
+  Original Error: { code: '404', message: 'Resource not found' }
+
+stdout | src/core/lib/__tests__/errorHandler.test.ts > errorHandler > Context tracking > should track context in metadata
+[UNKNOWN_ERROR] Test
+  Severity: medium
+  User Message: Error inesperado. Contacta a soporte si persiste.
+  Metadata: {
+    component: 'LoginComponent',
+    stack: 'AppError: Test\n' +
+      '    at ErrorHandler.normalizeError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:268:14)\n' +
+      '    at ErrorHandler.handle (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:219:27)\n' +
+      '    at handleError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:435:23)\n' +
+      '    at C:/Users/Fernando/a42-app/src/core/lib/__tests__/errorHandler.test.ts:253:21\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:145:11\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:915:26\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1240:20\n' +
+      '    at new Promise (<anonymous>)\n' +
+      '    at runWithTimeout (file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1206:10)\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1650:37',
+    timestamp: 1765746631192
+  }
+  Original Error: Error: Test
+      at C:/Users/Fernando/a42-app/src/core/lib/__tests__/errorHandler.test.ts:253:33
+      at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:145:11
+      at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:915:26
+      at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1240:20
+      at new Promise (<anonymous>)
+      at runWithTimeout (file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1206:10)
+      at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1650:37
+      at Traces.$ (file:///C:/Users/Fernando/a42-app/node_modules/vitest/dist/chunks/traces.U4xDYhzZ.js:115:27)
+      at trace (file:///C:/Users/Fernando/a42-app/node_modules/vitest/dist/chunks/test.BT8LKgU9.js:239:21)
+      at runTest (file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1650:12)
+
+stdout | src/core/lib/__tests__/errorHandler.test.ts > errorHandler > Context tracking > should include stack trace
+[UNKNOWN_ERROR] Test
+  Severity: medium
+  User Message: Error inesperado. Contacta a soporte si persiste.
+  Metadata: {
+    component: undefined,
+    stack: 'AppError: Test\n' +
+      '    at ErrorHandler.normalizeError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:268:14)\n' +
+      '    at ErrorHandler.handle (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:219:27)\n' +
+      '    at handleError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:435:23)\n' +
+      '    at C:/Users/Fernando/a42-app/src/core/lib/__tests__/errorHandler.test.ts:259:21\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:145:11\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:915:26\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1240:20\n' +
+      '    at new Promise (<anonymous>)\n' +
+      '    at runWithTimeout (file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1206:10)\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1650:37',
+    timestamp: 1765746631193
+  }
+  Original Error: Error: Test
+      at C:/Users/Fernando/a42-app/src/core/lib/__tests__/errorHandler.test.ts:259:33
+      at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:145:11
+      at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:915:26
+      at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1240:20
+      at new Promise (<anonymous>)
+      at runWithTimeout (file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1206:10)
+      at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1650:37
+      at Traces.$ (file:///C:/Users/Fernando/a42-app/node_modules/vitest/dist/chunks/traces.U4xDYhzZ.js:115:27)
+      at trace (file:///C:/Users/Fernando/a42-app/node_modules/vitest/dist/chunks/test.BT8LKgU9.js:239:21)
+      at runTest (file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1650:12)
+
+stdout | src/core/lib/__tests__/errorHandler.test.ts > errorHandler > Context tracking > should include timestamp
+[UNKNOWN_ERROR] Test
+  Severity: medium
+  User Message: Error inesperado. Contacta a soporte si persiste.
+  Metadata: {
+    component: undefined,
+    stack: 'AppError: Test\n' +
+      '    at ErrorHandler.normalizeError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:268:14)\n' +
+      '    at ErrorHandler.handle (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:219:27)\n' +
+      '    at handleError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:435:23)\n' +
+      '    at C:/Users/Fernando/a42-app/src/core/lib/__tests__/errorHandler.test.ts:265:21\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:145:11\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:915:26\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1240:20\n' +
+      '    at new Promise (<anonymous>)\n' +
+      '    at runWithTimeout (file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1206:10)\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1650:37',
+    timestamp: 1765746631195
+  }
+  Original Error: Error: Test
+      at C:/Users/Fernando/a42-app/src/core/lib/__tests__/errorHandler.test.ts:265:33
+      at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:145:11
+      at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:915:26
+      at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1240:20
+      at new Promise (<anonymous>)
+      at runWithTimeout (file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1206:10)
+      at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1650:37
+      at Traces.$ (file:///C:/Users/Fernando/a42-app/node_modules/vitest/dist/chunks/traces.U4xDYhzZ.js:115:27)
+      at trace (file:///C:/Users/Fernando/a42-app/node_modules/vitest/dist/chunks/test.BT8LKgU9.js:239:21)
+      at runTest (file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1650:12)
+
+stdout | src/core/lib/__tests__/errorHandler.test.ts > errorHandler > Edge cases > should handle null error
+[UNKNOWN_ERROR] null
+  Severity: medium
+  User Message: Error inesperado. Contacta a soporte si persiste.
+  Metadata: {
+    component: undefined,
+    timestamp: 1765746631196,
+    stack: 'AppError: null\n' +
+      '    at ErrorHandler.normalizeError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:279:12)\n' +
+      '    at ErrorHandler.handle (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:219:27)\n' +
+      '    at handleError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:435:23)\n' +
+      '    at C:/Users/Fernando/a42-app/src/core/lib/__tests__/errorHandler.test.ts:274:22\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:145:11\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:915:26\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1240:20\n' +
+      '    at new Promise (<anonymous>)\n' +
+      '    at runWithTimeout (file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1206:10)\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1650:37'
+  }
+
+stdout | src/core/lib/__tests__/errorHandler.test.ts > errorHandler > Edge cases > should handle undefined error
+[UNKNOWN_ERROR] undefined
+  Severity: medium
+  User Message: Error inesperado. Contacta a soporte si persiste.
+  Metadata: {
+    component: undefined,
+    timestamp: 1765746631197,
+    stack: 'AppError: undefined\n' +
+      '    at ErrorHandler.normalizeError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:279:12)\n' +
+      '    at ErrorHandler.handle (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:219:27)\n' +
+      '    at handleError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:435:23)\n' +
+      '    at C:/Users/Fernando/a42-app/src/core/lib/__tests__/errorHandler.test.ts:281:22\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:145:11\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:915:26\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1240:20\n' +
+      '    at new Promise (<anonymous>)\n' +
+      '    at runWithTimeout (file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1206:10)\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1650:37'
+  }
+
+stdout | src/core/lib/__tests__/errorHandler.test.ts > errorHandler > Edge cases > should handle object without message
+[UNKNOWN_ERROR] [object Object]
+  Severity: medium
+  User Message: Error inesperado. Contacta a soporte si persiste.
+  Metadata: {
+    component: undefined,
+    timestamp: 1765746631199,
+    stack: 'AppError: [object Object]\n' +
+      '    at ErrorHandler.normalizeError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:279:12)\n' +
+      '    at ErrorHandler.handle (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:219:27)\n' +
+      '    at handleError (C:/Users/Fernando/a42-app/src/core/lib/errorHandler.ts:435:23)\n' +
+      '    at C:/Users/Fernando/a42-app/src/core/lib/__tests__/errorHandler.test.ts:288:22\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:145:11\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:915:26\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1240:20\n' +
+      '    at new Promise (<anonymous>)\n' +
+      '    at runWithTimeout (file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1206:10)\n' +
+      '    at file:///C:/Users/Fernando/a42-app/node_modules/@vitest/runner/dist/index.js:1650:37'
+  }
+  Original Error: { foo: 'bar' }
+
+ Ô£ô src/core/lib/__tests__/errorHandler.test.ts (25 tests) 48ms
+ Ô£ô src/editor/hooks/__tests__/useEngineSceneSync.test.ts (3 tests) 40ms
+ Ô£ô src/editor/hooks/__tests__/useEngineCameraSync.test.ts (3 tests) 40ms
+ Ô£ô src/editor/hooks/__tests__/useEngineSelectionSync.test.ts (2 tests) 30ms
+ Ô£ô src/editor/hooks/__tests__/useEngineModeSync.test.ts (3 tests) 33ms
+ Ô£ô src/editor/hooks/__tests__/useEngineSafetyZonesSync.test.ts (2 tests) 32ms
+ Ô£ô src/editor/stores/__tests__/useEditorStore.test.ts (16 tests) 9ms
+ Ô£ô src/pdf/utils/__tests__/PriceCalculator.test.ts (16 tests) 6ms
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ» Failed Tests 49 ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»
+
+ FAIL  src/crm/hooks/__tests__/useAdminOrders.test.ts > useAdminOrders > should fetch budgets when activeTab is budgets
+AssertionError: expected [] to have a length of 1 but got +0
+
+Ignored nodes: comments, script, style
+[36m<html>[39m
+  [36m<head />[39m
+  [36m<body>[39m
+    [36m<div />[39m
+  [36m</body>[39m
+[36m</html>[39m
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ÔØ» src/crm/hooks/__tests__/useAdminOrders.test.ts:70:37
+     68| 
+     69|     await waitFor(() => {
+     70|       expect(result.current.orders).toHaveLength(1);
+       |                                     ^
+     71|       expect(result.current.orders[0].id).toBe('order-1');
+     72|     });
+ ÔØ» runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:47:12
+ ÔØ» checkCallback node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ ÔØ» Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:118:16
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[1/49]ÔÄ»
+
+ FAIL  src/crm/hooks/__tests__/useAdminOrders.test.ts > useAdminOrders > should fetch orders when activeTab is orders
+AssertionError: expected [] to have a length of 1 but got +0
+
+Ignored nodes: comments, script, style
+[36m<html>[39m
+  [36m<head />[39m
+  [36m<body>[39m
+    [36m<div />[39m
+  [36m</body>[39m
+[36m</html>[39m
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ÔØ» src/crm/hooks/__tests__/useAdminOrders.test.ts:93:37
+     91| 
+     92|     await waitFor(() => {
+     93|       expect(result.current.orders).toHaveLength(1);
+       |                                     ^
+     94|     });
+     95|   });
+ ÔØ» runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:47:12
+ ÔØ» checkCallback node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ ÔØ» Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:118:16
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[2/49]ÔÄ»
+
+ FAIL  src/crm/hooks/__tests__/useAdminOrders.test.ts > useAdminOrders > should update order status
+TypeError: __vite_ssr_import_1__.supabase.from(...).update is not a function
+ ÔØ» Object.updateOrderStatus src/crm/hooks/useAdminOrders.ts:118:12
+    116|         const { error } = await supabase
+    117|           .from('orders')
+    118|           .update(updateData)
+       |            ^
+    119|           .eq('id', id);
+    120| 
+ ÔØ» src/crm/hooks/__tests__/useAdminOrders.test.ts:140:28
+ ÔØ» node_modules/@testing-library/react/dist/act-compat.js:48:24
+ ÔØ» process.env.NODE_ENV.exports.act node_modules/react/cjs/react.development.js:814:22
+ ÔØ» Proxy.<anonymous> node_modules/@testing-library/react/dist/act-compat.js:47:25
+ ÔØ» src/crm/hooks/__tests__/useAdminOrders.test.ts:139:11
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[3/49]ÔÄ»
+
+ FAIL  src/crm/hooks/__tests__/useAdminOrders.test.ts > useAdminOrders > should delete order
+TypeError: __vite_ssr_import_1__.supabase.from(...).delete is not a function
+ ÔØ» Object.deleteOrder src/crm/hooks/useAdminOrders.ts:145:57
+    143| 
+    144|       try {
+    145|         const { error } = await supabase.from('orders').delete().eq('iÔÇª
+       |                                                         ^
+    146| 
+    147|         if (error) throw error;
+ ÔØ» src/crm/hooks/__tests__/useAdminOrders.test.ts:158:28
+ ÔØ» node_modules/@testing-library/react/dist/act-compat.js:48:24
+ ÔØ» process.env.NODE_ENV.exports.act node_modules/react/cjs/react.development.js:814:22
+ ÔØ» Proxy.<anonymous> node_modules/@testing-library/react/dist/act-compat.js:47:25
+ ÔØ» src/crm/hooks/__tests__/useAdminOrders.test.ts:157:11
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[4/49]ÔÄ»
+
+ FAIL  src/crm/hooks/__tests__/useClients.test.ts > useClients > should approve client
+TypeError: __vite_ssr_import_1__.supabase.from(...).update is not a function
+ ÔØ» Object.approveClient src/crm/hooks/useClients.ts:70:12
+     68|         const { error } = await supabase
+     69|           .from('profiles')
+     70|           .update({ is_approved: true })
+       |            ^
+     71|           .eq('id', clientId);
+     72| 
+ ÔØ» src/crm/hooks/__tests__/useClients.test.ts:120:28
+ ÔØ» node_modules/@testing-library/react/dist/act-compat.js:48:24
+ ÔØ» process.env.NODE_ENV.exports.act node_modules/react/cjs/react.development.js:814:22
+ ÔØ» Proxy.<anonymous> node_modules/@testing-library/react/dist/act-compat.js:47:25
+ ÔØ» src/crm/hooks/__tests__/useClients.test.ts:119:11
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[5/49]ÔÄ»
+
+ FAIL  src/crm/hooks/__tests__/useClients.test.ts > useClients > should create client
+TypeError: __vite_ssr_import_1__.supabase.from(...).insert is not a function
+ ÔØ» Object.createClient src/crm/hooks/useClients.ts:107:62
+    105| 
+    106|       try {
+    107|         const { error } = await supabase.from('pre_clients').insert([dÔÇª
+       |                                                              ^
+    108| 
+    109|         if (error) throw error;
+ ÔØ» src/crm/hooks/__tests__/useClients.test.ts:148:28
+ ÔØ» node_modules/@testing-library/react/dist/act-compat.js:48:24
+ ÔØ» process.env.NODE_ENV.exports.act node_modules/react/cjs/react.development.js:814:22
+ ÔØ» Proxy.<anonymous> node_modules/@testing-library/react/dist/act-compat.js:47:25
+ ÔØ» src/crm/hooks/__tests__/useClients.test.ts:147:11
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[6/49]ÔÄ»
+
+ FAIL  src/crm/hooks/__tests__/useClients.test.ts > useClients > should delete client
+TypeError: __vite_ssr_import_1__.supabase.from(...).delete is not a function
+ ÔØ» Object.deleteClient src/crm/hooks/useClients.ts:128:59
+    126| 
+    127|       try {
+    128|         const { error } = await supabase.from('profiles').delete().eq(ÔÇª
+       |                                                           ^
+    129| 
+    130|         if (error) throw error;
+ ÔØ» src/crm/hooks/__tests__/useClients.test.ts:186:28
+ ÔØ» node_modules/@testing-library/react/dist/act-compat.js:48:24
+ ÔØ» process.env.NODE_ENV.exports.act node_modules/react/cjs/react.development.js:814:22
+ ÔØ» Proxy.<anonymous> node_modules/@testing-library/react/dist/act-compat.js:47:25
+ ÔØ» src/crm/hooks/__tests__/useClients.test.ts:185:11
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[7/49]ÔÄ»
+
+ FAIL  src/crm/hooks/__tests__/useOrderData.test.ts > useOrderData > should update order
+AssertionError: expected 'pendiente' to be 'presupuestado' // Object.is equality
+
+Ignored nodes: comments, script, style
+[36m<html>[39m
+  [36m<head />[39m
+  [36m<body>[39m
+    [36m<div />[39m
+  [36m</body>[39m
+[36m</html>[39m
+
+Expected: "presupuestado"
+Received: "pendiente"
+
+ ÔØ» src/crm/hooks/__tests__/useOrderData.test.ts:191:44
+    189| 
+    190|     await waitFor(() => {
+    191|       expect(result.current.order?.status).toBe('presupuestado');
+       |                                            ^
+    192|     });
+    193|   });
+ ÔØ» runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:47:12
+ ÔØ» checkCallback node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ ÔØ» Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:118:16
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[8/49]ÔÄ»
+
+ FAIL  src/crm/hooks/__tests__/useOrderData.test.ts > useOrderData > should handle update error
+AssertionError: expected "vi.fn()" to be called at least once
+
+Ignored nodes: comments, script, style
+[36m<html>[39m
+  [36m<head />[39m
+  [36m<body>[39m
+    [36m<div />[39m
+  [36m</body>[39m
+[36m</html>[39m
+ ÔØ» src/crm/hooks/__tests__/useOrderData.test.ts:220:31
+    218| 
+    219|     await waitFor(() => {
+    220|       expect(mockHandleError).toHaveBeenCalled();
+       |                               ^
+    221|     });
+    222|   });
+ ÔØ» runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:47:12
+ ÔØ» checkCallback node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ ÔØ» Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:118:16
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[9/49]ÔÄ»
+
+ FAIL  src/crm/hooks/__tests__/useOrderItems.test.ts > useOrderItems > should add parametric item
+Error: Invalid item type for parametric item
+ ÔØ» Object.addParametricItem src/crm/hooks/useOrderItems.ts:119:17
+    117|           dimensions = `${value} m┬▓`;
+    118|         } else {
+    119|           throw new Error('Invalid item type for parametric item');
+       |                 ^
+    120|         }
+    121| 
+ ÔØ» src/crm/hooks/__tests__/useOrderItems.test.ts:155:28
+ ÔØ» node_modules/@testing-library/react/dist/act-compat.js:48:24
+ ÔØ» process.env.NODE_ENV.exports.act node_modules/react/cjs/react.development.js:814:22
+ ÔØ» Proxy.<anonymous> node_modules/@testing-library/react/dist/act-compat.js:47:25
+ ÔØ» src/crm/hooks/__tests__/useOrderItems.test.ts:154:11
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[10/49]ÔÄ»
+
+ FAIL  src/crm/hooks/__tests__/useOrders.test.ts > useOrders > fetchOrders > should fetch budgets correctly
+AssertionError: expected [] to deeply equal [ { id: '1', ÔÇª(6) } ]
+
+Ignored nodes: comments, script, style
+[36m<html>[39m
+  [36m<head />[39m
+  [36m<body>[39m
+    [36m<div />[39m
+  [36m</body>[39m
+[36m</html>[39m
+
+- Expected
++ Received
+
+- [
+-   {
+-     "created_at": "2024-01-01",
+-     "id": "1",
+-     "is_archived": false,
+-     "order_ref": "BUD-001",
+-     "status": "pendiente",
+-     "total_price": 1000,
+-     "user_id": "user-1",
+-   },
+- ]
++ []
+
+ ÔØ» src/crm/hooks/__tests__/useOrders.test.ts:62:39
+     60| 
+     61|       await waitFor(() => {
+     62|         expect(result.current.orders).toEqual(mockOrders);
+       |                                       ^
+     63|         expect(result.current.loading).toBe(false);
+     64|       });
+ ÔØ» runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:47:12
+ ÔØ» checkCallback node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ ÔØ» Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:118:16
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[11/49]ÔÄ»
+
+ FAIL  src/crm/hooks/__tests__/useOrders.test.ts > useOrders > fetchOrders > should fetch orders correctly
+AssertionError: expected [] to deeply equal [ { id: '2', ÔÇª(6) } ]
+
+Ignored nodes: comments, script, style
+[36m<html>[39m
+  [36m<head />[39m
+  [36m<body>[39m
+    [36m<div />[39m
+  [36m</body>[39m
+[36m</html>[39m
+
+- Expected
++ Received
+
+- [
+-   {
+-     "created_at": "2024-01-02",
+-     "id": "2",
+-     "is_archived": false,
+-     "order_ref": "ORD-001",
+-     "status": "pedido",
+-     "total_price": 2000,
+-     "user_id": "user-1",
+-   },
+- ]
++ []
+
+ ÔØ» src/crm/hooks/__tests__/useOrders.test.ts:103:39
+    101| 
+    102|       await waitFor(() => {
+    103|         expect(result.current.orders).toEqual(mockOrders);
+       |                                       ^
+    104|       });
+    105| 
+ ÔØ» runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:47:12
+ ÔØ» checkCallback node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ ÔØ» Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:118:16
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[12/49]ÔÄ»
+
+ FAIL  src/crm/hooks/__tests__/useOrders.test.ts > useOrders > fetchOrders > should fetch archived orders correctly
+AssertionError: expected [] to deeply equal [ { id: '3', ÔÇª(6) } ]
+
+Ignored nodes: comments, script, style
+[36m<html>[39m
+  [36m<head />[39m
+  [36m<body>[39m
+    [36m<div />[39m
+  [36m</body>[39m
+[36m</html>[39m
+
+- Expected
++ Received
+
+- [
+-   {
+-     "created_at": "2024-01-03",
+-     "id": "3",
+-     "is_archived": true,
+-     "order_ref": "ARC-001",
+-     "status": "cancelado",
+-     "total_price": 0,
+-     "user_id": "user-1",
+-   },
+- ]
++ []
+
+ ÔØ» src/crm/hooks/__tests__/useOrders.test.ts:143:39
+    141| 
+    142|       await waitFor(() => {
+    143|         expect(result.current.orders).toEqual(mockOrders);
+       |                                       ^
+    144|       });
+    145| 
+ ÔØ» runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:47:12
+ ÔØ» checkCallback node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ ÔØ» Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:118:16
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[13/49]ÔÄ»
+
+ FAIL  src/crm/hooks/__tests__/useOrders.test.ts > useOrders > fetchOrders > should handle fetch error
+AssertionError: expected "vi.fn()" to be called with arguments: [ Error: Fetch failed ]
+
+Received: 
+
+  1st vi.fn() call:
+
+  [
+-   Error {
+-     "message": "Fetch failed",
++   TypeError {
++     "message": "query.eq is not a function",
+    },
+  ]
+
+
+Number of calls: 1
+
+ ÔØ» src/crm/hooks/__tests__/useOrders.test.ts:171:31
+    169|       });
+    170| 
+    171|       expect(mockHandleError).toHaveBeenCalledWith(mockError);
+       |                               ^
+    172|     });
+    173|   });
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[14/49]ÔÄ»
+
+ FAIL  src/core/hooks/__tests__/useErrorHandler.test.ts > useErrorHandler > showInfo > should show info toast
+TypeError: (0 , __vite_ssr_import_1__.default) is not a function
+ ÔØ» Object.showInfo src/core/hooks/useErrorHandler.ts:150:5
+    148|    */
+    149|   const showInfo = useCallback((message: string) => {
+    150|     toast(message, {
+       |     ^
+    151|       icon: 'Ôä╣´©Å',
+    152|     });
+ ÔØ» src/core/hooks/__tests__/useErrorHandler.test.ts:164:24
+ ÔØ» node_modules/@testing-library/react/dist/act-compat.js:48:24
+ ÔØ» process.env.NODE_ENV.exports.act node_modules/react/cjs/react.development.js:814:22
+ ÔØ» Proxy.<anonymous> node_modules/@testing-library/react/dist/act-compat.js:47:25
+ ÔØ» src/core/hooks/__tests__/useErrorHandler.test.ts:163:7
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[15/49]ÔÄ»
+
+ FAIL  src/core/services/__tests__/catalogService.test.ts > catalogService > loadCatalogData > should handle HTTP 
+errors
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ÔØ» src/core/services/__tests__/catalogService.test.ts:52:31
+     50| 
+     51|       const status = getCatalogLoadStatus();
+     52|       expect(status.isLoaded).toBe(false);
+       |                               ^
+     53|       expect(status.error).toContain('Error HTTP');
+     54|     });
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[16/49]ÔÄ»
+
+ FAIL  src/core/services/__tests__/catalogService.test.ts > catalogService > loadCatalogData > should handle empty CSV
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ÔØ» src/core/services/__tests__/catalogService.test.ts:65:31
+     63| 
+     64|       const status = getCatalogLoadStatus();
+     65|       expect(status.isLoaded).toBe(false);
+       |                               ^
+     66|       expect(status.error).toContain('CSV vac├¡o');
+     67|     });
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[17/49]ÔÄ»
+
+ FAIL  src/core/services/__tests__/catalogService.test.ts > catalogService > getProxiedImageUrl > should return 
+proxied URL for external images
+AssertionError: expected 'https://example.com/image.jpg' to contain 'https://images.weserv.nl'
+
+Expected: "https://images.weserv.nl"
+Received: "https://example.com/image.jpg"
+
+ ÔØ» src/core/services/__tests__/catalogService.test.ts:123:23
+    121|       const url = 'https://example.com/image.jpg';
+    122|       const proxied = getProxiedImageUrl(url);
+    123|       expect(proxied).toContain('https://images.weserv.nl');
+       |                       ^
+    124|       expect(proxied).toContain(encodeURIComponent(url));
+    125|     });
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[18/49]ÔÄ»
+
+ FAIL  src/core/services/__tests__/catalogService.test.ts > catalogService > getProxiedImageUrl > should return empty 
+string for null/undefined
+AssertionError: expected null to be '' // Object.is equality
+
+- Expected: 
+""
+
++ Received: 
+null
+
+ ÔØ» src/core/services/__tests__/catalogService.test.ts:134:47
+    132| 
+    133|     it('should return empty string for null/undefined', () => {
+    134|       expect(getProxiedImageUrl(null as any)).toBe('');
+       |                                               ^
+    135|       expect(getProxiedImageUrl(undefined as any)).toBe('');
+    136|     });
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[19/49]ÔÄ»
+
+ FAIL  src/editor/hooks/__tests__/useEditorMedia.test.ts > useEditorMedia > takePhoto > should take photo successfully
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ÔØ» src/editor/hooks/__tests__/useEditorMedia.test.ts:55:35
+     53|       });
+     54| 
+     55|       expect(photoResult.success).toBe(true);
+       |                                   ^
+     56|     });
+     57| 
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[20/49]ÔÄ»
+
+ FAIL  src/editor/hooks/__tests__/useEditorMedia.test.ts > useEditorMedia > start360Video > should start 360 video 
+successfully
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ÔØ» src/editor/hooks/__tests__/useEditorMedia.test.ts:81:35
+     79|       });
+     80| 
+     81|       expect(videoResult.success).toBe(true);
+       |                                   ^
+     82|     });
+     83|   });
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[21/49]ÔÄ»
+
+ FAIL  src/editor/hooks/__tests__/useEditorMedia.test.ts > useEditorMedia > toggleRecording > should toggle recording
+AssertionError: expected "vi.fn()" to be called at least once
+ ÔØ» src/editor/hooks/__tests__/useEditorMedia.test.ts:93:51
+     91|       });
+     92| 
+     93|       expect(mockRecorderManager.toggleRecording).toHaveBeenCalled();
+       |                                                   ^
+     94|     });
+     95|   });
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[22/49]ÔÄ»
+
+ FAIL  src/editor/hooks/__tests__/useEditorMedia.test.ts > useEditorMedia > isRecording > should reflect recording 
+state
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ÔØ» src/editor/hooks/__tests__/useEditorMedia.test.ts:145:42
+    143|       const { result } = renderHook(() => useEditorMedia());
+    144|       
+    145|       expect(result.current.isRecording).toBe(true);
+       |                                          ^
+    146|     });
+    147|   });
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[23/49]ÔÄ»
+
+ FAIL  src/editor/hooks/__tests__/useEngineSync.test.ts > useEngineModeSync > should not call clearTools when engine 
+is null
+AssertionError: expected "vi.fn()" to not be called at all, but actually been called 2 times
+
+Received: 
+
+  1st vi.fn() call:
+
+    Array []
+
+  2nd vi.fn() call:
+
+    Array []
+
+
+Number of calls: 2
+
+ ÔØ» src/editor/hooks/__tests__/useEngineSync.test.ts:42:39
+     40|   it('should not call clearTools when engine is null', () => {
+     41|     renderHook(() => useEngineModeSync(null, 'idle'));
+     42|     expect(mockEngine.clearTools).not.toHaveBeenCalled();
+       |                                       ^
+     43|   });
+     44| });
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[24/49]ÔÄ»
+
+ FAIL  src/editor/hooks/__tests__/useProjectActions.test.ts > useProjectActions > saveProject > should save new 
+project when user is logged in
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ÔØ» src/editor/hooks/__tests__/useProjectActions.test.ts:80:34
+     78|       });
+     79| 
+     80|       expect(saveResult.success).toBe(true);
+       |                                  ^
+     81|       expect(mockSetProjectInfo).toHaveBeenCalled();
+     82|     });
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[25/49]ÔÄ»
+
+ FAIL  src/editor/hooks/__tests__/useSceneTools.test.ts > useSceneTools > setCadSegment > should set CAD segment with 
+valid params
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ÔØ» src/editor/hooks/__tests__/useSceneTools.test.ts:123:35
+    121|           indexAnchor: 0,
+    122|         });
+    123|         expect(operation.success).toBe(true);
+       |                                   ^
+    124|       });
+    125| 
+ ÔØ» node_modules/@testing-library/react/dist/act-compat.js:48:24
+ ÔØ» process.env.NODE_ENV.exports.act node_modules/react/cjs/react.development.js:814:22
+ ÔØ» Proxy.<anonymous> node_modules/@testing-library/react/dist/act-compat.js:47:25
+ ÔØ» src/editor/hooks/__tests__/useSceneTools.test.ts:117:7
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[26/49]ÔÄ»
+
+ FAIL  src/editor/hooks/__tests__/useSceneTools.test.ts > useSceneTools > setCadAngle > should set CAD angle with 
+valid angle
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ÔØ» src/editor/hooks/__tests__/useSceneTools.test.ts:149:35
+    147|       act(() => {
+    148|         const operation = result.current.setCadAngle(45);
+    149|         expect(operation.success).toBe(true);
+       |                                   ^
+    150|       });
+    151| 
+ ÔØ» node_modules/@testing-library/react/dist/act-compat.js:48:24
+ ÔØ» process.env.NODE_ENV.exports.act node_modules/react/cjs/react.development.js:814:22
+ ÔØ» Proxy.<anonymous> node_modules/@testing-library/react/dist/act-compat.js:47:25
+ ÔØ» src/editor/hooks/__tests__/useSceneTools.test.ts:147:7
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[27/49]ÔÄ»
+
+ FAIL  src/editor/hooks/__tests__/useSceneTools.test.ts > useSceneTools > swapCadSelection > should swap CAD selection
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ÔØ» src/editor/hooks/__tests__/useSceneTools.test.ts:171:35
+    169|       act(() => {
+    170|         const operation = result.current.swapCadSelection();
+    171|         expect(operation.success).toBe(true);
+       |                                   ^
+    172|       });
+    173| 
+ ÔØ» node_modules/@testing-library/react/dist/act-compat.js:48:24
+ ÔØ» process.env.NODE_ENV.exports.act node_modules/react/cjs/react.development.js:814:22
+ ÔØ» Proxy.<anonymous> node_modules/@testing-library/react/dist/act-compat.js:47:25
+ ÔØ» src/editor/hooks/__tests__/useSceneTools.test.ts:169:7
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[28/49]ÔÄ»
+
+ FAIL  src/editor/stores/__tests__/useProjectStore.test.ts > useProjectStore > resetProject > should reset project and 
+clear scene
+AssertionError: expected "vi.fn()" to be called at least once
+ ÔØ» src/editor/stores/__tests__/useProjectStore.test.ts:92:51
+     90|       expect(useProjectStore.getState().currentProjectName).toBeNull();
+     91|       expect(useProjectStore.getState().isReadOnlyMode).toBe(false);
+     92|       expect(useSceneStore.getState().resetScene).toHaveBeenCalled();
+       |                                                   ^
+     93|     });
+     94|   });
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[29/49]ÔÄ»
+
+ FAIL  src/editor/stores/__tests__/useSelectionStore.test.ts > useSelectionStore > duplicateSelection > should 
+duplicate selected item
+AssertionError: expected "vi.fn()" to be called at least once
+ ÔØ» src/editor/stores/__tests__/useSelectionStore.test.ts:108:34
+    106|       useSelectionStore.getState().duplicateSelection();
+    107|       
+    108|       expect(sceneStore.addItem).toHaveBeenCalled();
+       |                                  ^
+    109|       expect(useSelectionStore.getState().selectedItemId).not.toBe('itÔÇª
+    110|     });
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[30/49]ÔÄ»
+
+ FAIL  src/editor/stores/__tests__/useSelectionStore.test.ts > useSelectionStore > removeSelection > should remove 
+selected item
+AssertionError: expected "vi.fn()" to be called with arguments: [ 'item-1' ]
+
+Number of calls: 0
+
+ ÔØ» src/editor/stores/__tests__/useSelectionStore.test.ts:137:37
+    135|       useSelectionStore.getState().removeSelection();
+    136|       
+    137|       expect(sceneStore.removeItem).toHaveBeenCalledWith('item-1');
+       |                                     ^
+    138|       expect(useSelectionStore.getState().selectedItemId).toBeNull();
+    139|     });
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[31/49]ÔÄ»
+
+ FAIL  src/editor/ui/__tests__/FenceProperties.test.tsx > FenceProperties > should not render when no fence is selected
+ FAIL  src/editor/ui/__tests__/FenceProperties.test.tsx > FenceProperties > should not render when selected item is 
+not a fence
+ FAIL  src/editor/ui/__tests__/FenceProperties.test.tsx > FenceProperties > should render fence properties panel when 
+fence is selected
+ FAIL  src/editor/ui/__tests__/FenceProperties.test.tsx > FenceProperties > should render preset selector buttons
+
+ Test Files  15 failed | 35 passed (50)
+      Tests  49 failed | 461 passed | 10 skipped (520)
+   Start at  22:10:15
+   Duration  16.96s (transform 6.75s, setup 21.42s, import 18.03s, tests 27.27s, environment 75.62s)
+
+ FAIL  src/editor/ui/__tests__/FenceProperties.test.tsx > FenceProperties > should render selected preset
+ FAIL  src/editor/ui/__tests__/FenceProperties.test.tsx > FenceProperties > should call updateItemFenceConfig when 
+preset is changed
+ FAIL  src/editor/ui/__tests__/FenceProperties.test.tsx > FenceProperties > should render color controls
+ FAIL  src/editor/ui/__tests__/FenceProperties.test.tsx > FenceProperties > should render additional color controls 
+for multi-color presets
+ FAIL  src/editor/ui/__tests__/FenceProperties.test.tsx > FenceProperties > should render CAD control component
+ FAIL  src/editor/ui/__tests__/FenceProperties.test.tsx > FenceProperties > should render help text
+TypeError: items.find is not a function
+ ÔØ» src/editor/ui/FenceProperties.tsx:292:17
+    290| 
+    291|   const selectedItem = useMemo(
+    292|     () => items.find((i) => i.uuid === selectedItemId),
+       |                 ^
+    293|     [items, selectedItemId]
+    294|   );
+ ÔØ» mountMemo node_modules/react-dom/cjs/react-dom-client.development.js:8777:23
+ ÔØ» Object.useMemo node_modules/react-dom/cjs/react-dom-client.development.js:26216:18
+ ÔØ» process.env.NODE_ENV.exports.useMemo node_modules/react/cjs/react.development.js:1251:34
+ ÔØ» FenceProperties src/editor/ui/FenceProperties.tsx:291:24
+ ÔØ» Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:20
+ ÔØ» renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:22
+ ÔØ» updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:19
+ ÔØ» beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:18
+ ÔØ» runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:874:13
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[32/49]ÔÄ»
+
+ FAIL  src/editor/ui/__tests__/FloorProperties.test.tsx > FloorProperties > should not render when no floor is selected
+ FAIL  src/editor/ui/__tests__/FloorProperties.test.tsx > FloorProperties > should not render when selected item is 
+not a floor
+ FAIL  src/editor/ui/__tests__/FloorProperties.test.tsx > FloorProperties > should render floor properties panel when 
+floor is selected
+ FAIL  src/editor/ui/__tests__/FloorProperties.test.tsx > FloorProperties > should render material selector buttons
+ FAIL  src/editor/ui/__tests__/FloorProperties.test.tsx > FloorProperties > should call updateFloorMaterial when 
+material is selected
+ FAIL  src/editor/ui/__tests__/FloorProperties.test.tsx > FloorProperties > should render upload button for texture
+ FAIL  src/editor/ui/__tests__/FloorProperties.test.tsx > FloorProperties > should render texture controls when 
+texture is present
+ FAIL  src/editor/ui/__tests__/FloorProperties.test.tsx > FloorProperties > should render CAD control component
+TypeError: items.find is not a function
+ ÔØ» FloorProperties src/editor/ui/FloorProperties.tsx:188:30
+    186| 
+    187|   // Selected item
+    188|   const selectedItem = items.find((i) => i.uuid === selectedItemId);
+       |                              ^
+    189| 
+    190|   // Type guard
+ ÔØ» Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:20
+ ÔØ» renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:22
+ ÔØ» updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:19
+ ÔØ» beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:18
+ ÔØ» runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:874:13
+ ÔØ» performUnitOfWork node_modules/react-dom/cjs/react-dom-client.development.js:17641:22
+ ÔØ» workLoopSync node_modules/react-dom/cjs/react-dom-client.development.js:17469:41
+ ÔØ» renderRootSync node_modules/react-dom/cjs/react-dom-client.development.js:17450:11
+ ÔØ» performWorkOnRoot node_modules/react-dom/cjs/react-dom-client.development.js:16583:35
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[33/49]ÔÄ»
+

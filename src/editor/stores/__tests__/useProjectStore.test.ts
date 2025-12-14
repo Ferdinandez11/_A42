@@ -7,13 +7,22 @@ import { supabase } from '@/core/lib/supabase';
 import { AppError, ErrorType, ErrorSeverity } from '@/core/lib/errorHandler';
 
 // Mock stores
+const { mockResetScene, mockSetState } = vi.hoisted(() => {
+  const resetScene = vi.fn();
+  const setState = vi.fn();
+  return {
+    mockResetScene: resetScene,
+    mockSetState: setState,
+  };
+});
+
 vi.mock('../scene/useSceneStore', () => ({
   useSceneStore: {
     getState: vi.fn(() => ({
-      resetScene: vi.fn(),
-      setState: vi.fn(),
+      resetScene: mockResetScene,
+      setState: mockSetState,
     })),
-    setState: vi.fn(),
+    setState: mockSetState,
   },
 }));
 
@@ -89,7 +98,7 @@ describe('useProjectStore', () => {
       expect(useProjectStore.getState().currentProjectId).toBeNull();
       expect(useProjectStore.getState().currentProjectName).toBeNull();
       expect(useProjectStore.getState().isReadOnlyMode).toBe(false);
-      expect(useSceneStore.getState().resetScene).toHaveBeenCalled();
+      expect(mockResetScene).toHaveBeenCalled();
     });
   });
 

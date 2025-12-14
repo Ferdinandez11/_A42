@@ -103,17 +103,37 @@ describe('useClients', () => {
   });
 
   it('should approve client', async () => {
+    // Primero cargar los clientes
+    const mockQuery = {
+      select: vi.fn().mockReturnThis(),
+      order: vi.fn().mockResolvedValue({
+        data: [mockClient],
+        error: null,
+      }),
+    };
+
     const mockEq = vi.fn().mockResolvedValue({ data: null, error: null });
     const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
-    const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
 
-    (supabase.from as any).mockReturnValue(mockFrom);
+    let callCount = 0;
+    (supabase.from as any).mockImplementation((table) => {
+      callCount++;
+      if (callCount === 1) {
+        // Primera llamada: fetchClients
+        return mockQuery;
+      }
+      // Segunda llamada: approveClient
+      return { update: mockUpdate };
+    });
 
     const { result } = renderHook(() => useClients());
 
-    // Set initial clients
     await act(async () => {
-      result.current.clients.push(mockClient);
+      await result.current.fetchClients();
+    });
+
+    await waitFor(() => {
+      expect(result.current.clients).toHaveLength(1);
     });
 
     await act(async () => {
@@ -137,9 +157,14 @@ describe('useClients', () => {
     const mockSelect = vi.fn().mockReturnValue({ order: mockOrder });
     const mockFetch = vi.fn().mockReturnValue({ select: mockSelect });
 
+    let callCount = 0;
     (supabase.from as any).mockImplementation((table) => {
-      if (table === 'pre_clients') return mockInsert;
-      return mockFetch;
+      callCount++;
+      if (table === 'pre_clients') {
+        return { insert: mockInsertFn };
+      }
+      // Para fetchClients después de crear
+      return { select: mockSelect };
     });
 
     const { result } = renderHook(() => useClients());
@@ -152,6 +177,7 @@ describe('useClients', () => {
       expect(mockShowSuccess).toHaveBeenCalledWith(
         expect.stringContaining('creado correctamente')
       );
+      expect(mockInsertFn).toHaveBeenCalled();
     });
   });
 
@@ -169,17 +195,37 @@ describe('useClients', () => {
   });
 
   it('should delete client', async () => {
+    // Primero cargar los clientes
+    const mockQuery = {
+      select: vi.fn().mockReturnThis(),
+      order: vi.fn().mockResolvedValue({
+        data: [mockClient],
+        error: null,
+      }),
+    };
+
     const mockEq = vi.fn().mockResolvedValue({ data: null, error: null });
     const mockDelete = vi.fn().mockReturnValue({ eq: mockEq });
-    const mockFrom = vi.fn().mockReturnValue({ delete: mockDelete });
 
-    (supabase.from as any).mockReturnValue(mockFrom);
+    let callCount = 0;
+    (supabase.from as any).mockImplementation((table) => {
+      callCount++;
+      if (callCount === 1) {
+        // Primera llamada: fetchClients
+        return mockQuery;
+      }
+      // Segunda llamada: deleteClient
+      return { delete: mockDelete };
+    });
 
     const { result } = renderHook(() => useClients());
 
-    // Set initial clients
     await act(async () => {
-      result.current.clients.push(mockClient);
+      await result.current.fetchClients();
+    });
+
+    await waitFor(() => {
+      expect(result.current.clients).toHaveLength(1);
     });
 
     await act(async () => {

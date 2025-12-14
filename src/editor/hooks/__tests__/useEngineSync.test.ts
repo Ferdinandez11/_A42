@@ -38,7 +38,12 @@ describe('useEngineModeSync', () => {
   });
 
   it('should not call clearTools when engine is null', () => {
+    vi.clearAllMocks();
     renderHook(() => useEngineModeSync(null, 'idle'));
+    
+    // El efecto se ejecuta en el primer render, pero como engine es null, no debería llamar clearTools
+    // Sin embargo, el efecto se ejecuta dos veces en modo desarrollo de React
+    // Verificamos que no se haya llamado con el engine mock
     expect(mockEngine.clearTools).not.toHaveBeenCalled();
   });
 });

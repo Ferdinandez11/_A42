@@ -14,7 +14,10 @@ vi.mock('@/core/hooks/useErrorHandler', () => ({
 
 describe('useEditorMedia', () => {
   const mockRecorderManager = {
-    toggleRecording: vi.fn(),
+    startRecording: vi.fn(),
+    stopRecording: vi.fn(),
+    takeScreenshot: vi.fn().mockResolvedValue(undefined),
+    startOrbitAnimation: vi.fn().mockResolvedValue(undefined),
     isRecording: false,
   };
 
@@ -90,7 +93,7 @@ describe('useEditorMedia', () => {
         result.current.toggleRecording();
       });
 
-      expect(mockRecorderManager.toggleRecording).toHaveBeenCalled();
+      expect(mockRecorderManager.startRecording).toHaveBeenCalled();
     });
   });
 
@@ -138,9 +141,16 @@ describe('useEditorMedia', () => {
 
   describe('isRecording', () => {
     it('should reflect recording state', () => {
-      mockRecorderManager.isRecording = true;
-      
       const { result } = renderHook(() => useEditorMedia());
+      
+      // El estado isRecording se maneja internamente en el hook
+      // Inicialmente debe ser false
+      expect(result.current.isRecording).toBe(false);
+      
+      // Al activar la grabación, el estado cambia
+      act(() => {
+        result.current.toggleRecording();
+      });
       
       expect(result.current.isRecording).toBe(true);
     });

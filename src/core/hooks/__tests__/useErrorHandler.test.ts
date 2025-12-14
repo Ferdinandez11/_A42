@@ -6,14 +6,31 @@ import { useErrorHandler } from '../useErrorHandler';
 import { AppError, ErrorType, ErrorSeverity } from '@/core/lib/errorHandler';
 
 // Mock react-hot-toast
+const { mockToast, mockSuccess, mockError, mockLoading, mockDismiss } = vi.hoisted(() => {
+  const toast = vi.fn();
+  const success = vi.fn();
+  const error = vi.fn();
+  const loading = vi.fn(() => 'toast-id');
+  const dismiss = vi.fn();
+
+  Object.assign(toast, {
+    success,
+    error,
+    loading,
+    dismiss,
+  });
+
+  return {
+    mockToast: toast,
+    mockSuccess: success,
+    mockError: error,
+    mockLoading: loading,
+    mockDismiss: dismiss,
+  };
+});
+
 vi.mock('react-hot-toast', () => ({
-  default: {
-    success: vi.fn(),
-    error: vi.fn(),
-    loading: vi.fn(() => 'toast-id'),
-    dismiss: vi.fn(),
-    info: vi.fn(),
-  },
+  default: mockToast,
 }));
 
 // Mock errorHandler core
@@ -49,7 +66,7 @@ describe('useErrorHandler', () => {
         result.current.handleError(error);
       });
 
-      expect(toast.error).toHaveBeenCalledWith('Error de prueba');
+      expect(mockError).toHaveBeenCalledWith('Error de prueba');
     });
 
     it('should not show toast when showToast is false', () => {
@@ -65,7 +82,7 @@ describe('useErrorHandler', () => {
         result.current.handleError(error, { showToast: false });
       });
 
-      expect(toast.error).not.toHaveBeenCalled();
+      expect(mockError).not.toHaveBeenCalled();
     });
 
     it('should show different toast styles based on severity', () => {
@@ -80,7 +97,7 @@ describe('useErrorHandler', () => {
         result.current.handleError(criticalError);
       });
 
-      expect(toast.error).toHaveBeenCalledWith('Error crítico', {
+      expect(mockError).toHaveBeenCalledWith('Error crítico', {
         duration: 6000,
         icon: '🚨',
       });
@@ -115,7 +132,7 @@ describe('useErrorHandler', () => {
         result.current.handleError(error, { customMessage: 'Custom message' });
       });
 
-      expect(toast.error).toHaveBeenCalledWith('Custom message');
+      expect(mockError).toHaveBeenCalledWith('Custom message');
     });
 
     it('should return AppError instance', () => {
@@ -140,7 +157,7 @@ describe('useErrorHandler', () => {
         result.current.showSuccess('Success message');
       });
 
-      expect(toast.success).toHaveBeenCalledWith('Success message');
+      expect(mockSuccess).toHaveBeenCalledWith('Success message');
     });
   });
 
@@ -152,7 +169,7 @@ describe('useErrorHandler', () => {
         result.current.showError('Error message');
       });
 
-      expect(toast.error).toHaveBeenCalledWith('Error message');
+      expect(mockError).toHaveBeenCalledWith('Error message');
     });
   });
 
@@ -164,7 +181,8 @@ describe('useErrorHandler', () => {
         result.current.showInfo('Info message');
       });
 
-      expect(toast.info).toHaveBeenCalledWith('Info message', {
+      // El código usa toast(message, { icon: 'ℹ️' }) directamente
+      expect(mockToast).toHaveBeenCalledWith('Info message', {
         icon: 'ℹ️',
       });
     });
@@ -179,7 +197,7 @@ describe('useErrorHandler', () => {
         toastId = result.current.showLoading('Loading...');
       });
 
-      expect(toast.loading).toHaveBeenCalledWith('Loading...');
+      expect(mockLoading).toHaveBeenCalledWith('Loading...');
       expect(toastId!).toBe('toast-id');
     });
   });
@@ -192,7 +210,7 @@ describe('useErrorHandler', () => {
         result.current.dismissToast('toast-id');
       });
 
-      expect(toast.dismiss).toHaveBeenCalledWith('toast-id');
+      expect(mockDismiss).toHaveBeenCalledWith('toast-id');
     });
   });
 
@@ -204,7 +222,7 @@ describe('useErrorHandler', () => {
         result.current.dismissAll();
       });
 
-      expect(toast.dismiss).toHaveBeenCalled();
+      expect(mockDismiss).toHaveBeenCalled();
     });
   });
 });

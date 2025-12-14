@@ -8,8 +8,37 @@ import { useSceneStore } from '@/editor/stores/scene/useSceneStore';
 import { FENCE_PRESETS } from '@/editor/data/fence_presets';
 
 // Mock stores
-vi.mock('@/editor/stores/selection/useSelectionStore');
-vi.mock('@/editor/stores/scene/useSceneStore');
+vi.mock('@/editor/stores/selection/useSelectionStore', () => ({
+  useSelectionStore: vi.fn((selector) => {
+    const state = {
+      selectedItemId: 'fence-1',
+    };
+    return selector(state);
+  }),
+}));
+
+vi.mock('@/editor/stores/scene/useSceneStore', () => ({
+  useSceneStore: vi.fn((selector) => {
+    const state = {
+      items: [{
+        uuid: 'fence-1',
+        type: 'fence' as const,
+        position: [0, 0, 0] as [number, number, number],
+        rotation: [0, 0, 0] as [number, number, number],
+        scale: [1, 1, 1] as [number, number, number],
+        fenceConfig: {
+          presetId: 'wood',
+          colors: {
+            post: 0x8b4513,
+            slatA: 0x654321,
+          },
+        },
+      }],
+      updateItemFenceConfig: mockUpdateItemFenceConfig,
+    };
+    return selector(state);
+  }),
+}));
 vi.mock('@/editor/ui/CadControl', () => ({
   CadControl: () => <div data-testid="cad-control">CAD Control</div>,
 }));
@@ -35,19 +64,29 @@ describe('FenceProperties', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     
-    (useSelectionStore as any).mockReturnValue({
-      selectedItemId: 'fence-1',
+    // Reset mocks
+    (useSelectionStore as any).mockImplementation((selector: any) => {
+      const state = {
+        selectedItemId: 'fence-1',
+      };
+      return selector(state);
     });
 
-    (useSceneStore as any).mockReturnValue({
-      items: [mockFenceItem],
-      updateItemFenceConfig: mockUpdateItemFenceConfig,
+    (useSceneStore as any).mockImplementation((selector: any) => {
+      const state = {
+        items: [mockFenceItem],
+        updateItemFenceConfig: mockUpdateItemFenceConfig,
+      };
+      return selector(state);
     });
   });
 
   it('should not render when no fence is selected', () => {
-    (useSelectionStore as any).mockReturnValue({
-      selectedItemId: null,
+    (useSelectionStore as any).mockImplementation((selector: any) => {
+      const state = {
+        selectedItemId: null,
+      };
+      return selector(state);
     });
 
     const { container } = render(<FenceProperties />);
@@ -55,9 +94,19 @@ describe('FenceProperties', () => {
   });
 
   it('should not render when selected item is not a fence', () => {
-    (useSceneStore as any).mockReturnValue({
-      items: [{ uuid: 'floor-1', type: 'floor' }],
-      updateItemFenceConfig: mockUpdateItemFenceConfig,
+    (useSelectionStore as any).mockImplementation((selector: any) => {
+      const state = {
+        selectedItemId: 'floor-1',
+      };
+      return selector(state);
+    });
+
+    (useSceneStore as any).mockImplementation((selector: any) => {
+      const state = {
+        items: [{ uuid: 'floor-1', type: 'floor' }],
+        updateItemFenceConfig: mockUpdateItemFenceConfig,
+      };
+      return selector(state);
     });
 
     const { container } = render(<FenceProperties />);
@@ -96,14 +145,14 @@ describe('FenceProperties', () => {
     const user = userEvent.setup();
     render(<FenceProperties />);
 
-    // Click on a different preset
-    const metalPreset = screen.getByText(FENCE_PRESETS.metal.name);
+    // Click on a different preset (metal_slats instead of metal)
+    const metalPreset = screen.getByText(FENCE_PRESETS.metal_slats.name);
     await user.click(metalPreset);
 
     expect(mockUpdateItemFenceConfig).toHaveBeenCalledWith(
       'fence-1',
       expect.objectContaining({
-        presetId: 'metal',
+        presetId: 'metal_slats',
       })
     );
   });
@@ -119,19 +168,22 @@ describe('FenceProperties', () => {
     const multiColorItem = {
       ...mockFenceItem,
       fenceConfig: {
-        presetId: 'multi_wood',
+        presetId: 'metal_slats', // Use a preset that actually has multiColor: true
         colors: {
-          post: 0x8b4513,
-          slatA: 0x654321,
-          slatB: 0x543210,
-          slatC: 0x432109,
+          post: 0x1a1a1a,
+          slatA: 0xcccccc,
+          slatB: 0x888888,
+          slatC: 0x444444,
         },
       },
     };
 
-    (useSceneStore as any).mockReturnValue({
-      items: [multiColorItem],
-      updateItemFenceConfig: mockUpdateItemFenceConfig,
+    (useSceneStore as any).mockImplementation((selector: any) => {
+      const state = {
+        items: [multiColorItem],
+        updateItemFenceConfig: mockUpdateItemFenceConfig,
+      };
+      return selector(state);
     });
 
     render(<FenceProperties />);
