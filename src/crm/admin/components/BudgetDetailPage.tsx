@@ -509,6 +509,11 @@ export const BudgetDetailPage = () => {
             status: status as OrderStatus, 
             total_price: totals.final 
           };
+
+          // Si el presupuesto se rechaza, lo marcamos como archivado
+          if (status === 'rechazado') {
+            (update as any).is_archived = true;
+          }
           
           if (status === 'pedido') {
             const d = new Date(); 

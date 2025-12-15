@@ -89,6 +89,11 @@ export const ClientDashboard: React.FC = () => {
 
   const loading = projectsLoading || ordersLoading;
 
+  // Proyectos que aún no tienen ningún presupuesto/pedido asociado
+  const standaloneProjects = projects.filter(
+    (project) => !project.orders || project.orders.length === 0
+  );
+
   // ==========================================================================
   // EFECTOS
   // ==========================================================================
@@ -294,11 +299,11 @@ export const ClientDashboard: React.FC = () => {
           <>
             {activeTab === 'projects' && (
               <>
-                {projects.length === 0 ? (
+                {standaloneProjects.length === 0 ? (
                   <EmptyProjectsState />
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {projects.map((project) => (
+                    {standaloneProjects.map((project) => (
                       <ProjectCard
                         key={project.id}
                         project={project}

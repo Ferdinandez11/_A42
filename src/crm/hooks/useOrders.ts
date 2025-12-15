@@ -51,9 +51,10 @@ export const useOrders = (): UseOrdersReturn => {
           .order('created_at', { ascending: false });
 
         if (activeTab === 'budgets') {
+          // Solo presupuestos activos (no archivados y no rechazados)
           query = query
             .eq('is_archived', false)
-            .in('status', ['pendiente', 'presupuestado', 'rechazado']);
+            .in('status', ['pendiente', 'presupuestado']);
         } else if (activeTab === 'orders') {
           query = query
             .eq('is_archived', false)
