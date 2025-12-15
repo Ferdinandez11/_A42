@@ -59,7 +59,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
         </button>
         <button
           onClick={() => onDelete(project.id)}
-          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center justify-center transition-colors"
+          className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors"
           title="Eliminar proyecto"
         >
           <Trash2 size={16} />
