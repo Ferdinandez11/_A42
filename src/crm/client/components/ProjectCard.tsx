@@ -30,7 +30,11 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
       className={`h-40 bg-neutral-800 flex items-center justify-center text-6xl text-neutral-600 ${
         project.thumbnail_url ? 'bg-cover bg-center bg-no-repeat' : ''
       }`}
-      style={project.thumbnail_url ? { backgroundImage: `url(${project.thumbnail_url})` } as React.CSSProperties : undefined}
+      style={
+        project.thumbnail_url
+          ? ({ backgroundImage: `url(${project.thumbnail_url})` } as React.CSSProperties)
+          : undefined
+      }
     >
       {!project.thumbnail_url && <ImageIcon size={48} />}
     </div>
