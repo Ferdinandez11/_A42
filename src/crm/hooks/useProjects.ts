@@ -69,15 +69,29 @@ export const useProjects = (): UseProjectsReturn => {
           .delete()
           .eq('id', projectId);
 
-        if (error) throw error;
+        if (error) {
+          // 409/23503 = violación de FK (hay pedidos/presupuestos enlazados)
+          if ((error as any).code === '23503' || String(error.message).includes('foreign key')) {
+            handleError(
+              new AppError(ErrorType.VALIDATION, 'No se puede eliminar el proyecto', {
+                userMessage:
+                  'No puedes borrar un proyecto que ya tiene presupuestos o pedidos asociados.',
+                severity: ErrorSeverity.LOW,
+              })
+            );
+          } else {
+            handleError(error);
+          }
+          throw error;
+        }
 
         setProjects((prev) => prev.filter((p) => p.id !== projectId));
         dismissToast(loadingToast);
         showSuccess('✅ Proyecto eliminado');
       } catch (error) {
         dismissToast(loadingToast);
-        handleError(error);
-        throw error; // Re-throw para que el componente pueda manejar
+        // El error ya fue manejado arriba si era de FK; aquí solo re-lanzamos
+        throw error; // Re-throw para que el componente pueda manejar si lo necesita
       }
     },
     [handleError, showSuccess, showLoading, dismissToast]

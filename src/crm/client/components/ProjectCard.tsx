@@ -42,24 +42,24 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
       <h4 className="text-white font-bold mb-4 flex-1">
         {project.name || 'Sin Nombre'}
       </h4>
-      <div className="flex gap-2">
+      <div className="grid grid-cols-3 gap-2 w-full">
         <button
           onClick={() => onEdit(project.id)}
-          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
         >
           <Edit size={16} />
           Editar
         </button>
         <button
           onClick={() => onRequestQuote(project)}
-          className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
+          className="w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
         >
           <ShoppingCart size={16} />
           Pedir
         </button>
         <button
           onClick={() => onDelete(project.id)}
-          className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors"
+          className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors"
           title="Eliminar proyecto"
         >
           <Trash2 size={16} />
