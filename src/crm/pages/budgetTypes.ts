@@ -48,6 +48,7 @@ export interface Attachment {
   file_name: string;
   file_url: string;
   uploader_id: string;
+  created_at?: string;
 }
 
 export interface ModalState {

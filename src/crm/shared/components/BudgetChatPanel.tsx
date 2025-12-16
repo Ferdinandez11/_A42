@@ -36,6 +36,19 @@ export const BudgetChatPanel = ({
       <div className="flex-1 overflow-y-auto flex flex-col gap-2.5 pr-1 mt-4">
         {messages.map(msg => {
           const isMe = msg.profiles?.role === 'client';
+          const authorName = msg.profiles?.full_name || (msg.profiles?.role === 'client' ? 'Tú' : 'Administrador');
+          const authorRole = msg.profiles?.role === 'client' ? '👤 Cliente' : '🏢 Admin';
+          const messageDate = new Date(msg.created_at);
+          const formattedDate = messageDate.toLocaleDateString('es-ES', { 
+            day: '2-digit', 
+            month: '2-digit', 
+            year: 'numeric' 
+          });
+          const formattedTime = messageDate.toLocaleTimeString('es-ES', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          });
+          
           return (
             <div 
               key={msg.id}
@@ -45,7 +58,17 @@ export const BudgetChatPanel = ({
                   : 'self-start bg-zinc-700 text-white'
               }`}
             >
-              {msg.content}
+              <div className="flex justify-between items-start mb-1">
+                <span className="text-xs font-semibold opacity-90">
+                  {authorRole} {authorName}
+                </span>
+                <span className="text-[10px] opacity-75 ml-2">
+                  {formattedDate} {formattedTime}
+                </span>
+              </div>
+              <div className="text-sm whitespace-pre-wrap">
+                {msg.content}
+              </div>
             </div>
           );
         })}

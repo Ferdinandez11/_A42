@@ -4,10 +4,12 @@ interface BudgetHeaderProps {
   isDecisionTime: boolean;
   isOrderConfirmed: boolean;
   isPending: boolean;
+  isArchived?: boolean;
   onAccept: () => void;
   onReject: () => void;
   onCancel: () => void;
   onDelete: () => void;
+  onReactivate?: () => void;
   onBack: () => void;
 }
 
@@ -16,10 +18,12 @@ export const BudgetHeader = ({
   isDecisionTime,
   isOrderConfirmed,
   isPending,
+  isArchived,
   onAccept,
   onReject,
   onCancel,
   onDelete,
+  onReactivate,
   onBack,
 }: BudgetHeaderProps) => {
   return (
@@ -32,13 +36,32 @@ export const BudgetHeader = ({
       </button>
       
       <div className="flex gap-2.5 items-center">
-        {isLocked && (
+        {isLocked && !isArchived && (
           <span className="text-gray-500 text-xs mr-2.5">
             ⚠️ Cambios solo vía chat
           </span>
         )}
         
-        {isDecisionTime && (
+        {isArchived && (
+          <>
+            {onReactivate && (
+              <button 
+                onClick={onReactivate}
+                className="bg-blue-600 text-white border-none py-2 px-4 rounded-md cursor-pointer font-bold hover:bg-blue-700 transition-colors"
+              >
+                🔄 Reactivar
+              </button>
+            )}
+            <button 
+              onClick={onDelete}
+              className="bg-red-700 text-white border-none py-2 px-4 rounded-md cursor-pointer font-bold hover:bg-red-800 transition-colors"
+            >
+              🗑️ Borrar Definitivamente
+            </button>
+          </>
+        )}
+        
+        {!isArchived && isDecisionTime && (
           <>
             <button 
               onClick={onAccept}
@@ -55,7 +78,7 @@ export const BudgetHeader = ({
           </>
         )}
         
-        {isOrderConfirmed && (
+        {!isArchived && isOrderConfirmed && (
           <button 
             onClick={onCancel}
             className="bg-red-700 text-white border-none py-2 px-4 rounded-md cursor-pointer hover:bg-red-800 transition-colors"
@@ -64,7 +87,7 @@ export const BudgetHeader = ({
           </button>
         )}
         
-        {isPending && (
+        {!isArchived && isPending && (
           <button 
             onClick={onDelete}
             className="bg-red-700 text-white border-none py-2 px-4 rounded-md cursor-pointer hover:bg-red-800 transition-colors"

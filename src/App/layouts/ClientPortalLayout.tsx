@@ -19,6 +19,9 @@ export const ClientPortalLayout: React.FC = () => (
         <Link to="/portal?tab=orders" className="text-zinc-400 hover:text-white">
           Mis Pedidos
         </Link>
+        <Link to="/portal/calendar" className="text-zinc-400 hover:text-white">
+          📅 Calendario
+        </Link>
         <Link to="/portal/profile" className="text-zinc-400 hover:text-white">
           Mi Perfil 👤
         </Link>

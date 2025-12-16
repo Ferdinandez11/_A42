@@ -7,6 +7,7 @@ export interface OrderData {
   estimated_delivery_date?: string | null;
   total_price: number;
   project_id?: string | null;
+  is_archived?: boolean;
   profiles?: {
     full_name: string;
     role: string;

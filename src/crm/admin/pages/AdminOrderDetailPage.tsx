@@ -154,6 +154,31 @@ export const AdminOrderDetailPage = () => {
           ]);
 
           if (dbError) throw dbError;
+
+          // Agregar observación automática con el PDF del presupuesto
+          const formattedDate = budgetDate.toLocaleString('es-ES', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+          const observationContent = `📄 Presupuesto generado el ${formattedDate}\n\n[Ver PDF](${publicUrl})`;
+          
+          const { error: obsError } = await supabase.from('order_observations').insert([
+            {
+              order_id: id,
+              user_id: user?.id,
+              content: observationContent,
+            },
+          ]);
+
+          if (obsError) {
+            console.error('Error adding observation:', obsError);
+          } else {
+            // Recargar observaciones para mostrar la nueva
+            await fetchObservations(id);
+          }
           
           dismissToast(pdfToast);
           showSuccess('✅ Cambios guardados y PDF de Presupuesto enviado al cliente');

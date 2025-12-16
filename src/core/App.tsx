@@ -23,6 +23,7 @@ import { BudgetDetailPage } from "@/crm/admin/components/BudgetDetailPage";
 import { AdminOrderDetailPage } from "@/crm/admin/pages/AdminOrderDetailPage";
 import { AdminClientDetailPage } from "@/crm/admin/pages/AdminClientDetailPage";
 import { AdminCalendarPage } from "@/crm/admin/pages/AdminCalendarPage";
+import { ClientCalendarPage } from "@/crm/client/pages/ClientCalendarPage";
 
 /**
  * App Root Component
@@ -49,6 +50,7 @@ const App: React.FC = () => {
         <Route path="/portal" element={<ClientPortalLayout />}>
           <Route index element={<ClientDashboard />} />
           <Route path="profile" element={<ProfilePage />} />
+          <Route path="calendar" element={<ClientCalendarPage />} />
           <Route path="order/:id" element={<BudgetDetailPage />} />
         </Route>
       </Routes>

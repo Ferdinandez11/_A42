@@ -62,6 +62,7 @@ export const BudgetDetailPage = () => {
     handleStatusChange,
     handleDelete,
     handleCancelOrder,
+    handleReactivate,
     handleSendMessage,
     closeModal,
   } = useBudgetDetail(id);
@@ -73,7 +74,8 @@ export const BudgetDetailPage = () => {
   const isPending = order.status === 'pendiente';
   const isDecisionTime = order.status === 'presupuestado';
   const isOrderConfirmed = order.status === 'pedido';
-  const isLocked = !isPending && !isOrderConfirmed && order.status !== 'presupuestado';
+  const isArchived = order.is_archived === true;
+  const isLocked = !isPending && !isOrderConfirmed && order.status !== 'presupuestado' && !isArchived;
 
   // OrderData is compatible with Order for UI components
   const orderForUI = order as any;
@@ -87,10 +89,12 @@ export const BudgetDetailPage = () => {
         isDecisionTime={isDecisionTime}
         isOrderConfirmed={isOrderConfirmed}
         isPending={isPending}
+        isArchived={isArchived}
         onAccept={() => handleStatusChange('pedido')}
         onReject={() => handleStatusChange('rechazado')}
         onCancel={handleCancelOrder}
         onDelete={handleDelete}
+        onReactivate={handleReactivate}
         onBack={() => navigate(-1)}
       />
 

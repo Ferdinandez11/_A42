@@ -47,9 +47,31 @@ export const BudgetObservationsCard = ({
                 {new Date(obs.created_at).toLocaleString()}
               </span>
             </div>
-            <p className="m-0 text-xs text-gray-300 whitespace-pre-wrap">
-              {obs.content}
-            </p>
+            <div className="m-0 text-xs text-gray-300 whitespace-pre-wrap">
+              {obs.content.split('\n').map((line, idx) => {
+                // Detectar enlaces markdown [texto](url)
+                const linkMatch = line.match(/\[([^\]]+)\]\(([^)]+)\)/);
+                if (linkMatch) {
+                  const [, linkText, linkUrl] = linkMatch;
+                  const parts = line.split(linkMatch[0]);
+                  return (
+                    <div key={idx}>
+                      {parts[0]}
+                      <a 
+                        href={linkUrl} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="text-blue-400 hover:text-blue-300 underline"
+                      >
+                        {linkText}
+                      </a>
+                      {parts[1]}
+                    </div>
+                  );
+                }
+                return <div key={idx}>{line}</div>;
+              })}
+            </div>
           </div>
         ))}
       </div>

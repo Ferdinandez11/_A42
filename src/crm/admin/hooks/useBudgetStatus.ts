@@ -13,6 +13,7 @@ interface UseBudgetStatusReturn {
   handleStatusChange: (orderId: string, status: string, totals: BudgetTotals) => Promise<void>;
   handleDelete: (orderId: string) => Promise<void>;
   handleCancelOrder: (orderId: string) => Promise<void>;
+  handleReactivate: (orderId: string) => Promise<void>;
 }
 
 /**
@@ -81,7 +82,7 @@ export const useBudgetStatus = (): UseBudgetStatusReturn => {
 
   const handleDelete = useCallback(
     async (orderId: string) => {
-      const loadingToast = showLoading('Eliminando solicitud...');
+      const loadingToast = showLoading('Eliminando...');
 
       try {
         const { error } = await supabase.from('orders').delete().eq('id', orderId);
@@ -89,8 +90,8 @@ export const useBudgetStatus = (): UseBudgetStatusReturn => {
         if (error) throw error;
 
         dismissToast(loadingToast);
-        showSuccess('✅ Solicitud eliminada');
-        navigate('/portal?tab=orders');
+        showSuccess('✅ Eliminado definitivamente');
+        navigate('/portal?tab=archived');
       } catch (error) {
         dismissToast(loadingToast);
         handleError(error);
@@ -126,10 +127,39 @@ export const useBudgetStatus = (): UseBudgetStatusReturn => {
     [handleError, showSuccess, showLoading, dismissToast, navigate]
   );
 
+  const handleReactivate = useCallback(
+    async (orderId: string) => {
+      const loadingToast = showLoading('Reactivando presupuesto...');
+
+      try {
+        // Reactivar: quitar el flag de archivado y volver a estado pendiente
+        const { error } = await supabase
+          .from('orders')
+          .update({
+            is_archived: false,
+            status: 'pendiente',
+          })
+          .eq('id', orderId);
+
+        if (error) throw error;
+
+        dismissToast(loadingToast);
+        showSuccess('✅ Presupuesto reactivado. Volverá a "Mis Presupuestos"');
+        navigate('/portal?tab=budgets');
+      } catch (error) {
+        dismissToast(loadingToast);
+        handleError(error);
+        throw error;
+      }
+    },
+    [handleError, showSuccess, showLoading, dismissToast, navigate]
+  );
+
   return {
     handleStatusChange,
     handleDelete,
     handleCancelOrder,
+    handleReactivate,
   };
 };
 

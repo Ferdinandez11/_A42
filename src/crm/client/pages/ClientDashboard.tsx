@@ -322,7 +322,6 @@ export const ClientDashboard: React.FC = () => {
                 orders={orders}
                 activeTab={activeTab}
                 onViewOrder={handleViewOrder}
-                onReactivate={handleReactivate}
               />
             )}
           </>

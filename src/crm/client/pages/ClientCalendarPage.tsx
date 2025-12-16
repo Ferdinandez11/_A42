@@ -3,22 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/core/lib/supabase";
 
 // Types
-interface Profile {
-  company_name?: string;
-  email?: string;
-  full_name?: string;
-}
-
 interface Order {
   id: string;
   order_ref: string;
   custom_name?: string;
   estimated_delivery_date: string;
   status: string;
-  profiles?: Profile;
 }
 
-type FilterType = "all" | "client" | "ref";
+type FilterType = "all" | "ref";
 
 const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
@@ -38,35 +31,53 @@ const getStatusColor = (status: string): string => {
 };
 
 /**
- * Admin calendar page showing order delivery dates
+ * Client calendar page showing order delivery dates for the logged-in client
  */
-export const AdminCalendarPage: React.FC = () => {
+export const ClientCalendarPage: React.FC = () => {
   const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [orders, setOrders] = useState<Order[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [filterType, setFilterType] = useState<FilterType>("all");
 
   useEffect(() => {
-    loadOrders();
+    loadUserAndOrders();
   }, []);
 
   /**
-   * Loads orders from database
+   * Loads user and their orders from database
    */
-  const loadOrders = async (): Promise<void> => {
-    const { data } = await supabase
-      .from("orders")
-      .select(
-        "id, order_ref, custom_name, estimated_delivery_date, status, profiles(company_name, email, full_name)"
-      )
-      .not("estimated_delivery_date", "is", null)
-      .neq("status", "rechazado")
-      .neq("status", "cancelado");
+  const loadUserAndOrders = async (): Promise<void> => {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      
+      if (!user) {
+        navigate('/login');
+        return;
+      }
 
-    setOrders((data as Order[]) || []);
+      setUserId(user.id);
+
+      // Cargar solo pedidos del cliente actual
+      const { data, error } = await supabase
+        .from("orders")
+        .select("id, order_ref, custom_name, estimated_delivery_date, status")
+        .eq("user_id", user.id)
+        .not("estimated_delivery_date", "is", null)
+        .eq("is_archived", false)
+        .neq("status", "rechazado")
+        .neq("status", "cancelado");
+
+      if (error) throw error;
+
+      setOrders((data as Order[]) || []);
+    } catch (error) {
+      console.error('Error loading calendar:', error);
+    }
   };
 
   /**
@@ -114,15 +125,8 @@ export const AdminCalendarPage: React.FC = () => {
     const matchesRef =
       order.order_ref.toLowerCase().includes(searchLower) ||
       (order.custom_name && order.custom_name.toLowerCase().includes(searchLower));
-    const clientName =
-      order.profiles?.company_name ||
-      order.profiles?.full_name ||
-      order.profiles?.email ||
-      "";
-    const matchesClient = clientName.toLowerCase().includes(searchLower);
 
-    if (filterType === "all") return matchesRef || matchesClient;
-    if (filterType === "client") return matchesClient;
+    if (filterType === "all") return matchesRef;
     if (filterType === "ref") return matchesRef;
     return true;
   });
@@ -144,7 +148,7 @@ export const AdminCalendarPage: React.FC = () => {
   const calendarDays = getDaysInMonth(currentDate);
 
   return (
-    <div className="p-5 text-zinc-200 h-screen flex flex-col">
+    <div className="p-5 text-zinc-200 h-full flex flex-col">
       {/* Header and controls */}
       <div className="flex justify-between items-center mb-5 bg-zinc-900 p-4 rounded-xl border border-zinc-800">
         <div className="flex items-center gap-4">
@@ -174,7 +178,6 @@ export const AdminCalendarPage: React.FC = () => {
             className="bg-zinc-950 border border-zinc-700 text-white py-2 px-3 rounded-md outline-none w-32 cursor-pointer"
           >
             <option value="all">🔍 Todo</option>
-            <option value="client">👤 Cliente</option>
             <option value="ref">📦 Pedido/Ref</option>
           </select>
           <input
@@ -185,7 +188,7 @@ export const AdminCalendarPage: React.FC = () => {
             className="bg-zinc-950 border border-zinc-700 text-white py-2 px-3 rounded-md outline-none w-52"
           />
           <button
-            onClick={loadOrders}
+            onClick={loadUserAndOrders}
             className="bg-green-600 text-white border-none py-2 px-3 rounded-md cursor-pointer hover:bg-green-700"
           >
             🔄
@@ -260,19 +263,15 @@ export const AdminCalendarPage: React.FC = () => {
                 {events.map((event) => (
                   <div
                     key={event.id}
-                    onClick={() => navigate(`/admin/order/${event.id}`)}
-                    title={`Cliente: ${
-                      event.profiles?.company_name || event.profiles?.email
-                    }\nRef: ${event.order_ref}`}
+                    onClick={() => navigate(`/portal/order/${event.id}`)}
+                    title={`Ref: ${event.order_ref}`}
                     className={`${getStatusColor(
                       event.status
                     )} text-white py-1 px-1.5 rounded text-[11px] cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis border-l-[3px] border-black/20 hover:opacity-90`}
                   >
                     <strong>{event.order_ref}</strong>
                     <div className="text-[9px] opacity-90">
-                      {event.custom_name ||
-                        event.profiles?.company_name ||
-                        "Sin nombre"}
+                      {event.custom_name || "Sin nombre"}
                     </div>
                   </div>
                 ))}
@@ -284,3 +283,4 @@ export const AdminCalendarPage: React.FC = () => {
     </div>
   );
 };
+

@@ -67,6 +67,7 @@ interface UseBudgetDetailReturn {
   handleStatusChange: (status: string) => void;
   handleDelete: () => void;
   handleCancelOrder: () => void;
+  handleReactivate: () => void;
   handleSendMessage: () => Promise<void>;
   closeModal: () => void;
 }
@@ -305,10 +306,13 @@ export const useBudgetDetail = (orderId: string | undefined): UseBudgetDetailRet
   );
 
   const handleDelete = useCallback(() => {
+    const isArchived = orderData.order?.is_archived === true;
     setModal({
       isOpen: true,
-      title: 'Borrar Solicitud',
-      message: 'Se borrará la solicitud y el diseño. ¿Continuar?',
+      title: isArchived ? 'Borrar Definitivamente' : 'Borrar Solicitud',
+      message: isArchived 
+        ? 'Se eliminará permanentemente esta solicitud. Esta acción no se puede deshacer.'
+        : 'Se borrará la solicitud y el diseño. ¿Continuar?',
       isDestructive: true,
       onConfirm: async () => {
         if (!orderId) return;
@@ -316,7 +320,7 @@ export const useBudgetDetail = (orderId: string | undefined): UseBudgetDetailRet
         closeModal();
       },
     });
-  }, [orderId, budgetStatus]);
+  }, [orderId, orderData.order, budgetStatus]);
 
   const handleCancelOrder = useCallback(() => {
     setModal({
@@ -327,6 +331,20 @@ export const useBudgetDetail = (orderId: string | undefined): UseBudgetDetailRet
       onConfirm: async () => {
         if (!orderId) return;
         await budgetStatus.handleCancelOrder(orderId);
+        closeModal();
+      },
+    });
+  }, [orderId, budgetStatus]);
+
+  const handleReactivate = useCallback(() => {
+    setModal({
+      isOpen: true,
+      title: 'Reactivar Presupuesto',
+      message: 'El presupuesto volverá a la lista de "Mis Presupuestos"',
+      isDestructive: false,
+      onConfirm: async () => {
+        if (!orderId) return;
+        await budgetStatus.handleReactivate(orderId);
         closeModal();
       },
     });
@@ -381,6 +399,7 @@ export const useBudgetDetail = (orderId: string | undefined): UseBudgetDetailRet
     handleStatusChange,
     handleDelete,
     handleCancelOrder,
+    handleReactivate,
     handleSendMessage,
     closeModal,
   };
