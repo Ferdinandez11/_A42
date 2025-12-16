@@ -62,15 +62,22 @@ export const ClientCalendarPage: React.FC = () => {
 
       setUserId(user.id);
 
-      // Cargar solo pedidos del cliente actual
+      // Cargar solo pedidos del cliente actual que están en "Mis Presupuestos" o "Mis Pedidos"
+      // Esto excluye archivados, rechazados, cancelados y proyectos eliminados
       const { data, error } = await supabase
         .from("orders")
         .select("id, order_ref, custom_name, estimated_delivery_date, status")
         .eq("user_id", user.id)
         .not("estimated_delivery_date", "is", null)
         .eq("is_archived", false)
-        .neq("status", "rechazado")
-        .neq("status", "cancelado");
+        .in("status", [
+          'pendiente',
+          'presupuestado',
+          'pedido',
+          'en_proceso',
+          'enviado',
+          'entregado'
+        ]);
 
       if (error) throw error;
 
