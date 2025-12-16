@@ -79,7 +79,7 @@ const MESSAGES = {
 } as const;
 
 const GRID_CONFIGS = {
-  PRODUCTS: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5',
+  PRODUCTS: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
   CATEGORIES: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
   LINES: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3',
 } as const;
@@ -441,8 +441,7 @@ export const Catalog: React.FC = (() => {
             {MESSAGES.SEARCH_RESULTS(filteredProducts.length)}
           </h2>
           <div
-            className={`grid ${GRID_CONFIGS.PRODUCTS} gap-6 custom-scrollbar pr-2 pb-20`}
-            className="max-h-[calc(100vh-200px)] overflow-y-auto"
+            className={`grid ${GRID_CONFIGS.PRODUCTS} gap-6 custom-scrollbar pr-2 pb-20 max-h-[calc(100vh-200px)] overflow-y-auto`}
           >
             {filteredProducts.map((product) => (
               <ProductCard
@@ -475,8 +474,7 @@ export const Catalog: React.FC = (() => {
             <span className="opacity-50">{currentLine} /</span> {currentCategory}
           </h2>
           <div
-            className={`grid ${GRID_CONFIGS.PRODUCTS} gap-6 custom-scrollbar pr-2 pb-20`}
-            className="max-h-[calc(100vh-200px)] overflow-y-auto"
+            className={`grid ${GRID_CONFIGS.PRODUCTS} gap-6 custom-scrollbar pr-2 pb-20 max-h-[calc(100vh-200px)] overflow-y-auto`}
           >
             {products.map((product) => (
               <ProductCard

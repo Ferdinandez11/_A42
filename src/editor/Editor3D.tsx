@@ -18,6 +18,7 @@ import { FenceProperties } from "./ui/FenceProperties";
 import { InputModal } from "./ui/InputModal";
 import { QRModal } from "./ui/QRModal";
 import { Catalog } from "./ui/Catalog";
+import { ItemsModal } from "./ui/ItemsModal";
 
 import { useEditorStore } from "@/editor/stores/editor/useEditorStore";
 import { useSceneStore } from "@/editor/stores/scene/useSceneStore";
@@ -25,7 +26,7 @@ import { useSelectionStore } from "@/editor/stores/selection/useSelectionStore";
 import { useProjectStore } from "@/editor/stores/project/useProjectStore";
 
 import {
-  Euro,
+  List,
   Move,
   RotateCw,
   Scaling,
@@ -157,11 +158,14 @@ const QRButton: React.FC<{ onClick: () => void }> = ({ onClick }) => (
   </button>
 );
 
-const PriceDisplay: React.FC<{ price: number }> = ({ price }) => (
+const PriceDisplay: React.FC<{ onClick: () => void }> = ({ onClick }) => (
   <div className={CLASSES.priceButton}>
-    <button className={CLASSES.priceContent}>
-      <Euro size={18} />
-      <span className="text-lg">{price.toLocaleString()} €</span>
+    <button 
+      onClick={onClick}
+      className={CLASSES.priceContent}
+      title="Ver elementos del proyecto"
+    >
+      <List size={18} />
     </button>
   </div>
 );
@@ -225,6 +229,7 @@ const Watermark: React.FC = () => (
 export const Editor3D: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [qrVisible, setQRVisible] = useState<boolean>(false);
+  const [itemsModalVisible, setItemsModalVisible] = useState<boolean>(false);
 
   // Store hooks
   const {
@@ -239,7 +244,7 @@ export const Editor3D: React.FC = () => {
     measurementResult,
   } = useEditorStore();
 
-  const { items, totalPrice } = useSceneStore();
+  const { items } = useSceneStore();
   const { selectedItemId, duplicateSelection, removeSelection } = useSelectionStore();
   const { isReadOnlyMode } = useProjectStore();
 
@@ -274,6 +279,8 @@ export const Editor3D: React.FC = () => {
   // Handlers
   const handleQROpen = (): void => setQRVisible(true);
   const handleQRClose = (): void => setQRVisible(false);
+  const handleItemsModalOpen = (): void => setItemsModalVisible(true);
+  const handleItemsModalClose = (): void => setItemsModalVisible(false);
   const handleContextMenu = (e: React.MouseEvent): void => e.preventDefault();
 
   return (
@@ -303,7 +310,7 @@ export const Editor3D: React.FC = () => {
         <QRButton onClick={handleQROpen} />
 
         {/* Price Display */}
-        {!isReadOnlyMode && <PriceDisplay price={totalPrice} />}
+        {!isReadOnlyMode && <PriceDisplay onClick={handleItemsModalOpen} />}
 
         {/* Gizmo Panel */}
         {showGizmoPanel && (
@@ -323,6 +330,7 @@ export const Editor3D: React.FC = () => {
         {/* Modals */}
         <QRModal isOpen={qrVisible} onClose={handleQRClose} />
         <InputModal />
+        <ItemsModal isOpen={itemsModalVisible} onClose={handleItemsModalClose} />
 
         {/* Watermark */}
         <Watermark />
