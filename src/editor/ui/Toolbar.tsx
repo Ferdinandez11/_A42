@@ -179,17 +179,19 @@ const ProjectActions: React.FC<{
 }> = ({ isSaving, isReadOnly, hasUser, onSave, onImport }) => {
   const getSaveTitle = (): string => {
     if (!hasUser) return "Login Requerido";
-    if (isReadOnly) return "Solo Lectura";
+    if (isReadOnly) return "Guardar como nuevo proyecto (no sobrescribirá el original)";
     return "Guardar";
   };
 
   const getSaveLabel = (): string => {
     if (!hasUser) return 'Login';
     if (isSaving) return '...';
+    if (isReadOnly) return 'Guardar como nuevo';
     return 'Guardar';
   };
 
-  const isSaveDisabled = isSaving || isReadOnly || !hasUser;
+  // Permitir guardar incluso en modo solo lectura (siempre como nuevo proyecto)
+  const isSaveDisabled = isSaving || !hasUser;
 
   return (
     <>
