@@ -60,7 +60,7 @@ export const BudgetHeader = ({
             onClick={onCancel}
             className="bg-red-700 text-white border-none py-2 px-4 rounded-md cursor-pointer hover:bg-red-800 transition-colors"
           >
-            🚫 Cancelar Pedido
+            📦 Archivar Pedido
           </button>
         )}
         

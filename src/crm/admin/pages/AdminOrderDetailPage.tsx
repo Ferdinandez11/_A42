@@ -16,7 +16,6 @@ import { useOrderItems } from '@/crm/hooks/useOrderItems';
 // Utils
 import { applyClientDiscount, copyBasePriceToTotal, formatDiscountConfirmation } from '../utils/orderPriceUtils';
 import { calculateDeliveryDate } from '@/crm/pages/utils';
-import { formatMoney } from '@/crm/pages/utils';
 
 // Tipos
 import type { OrderStatus, CatalogItem } from '@/crm/pages/types';
@@ -102,12 +101,21 @@ export const AdminOrderDetailPage = () => {
     setIsGeneratingPDF(true);
 
     try {
-      const dateToSave = newDate ? new Date(newDate).toISOString() : null;
+      // Para presupuestos: si no hay fecha, calcular automáticamente (48h desde ahora)
+      // Para pedidos: el admin puede modificar la fecha manualmente en cualquier momento
+      let dateToSave = newDate ? new Date(newDate).toISOString() : null;
+      if (order.status === 'presupuestado' && !dateToSave) {
+        // Calcular fecha al momento de guardar (48h desde ahora)
+        const deliveryDate = new Date();
+        deliveryDate.setHours(deliveryDate.getHours() + 48);
+        dateToSave = deliveryDate.toISOString();
+      }
+      // Si es un pedido y no hay fecha nueva, mantener la fecha existente (no recalcular)
 
       await updateOrder({
         status: order.status,
         custom_name: order.custom_name, 
-        estimated_delivery_date: dateToSave,
+        estimated_delivery_date: dateToSave || order.estimated_delivery_date || undefined,
         total_price: order.total_price,
       });
 
@@ -117,8 +125,10 @@ export const AdminOrderDetailPage = () => {
         const pdfToast = showLoading('Generando PDF de presupuesto...');
         
         try {
+          // Fecha del presupuesto: momento exacto cuando se guarda y genera el PDF
+          const budgetDate = new Date();
           // @ts-expect-error - Type mismatch between OrderData and PDF generator expected type
-          const pdfBlob = await generateBudgetPDF(order, items3D, manualItems);
+          const pdfBlob = await generateBudgetPDF(order, items3D, manualItems, budgetDate);
           
           const fileName = `Presupuesto_${order.order_ref}_${Date.now()}.pdf`;
           const filePath = `${id}/${fileName}`;

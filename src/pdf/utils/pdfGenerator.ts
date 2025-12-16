@@ -57,16 +57,19 @@ interface ManualItem {
  * @param order - Order information
  * @param items3D - List of 3D items
  * @param manualItems - List of manual items
+ * @param budgetDate - Date when the budget was created (defaults to current date)
  * @returns PDF blob
  */
 export const generateBudgetPDF = async (
   order: Order,
   items3D: Item3D[],
-  manualItems: ManualItem[]
+  manualItems: ManualItem[],
+  budgetDate?: Date
 ): Promise<Blob> => {
   const doc = new jsPDF();
   const margin = 20;
   const rightMargin = 190; // Standard A4 right alignment
+  const budgetDateToUse = budgetDate || new Date();
 
   // Header
   doc.setFontSize(22);
@@ -78,7 +81,7 @@ export const generateBudgetPDF = async (
   doc.text(`Referencia: ${order.order_ref}`, rightMargin, 28, {
     align: "right",
   });
-  doc.text(`Fecha: ${new Date().toLocaleDateString()}`, rightMargin, 33, {
+  doc.text(`Fecha: ${budgetDateToUse.toLocaleDateString('es-ES')}`, rightMargin, 33, {
     align: "right",
   });
   if (order.custom_name) {

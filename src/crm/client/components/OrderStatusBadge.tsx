@@ -21,25 +21,20 @@ const ORDER_STATUS_CONFIG: Record<
     bgColor: 'bg-blue-500/10',
     label: 'Pedido',
   },
-  fabricacion: {
+  en_proceso: {
     color: 'text-yellow-400',
     bgColor: 'bg-yellow-500/10',
     label: 'Fabricación',
   },
-  entregado_parcial: {
-    color: 'text-yellow-300',
-    bgColor: 'bg-yellow-500/10',
-    label: 'Entregado Parcial',
+  enviado: {
+    color: 'text-blue-300',
+    bgColor: 'bg-blue-500/10',
+    label: 'Enviado',
   },
   entregado: {
     color: 'text-green-400',
     bgColor: 'bg-green-500/10',
     label: 'Entregado',
-  },
-  completado: {
-    color: 'text-green-500',
-    bgColor: 'bg-green-500/10',
-    label: 'Completado',
   },
   rechazado: {
     color: 'text-red-400',

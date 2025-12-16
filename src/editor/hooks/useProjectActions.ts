@@ -95,10 +95,8 @@ export const useProjectActions = (): ProjectActionsReturn => {
   // ==========================================================================
 
   const validateSavePermissions = (): { valid: boolean; error?: string } => {
-    if (isReadOnlyMode) {
-      return { valid: false, error: MESSAGES.READ_ONLY };
-    }
-
+    // En modo solo lectura, permitimos guardar pero siempre como nuevo proyecto
+    // (no bloqueamos, solo indicamos que no se puede sobrescribir)
     if (!user) {
       return { valid: false, error: MESSAGES.LOGIN_REQUIRED };
     }
@@ -137,7 +135,21 @@ export const useProjectActions = (): ProjectActionsReturn => {
   // ==========================================================================
 
   const determineSaveOperation = async (): Promise<SaveOperation | null> => {
-    // Proyecto existente
+    // Si está en modo solo lectura, siempre crear nuevo proyecto (no sobrescribir)
+    if (isReadOnlyMode && currentProjectName) {
+      const newName = await requestInput(
+        MESSAGES.PROMPT_SAVE_AS,
+        currentProjectName + COPY_SUFFIX
+      );
+      if (!newName) return null;
+
+      return {
+        mode: 'create',
+        name: newName,
+      };
+    }
+
+    // Proyecto existente (no en modo solo lectura)
     if (currentProjectId && currentProjectName) {
       const shouldOverwrite = confirm(
         MESSAGES.OVERWRITE_CONFIRM(currentProjectName)

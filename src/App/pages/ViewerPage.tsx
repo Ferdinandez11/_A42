@@ -68,9 +68,10 @@ export const ViewerPage: React.FC = () => {
     const params = new URLSearchParams(window.location.search);
     const projectId = params.get("project_id");
     const isClone = params.get("mode") === "clone";
+    const isReadOnly = params.get("mode") === "readonly";
 
     if (projectId) {
-      loadProjectFromURL(projectId)
+      loadProjectFromURL(projectId, isReadOnly)
         .then(() => {
           if (isClone) resetProject();
         })

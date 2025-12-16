@@ -45,6 +45,32 @@ export const useOrders = (): UseOrdersReturn => {
       const loadingToast = showLoading('Cargando datos...');
 
       try {
+        // ARCHIVADO AUTOMÁTICO: Presupuestos presupuestados con más de 15 días sin aceptar
+        // Se usa updated_at para detectar cuándo se cambió a 'presupuestado' (si existe),
+        // o created_at como fallback
+        if (activeTab === 'budgets') {
+          const fifteenDaysAgo = new Date();
+          fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
+          
+          // Buscar presupuestos presupuestados con más de 15 días sin aceptar
+          // Usamos updated_at para detectar cuándo se presupuestó (se actualiza al cambiar estado)
+          const { data: oldBudgeted, error: archiveError } = await supabase
+            .from('orders')
+            .select('id, status, updated_at, created_at')
+            .eq('status', 'presupuestado')
+            .eq('is_archived', false)
+            .lt('updated_at', fifteenDaysAgo.toISOString());
+
+          if (!archiveError && oldBudgeted && oldBudgeted.length > 0) {
+            // Archivar automáticamente los presupuestos con más de 15 días sin aceptar
+            const idsToArchive = oldBudgeted.map(o => o.id);
+            await supabase
+              .from('orders')
+              .update({ is_archived: true })
+              .in('id', idsToArchive);
+          }
+        }
+
         let query = supabase
           .from('orders')
           .select('*, projects(name)')
@@ -60,10 +86,9 @@ export const useOrders = (): UseOrdersReturn => {
             .eq('is_archived', false)
             .in('status', [
               'pedido',
-              'fabricacion',
-              'entregado_parcial',
+              'en_proceso',
+              'enviado',
               'entregado',
-              'completado',
             ]);
         } else if (activeTab === 'archived') {
           query = query.eq('is_archived', true);

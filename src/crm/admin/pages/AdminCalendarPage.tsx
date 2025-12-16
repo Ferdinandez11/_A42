@@ -28,8 +28,9 @@ const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const getStatusColor = (status: string): string => {
   const colors: Record<string, string> = {
     presupuestado: "bg-purple-600",
-    fabricacion: "bg-orange-600",
+    en_proceso: "bg-orange-600",
     pedido: "bg-blue-600",
+    enviado: "bg-indigo-600",
     entregado: "bg-green-600",
     retrasado: "bg-red-700",
   };

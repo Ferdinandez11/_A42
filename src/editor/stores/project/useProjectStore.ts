@@ -69,9 +69,22 @@ export const useProjectStore = create<ProjectState>((set) => ({
   /**
    * Loads a project from the database by ID
    * @param projectId - The project ID to load
+   * @param forceReadOnly - Force read-only mode (from URL parameter mode=readonly)
    */
-  loadProjectFromURL: async (projectId: string) => {
+  loadProjectFromURL: async (projectId: string, forceReadOnly?: boolean) => {
     try {
+      // Check if project has associated orders (presupuestos/pedidos)
+      // If it has, the project must be frozen (read-only mode)
+      const { data: ordersData, error: ordersError } = await supabase
+        .from("orders")
+        .select("id")
+        .eq("project_id", projectId);
+
+      if (ordersError) throw ordersError;
+
+      const hasAssociatedOrders = ordersData && ordersData.length > 0;
+      const shouldBeReadOnly = forceReadOnly || hasAssociatedOrders;
+
       const { data: project, error } = await supabase
         .from("projects")
         .select("id, name, data")
@@ -120,10 +133,11 @@ export const useProjectStore = create<ProjectState>((set) => ({
       });
 
       // Update project store
+      // Project is read-only if: forced by URL parameter OR has associated orders (presupuestos)
       set({
         currentProjectId: project.id,
         currentProjectName: project.name,
-        isReadOnlyMode: true,
+        isReadOnlyMode: shouldBeReadOnly,
       });
     } catch (error) {
       // Re-throw for component to handle with useErrorHandler

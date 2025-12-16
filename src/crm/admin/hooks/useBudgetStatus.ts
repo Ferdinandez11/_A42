@@ -41,9 +41,10 @@ export const useBudgetStatus = (): UseBudgetStatusReturn => {
           (update as any).is_archived = true;
         }
 
+        // Al aceptar presupuesto: calcular fecha de entrega = aceptación + 6 semanas
         if (status === 'pedido') {
           const d = new Date();
-          d.setDate(d.getDate() + 42);
+          d.setDate(d.getDate() + 42); // 6 semanas = 42 días
           update.estimated_delivery_date = d.toISOString();
         }
 
@@ -57,12 +58,18 @@ export const useBudgetStatus = (): UseBudgetStatusReturn => {
         dismissToast(loadingToast);
         showSuccess(
           status === 'pedido'
-            ? '✅ Pedido confirmado. ¡Pasando a fabricación!'
+            ? '✅ Presupuesto aceptado. El pedido ha pasado a "Mis Pedidos"'
             : '✅ Presupuesto archivado'
         );
 
-        if (status === 'pedido') navigate('/portal?tab=orders');
-        else navigate('/portal?tab=archived');
+        // Al aceptar presupuesto, navegar a Mis Pedidos
+        // Al rechazar, navegar a archivados
+        if (status === 'pedido') {
+          navigate('/portal');
+          // El componente recargará con el tab correcto automáticamente
+        } else {
+          navigate('/portal?tab=archived');
+        }
       } catch (error) {
         dismissToast(loadingToast);
         handleError(error);
@@ -95,18 +102,20 @@ export const useBudgetStatus = (): UseBudgetStatusReturn => {
 
   const handleCancelOrder = useCallback(
     async (orderId: string) => {
-      const loadingToast = showLoading('Cancelando pedido...');
+      const loadingToast = showLoading('Archivando pedido...');
 
       try {
+        // El cliente solo puede archivar pedidos en estado 'pedido' (pendiente de aceptación por admin)
+        // No se cancela, solo se archiva
         const { error } = await supabase
           .from('orders')
-          .update({ status: 'cancelado', is_archived: true })
+          .update({ is_archived: true })
           .eq('id', orderId);
 
         if (error) throw error;
 
         dismissToast(loadingToast);
-        showSuccess('✅ Pedido cancelado');
+        showSuccess('✅ Pedido archivado');
         navigate('/portal?tab=archived');
       } catch (error) {
         dismissToast(loadingToast);

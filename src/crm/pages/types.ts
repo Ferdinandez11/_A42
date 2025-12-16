@@ -24,7 +24,8 @@ export type OrderStatus =
   | 'pendiente' 
   | 'presupuestado' 
   | 'pedido' 
-  | 'fabricacion' 
+  | 'en_proceso' 
+  | 'enviado'
   | 'entregado' 
   | 'rechazado' 
   | 'cancelado';

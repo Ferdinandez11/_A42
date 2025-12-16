@@ -321,9 +321,9 @@ export const useBudgetDetail = (orderId: string | undefined): UseBudgetDetailRet
   const handleCancelOrder = useCallback(() => {
     setModal({
       isOpen: true,
-      title: 'Cancelar Pedido',
-      message: 'El pedido pasará a cancelado.',
-      isDestructive: true,
+      title: 'Archivar Pedido',
+      message: 'El pedido se archivará y desaparecerá de "Mis Pedidos".',
+      isDestructive: false,
       onConfirm: async () => {
         if (!orderId) return;
         await budgetStatus.handleCancelOrder(orderId);
