@@ -13,7 +13,12 @@ export class ARManager {
   private engine: A42Engine;
   private savedBackground: THREE.Color | THREE.Texture | null = null;
   private wasSkyVisible: boolean = true;
-  private transparentElements: HTMLElement[] = [];
+  private transparentElements: Array<{
+    el: HTMLElement;
+    background: string;
+    backgroundColor: string;
+  }> = [];
+  private savedAutoClear: boolean | null = null;
 
   constructor(engine: A42Engine) {
     this.engine = engine;
@@ -65,7 +70,16 @@ export class ARManager {
     this.engine.scene.background = null;
     this.engine.setSkyVisible(false);
     this.engine.setGridVisible(false);
+    // Critical for AR: ensure transparent clear and avoid opaque DOM backgrounds
+    this.savedAutoClear = this.engine.renderer.autoClear;
     this.engine.renderer.setClearColor(0x000000, 0);
+    this.engine.renderer.setClearAlpha(0);
+    this.engine.renderer.autoClear = false;
+    this.engine.renderer.domElement.style.setProperty(
+      "background",
+      "transparent",
+      "important"
+    );
 
     // Make elements transparent for AR
     this.makeElementsTransparent();
@@ -80,6 +94,11 @@ export class ARManager {
     if (this.savedBackground) this.engine.scene.background = this.savedBackground;
     if (this.wasSkyVisible) this.engine.setSkyVisible(true);
     this.engine.setGridVisible(gridVisible);
+    if (this.savedAutoClear !== null) {
+      this.engine.renderer.autoClear = this.savedAutoClear;
+      this.savedAutoClear = null;
+    }
+    this.engine.renderer.domElement.style.removeProperty("background");
 
     // Restore element styles
     this.restoreElementStyles();
@@ -90,32 +109,56 @@ export class ARManager {
    */
   private makeElementsTransparent(): void {
     this.transparentElements = [];
-    let el: HTMLElement | null = document.body;
-    while (el) {
-      if (el.style) {
-        this.transparentElements.push(el);
-        el.style.setProperty("background-color", "transparent", "important");
-      }
-      el = el.parentElement;
-    }
+
+    // 1) Ensure page base is transparent (dom-overlay)
     document.body.style.setProperty("background", "transparent", "important");
+    document.body.style.setProperty(
+      "background-color",
+      "transparent",
+      "important"
+    );
     document.documentElement.style.setProperty(
       "background",
       "transparent",
       "important"
     );
+    document.documentElement.style.setProperty(
+      "background-color",
+      "transparent",
+      "important"
+    );
+
+    // 2) Walk up from the WebGL canvas and force ancestors transparent.
+    // This fixes cases where the React container has an opaque Tailwind bg-* class.
+    let el: HTMLElement | null = this.engine.renderer.domElement.parentElement;
+    while (el && el !== document.body) {
+      this.transparentElements.push({
+        el,
+        background: el.style.background || "",
+        backgroundColor: el.style.backgroundColor || "",
+      });
+      el.style.setProperty("background", "transparent", "important");
+      el.style.setProperty("background-color", "transparent", "important");
+      el = el.parentElement;
+    }
   }
 
   /**
    * Restore original element styles after AR session
    */
   private restoreElementStyles(): void {
-    this.transparentElements.forEach((el) => {
-      el.style.removeProperty("background");
-      el.style.removeProperty("background-color");
+    this.transparentElements.forEach(({ el, background, backgroundColor }) => {
+      el.style.setProperty("background", background);
+      el.style.setProperty("background-color", backgroundColor);
+      if (!background) el.style.removeProperty("background");
+      if (!backgroundColor) el.style.removeProperty("background-color");
     });
+    this.transparentElements = [];
+
     document.body.style.removeProperty("background");
+    document.body.style.removeProperty("background-color");
     document.documentElement.style.removeProperty("background");
+    document.documentElement.style.removeProperty("background-color");
   }
 
   /**
