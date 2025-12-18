@@ -3,8 +3,8 @@
 > Professional fence design and budgeting system with real-time 3D visualization
 
 [![CI/CD Pipeline](https://github.com/Ferdinandez11/_A42/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/Ferdinandez11/_A42/actions/workflows/ci-cd.yml)
-[![Tests](https://img.shields.io/badge/tests-136%20passing-success)](https://github.com/Ferdinandez11/_A42)
-[![Coverage](https://img.shields.io/badge/coverage-58%25-yellow)](https://github.com/Ferdinandez11/_A42)
+[![Tests](https://img.shields.io/badge/tests-499%20passing-success)](https://github.com/Ferdinandez11/_A42)
+[![Coverage](https://img.shields.io/badge/coverage-54%25-yellow)](https://github.com/Ferdinandez11/_A42)
 [![TypeScript](https://img.shields.io/badge/TypeScript-100%25-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![License](https://img.shields.io/badge/license-Private-red)](LICENSE)
 
@@ -13,13 +13,12 @@
 ## ✨ Features
 
 - 🎨 **3D Fence Designer** - Interactive 3D editor with real-time preview
+- 🕶️ **AR Mode (WebXR)** - AR session support with transparent background
 - 💰 **Automatic Budgeting** - Price calculation with material breakdown
-- 👥 **CRM System** - Complete client and order management
-- 📊 **Admin Dashboard** - Order tracking, status updates, and reporting
-- 🔐 **Role-based Access** - Client, Employee, and Admin roles
-- 📱 **Responsive Design** - Works on desktop, tablet, and mobile
-- 🔔 **Real-time Notifications** - Toast notifications for all operations
-- 📄 **PDF Generation** - Automatic quote and invoice generation
+- 👥 **CRM System** - Client + budgets + orders management
+- 📊 **Admin Dashboard** - Tracking, status updates, calendar, reporting
+- 🔐 **Role-based Access** - Client, Employee, and Admin roles (Supabase)
+- 📄 **PDF Generation** - Quote PDF generation and attachments delivery
 
 ---
 
@@ -53,7 +52,7 @@ Visit `http://localhost:5173`
 
 ---
 
-## 🧪 Testing
+## 🧪 Testing & Coverage
 
 ```bash
 npm run test              # Run tests in watch mode
@@ -62,36 +61,25 @@ npm run test:coverage     # Generate coverage report
 npm run type-check        # TypeScript validation
 ```
 
-**Current Stats:**
-- ✅ 136 tests passing
-- ✅ 58% code coverage
-- ✅ 0 TypeScript errors
-- ✅ CI/CD automated
+**Current Stats (local run):**
+- ✅ **499 tests passing**
+- ⏭️ **10 tests skipped**
+- ✅ **0 failing tests**
+- ✅ **Coverage (Lines): 53.74%** (v8)
+
+> Coverage HTML report: `coverage/index.html`
 
 ---
 
 ## 🏗️ Tech Stack
 
-**Frontend:** React 18 + TypeScript + Vite + Three.js + Zustand + Tailwind CSS
+**Frontend:** React 19 + TypeScript + Vite + Three.js + Zustand + Tailwind CSS
 
 **Backend:** Supabase (PostgreSQL + Auth + Storage)
 
-**Testing:** Vitest + Testing Library (136 tests, 58% coverage)
+**Testing:** Vitest + Testing Library
 
 **CI/CD:** GitHub Actions + Husky pre-commit hooks
-
----
-
-## 📊 Test Coverage
-
-| Category | Coverage |
-|----------|----------|
-| Utils | 85.30% ⭐⭐⭐⭐⭐ |
-| Lib | 88.70% ⭐⭐⭐⭐⭐ |
-| Stores | 72.15% ⭐⭐⭐⭐ |
-| Hooks | 45.30% ⭐⭐ |
-| Components | 28.40% ⭐⭐ |
-| Features | 8.20% ⭐ |
 
 ---
 
@@ -122,52 +110,6 @@ chore: maintenance tasks
 
 ---
 
-## 🚢 CI/CD Pipeline
-
-Every push to `main`:
-1. ✅ Run 136 tests
-2. ✅ TypeScript check
-3. ✅ ESLint validation
-4. ✅ Build application
-5. ✅ Coverage check (55%+)
-
----
-
-## 📝 Project Status
-
-```
-Tests: 136 passing ✅
-Coverage: 58% ✅
-TypeScript: 0 errors ✅
-Build: Success ✅
-CI/CD: Automated ✅
-
-Progress: 8.5/10
-Status: Production-ready
-```
-
----
-
-## 🗺️ Roadmap
-
-**Completed (Sprint 1-4):**
-- [x] Testing infrastructure (136 tests)
-- [x] Error handling system
-- [x] CI/CD pipeline
-- [x] Pre-commit hooks
-
-**Next (Sprint 5-10):**
-- [ ] Increase coverage to 80%+
-- [ ] Performance optimization
-- [ ] E2E tests
-- [ ] Accessibility improvements
-
----
-
 ## 📄 License
 
 Private and proprietary.
-
----
-
-**Made with ❤️ by Fernando**
