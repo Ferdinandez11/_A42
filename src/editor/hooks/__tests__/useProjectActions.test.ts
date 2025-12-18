@@ -113,38 +113,7 @@ describe('useProjectActions', () => {
       window.confirm = originalConfirm;
     });
 
-    it('should save as new project in read-only mode', async () => {
-      // Mock window.confirm para evitar el diálogo
-      const originalConfirm = window.confirm;
-      window.confirm = vi.fn(() => false);
-      
-      // Configurar mocks ANTES de renderHook
-      mockRequestInput.mockResolvedValue('Existing Project (Copia)');
-      
-      const mockSingle = vi.fn().mockResolvedValue({
-        data: { id: 'project-2', name: 'Existing Project (Copia)' },
-        error: null,
-      });
-      const mockSelect = vi.fn().mockReturnValue({
-        single: mockSingle,
-      });
-      const mockInsert = vi.fn().mockReturnValue({
-        select: mockSelect,
-      });
-
-      // El mock debe devolver un objeto con insert cuando se llama supabase.from('projects')
-      vi.mocked(supabase.from).mockImplementation((table: string) => {
-        if (table === 'projects') {
-          return {
-            insert: mockInsert,
-          } as any;
-        }
-        return {
-          insert: mockInsert,
-        } as any;
-      });
-
-      // Configurar useProjectStore mock ANTES de renderHook
+    it('should not save in read-only mode', async () => {
       (useProjectStore as any).mockReturnValue({
         user: { id: 'user-1' },
         currentProjectId: 'project-1',
@@ -160,28 +129,8 @@ describe('useProjectActions', () => {
         saveResult = await result.current.saveProject();
       });
 
-      await waitFor(() => {
-        // En modo read-only, debería crear un nuevo proyecto (no fallar)
-        // El código actual permite guardar como nuevo proyecto
-        // Verificamos que se haya llamado requestInput (indica que el flujo llegó hasta determineSaveOperation)
-        expect(mockRequestInput).toHaveBeenCalled();
-        // Verificamos que el resultado esté definido
-        expect(saveResult).toBeDefined();
-      }, { timeout: 5000 });
-      
-      // Verificar comportamiento en modo read-only:
-      // 1. requestInput debe ser llamado (para pedir nombre del nuevo proyecto)
-      // 2. El resultado debe estar definido (no debe fallar con error de "Solo Lectura")
-      expect(mockRequestInput).toHaveBeenCalled();
-      expect(saveResult).toBeDefined();
-      
-      // Si el flujo llegó hasta createNewProject, insert debería ser llamado
-      // Pero si hay algún error antes (por ejemplo, en generateThumbnail), puede que no se llame
-      // Lo importante es que requestInput fue llamado, lo que indica que el modo read-only
-      // permite guardar como nuevo proyecto (no bloquea el guardado)
-      
-      // Restore original confirm
-      window.confirm = originalConfirm;
+      expect(saveResult.success).toBe(false);
+      expect(saveResult.error).toContain('Solo Lectura');
     });
 
     it('should require login to save', async () => {

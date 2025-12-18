@@ -65,7 +65,8 @@ export class SceneManager {
     // Initialize renderer
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,
-      alpha: false,
+      // Needed for WebXR AR: allow transparent clearColor (avoid black background)
+      alpha: true,
       preserveDrawingBuffer: true,
       powerPreference: "high-performance",
     });

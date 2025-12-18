@@ -25,6 +25,7 @@ interface OrderTableProps {
   orders: Order[];
   activeTab: TabType;
   onViewOrder: (orderId: string) => void;
+  onReactivate?: (order: Order) => void;
 }
 
 const MESSAGES = {
@@ -35,6 +36,7 @@ export const OrderTable: React.FC<OrderTableProps> = ({
   orders,
   activeTab,
   onViewOrder,
+  onReactivate,
 }) => {
   const isOrdersTab = useMemo(() => activeTab === 'orders', [activeTab]);
   const isArchivedTab = useMemo(() => activeTab === 'archived', [activeTab]);
@@ -107,13 +109,25 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                     <OrderStatusBadge status={order.status} />
                   </td>
                   <td className="px-6 py-4">
-                    <button
-                      onClick={() => onViewOrder(order.id)}
-                      className="bg-neutral-700 hover:bg-neutral-600 text-white px-4 py-2 rounded-lg text-sm font-medium border border-neutral-600 flex items-center gap-2 transition-colors"
-                    >
-                      <Eye size={14} />
-                      Ver Ficha
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => onViewOrder(order.id)}
+                        className="bg-neutral-700 hover:bg-neutral-600 text-white px-4 py-2 rounded-lg text-sm font-medium border border-neutral-600 flex items-center gap-2 transition-colors"
+                      >
+                        <Eye size={14} />
+                        Ver Ficha
+                      </button>
+
+                      {isArchivedTab && onReactivate && (
+                        <button
+                          onClick={() => onReactivate(order)}
+                          className="bg-neutral-800 hover:bg-neutral-700 text-white px-4 py-2 rounded-lg text-sm font-medium border border-neutral-600 flex items-center gap-2 transition-colors"
+                        >
+                          <RotateCcw size={14} />
+                          Reactivar
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))

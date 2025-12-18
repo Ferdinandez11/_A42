@@ -21,12 +21,14 @@ describe('OrderTable', () => {
 
   it('should render empty state when no orders', () => {
     const mockOnViewOrder = vi.fn();
+    const mockOnReactivate = vi.fn();
 
     render(
       <OrderTable
         orders={[]}
         activeTab="budgets"
         onViewOrder={mockOnViewOrder}
+        onReactivate={mockOnReactivate}
       />
     );
 
@@ -35,12 +37,14 @@ describe('OrderTable', () => {
 
   it('should render orders table', () => {
     const mockOnViewOrder = vi.fn();
+    const mockOnReactivate = vi.fn();
 
     render(
       <OrderTable
         orders={mockOrders}
         activeTab="budgets"
         onViewOrder={mockOnViewOrder}
+        onReactivate={mockOnReactivate}
       />
     );
 
@@ -51,12 +55,14 @@ describe('OrderTable', () => {
   it('should call onViewOrder when view button is clicked', async () => {
     const user = userEvent.setup();
     const mockOnViewOrder = vi.fn();
+    const mockOnReactivate = vi.fn();
 
     render(
       <OrderTable
         orders={mockOrders}
         activeTab="budgets"
         onViewOrder={mockOnViewOrder}
+        onReactivate={mockOnReactivate}
       />
     );
 
@@ -66,10 +72,7 @@ describe('OrderTable', () => {
     expect(mockOnViewOrder).toHaveBeenCalledWith('1');
   });
 
-  // TODO: Este test está desactualizado - OrderTable no implementa onReactivate
-  // La funcionalidad de reactivar está en BudgetHeader, no en OrderTable
-  // Referencia: src/crm/shared/components/BudgetHeader.tsx
-  it.skip('should show reactivate button for archived tab', async () => {
+  it('should show reactivate button for archived tab', async () => {
     const user = userEvent.setup();
     const mockOnViewOrder = vi.fn();
     const mockOnReactivate = vi.fn();
@@ -94,12 +97,14 @@ describe('OrderTable', () => {
 
   it('should display correct header for orders tab', () => {
     const mockOnViewOrder = vi.fn();
+    const mockOnReactivate = vi.fn();
 
     render(
       <OrderTable
         orders={mockOrders}
         activeTab="orders"
         onViewOrder={mockOnViewOrder}
+        onReactivate={mockOnReactivate}
       />
     );
 
@@ -108,12 +113,14 @@ describe('OrderTable', () => {
 
   it('should display correct header for budgets tab', () => {
     const mockOnViewOrder = vi.fn();
+    const mockOnReactivate = vi.fn();
 
     render(
       <OrderTable
         orders={mockOrders}
         activeTab="budgets"
         onViewOrder={mockOnViewOrder}
+        onReactivate={mockOnReactivate}
       />
     );
 

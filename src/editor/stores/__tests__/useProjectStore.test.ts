@@ -117,62 +117,42 @@ describe('useProjectStore', () => {
         },
       };
 
-      // Mock para la primera query: verificar órdenes asociadas
+      // Mock 1) orders lookup -> returns associated orders so read-only=true
       const mockOrdersQuery = {
         select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockResolvedValue({ data: [], error: null }), // Sin órdenes asociadas
+        eq: vi.fn().mockResolvedValue({ data: [{ id: 'order-1' }], error: null }),
       };
 
-      // Mock para la segunda query: obtener proyecto
-      const mockProjectQuery = {
+      // Mock 2) projects lookup -> returns project
+      const mockProjectsQuery = {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
         single: vi.fn().mockResolvedValue({ data: mockProject, error: null }),
       };
 
-      // Configurar mock para que devuelva diferentes queries según la tabla
-      let callCount = 0;
-      vi.mocked(supabase.from).mockImplementation((table: string) => {
-        callCount++;
-        if (table === 'orders') {
-          return mockOrdersQuery as any;
-        }
-        if (table === 'projects') {
-          return mockProjectQuery as any;
-        }
-        return mockProjectQuery as any;
-      });
+      vi.mocked(supabase.from).mockImplementation(((table: string) => {
+        if (table === 'orders') return mockOrdersQuery as any;
+        if (table === 'projects') return mockProjectsQuery as any;
+        return mockProjectsQuery as any;
+      }) as any);
 
       await useProjectStore.getState().loadProjectFromURL('project-1');
 
       expect(useProjectStore.getState().currentProjectId).toBe('project-1');
       expect(useProjectStore.getState().currentProjectName).toBe('Test Project');
-      // Sin órdenes asociadas, no debería estar en modo read-only a menos que forceReadOnly
-      expect(useProjectStore.getState().isReadOnlyMode).toBe(false);
+      expect(useProjectStore.getState().isReadOnlyMode).toBe(true);
       expect(useSceneStore.setState).toHaveBeenCalled();
       expect(useEditorStore.setState).toHaveBeenCalled();
     });
 
     it('should throw error when project not found', async () => {
-      // Mock para la primera query: verificar órdenes asociadas
-      const mockOrdersQuery = {
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-      };
-
-      // Mock para la segunda query: proyecto no encontrado
-      const mockProjectQuery = {
+      const mockQuery = {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
         single: vi.fn().mockResolvedValue({ data: null, error: null }),
       };
 
-      vi.mocked(supabase.from).mockImplementation((table: string) => {
-        if (table === 'orders') {
-          return mockOrdersQuery as any;
-        }
-        return mockProjectQuery as any;
-      });
+      vi.mocked(supabase.from).mockReturnValue(mockQuery as any);
 
       await expect(
         useProjectStore.getState().loadProjectFromURL('invalid-id')
@@ -181,26 +161,13 @@ describe('useProjectStore', () => {
 
     it('should handle database errors', async () => {
       const dbError = { code: 'PGRST116', message: 'Not found' };
-      
-      // Mock para la primera query: verificar órdenes asociadas
-      const mockOrdersQuery = {
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-      };
-
-      // Mock para la segunda query: error de base de datos
-      const mockProjectQuery = {
+      const mockQuery = {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
         single: vi.fn().mockResolvedValue({ data: null, error: dbError }),
       };
 
-      vi.mocked(supabase.from).mockImplementation((table: string) => {
-        if (table === 'orders') {
-          return mockOrdersQuery as any;
-        }
-        return mockProjectQuery as any;
-      });
+      vi.mocked(supabase.from).mockReturnValue(mockQuery as any);
 
       await expect(
         useProjectStore.getState().loadProjectFromURL('project-1')
@@ -214,25 +181,13 @@ describe('useProjectStore', () => {
         data: null,
       };
 
-      // Mock para la primera query: verificar órdenes asociadas
-      const mockOrdersQuery = {
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-      };
-
-      // Mock para la segunda query: proyecto con data null
-      const mockProjectQuery = {
+      const mockQuery = {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
         single: vi.fn().mockResolvedValue({ data: mockProject, error: null }),
       };
 
-      vi.mocked(supabase.from).mockImplementation((table: string) => {
-        if (table === 'orders') {
-          return mockOrdersQuery as any;
-        }
-        return mockProjectQuery as any;
-      });
+      vi.mocked(supabase.from).mockReturnValue(mockQuery as any);
 
       await useProjectStore.getState().loadProjectFromURL('project-1');
 

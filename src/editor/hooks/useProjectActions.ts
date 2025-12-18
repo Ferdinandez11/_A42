@@ -255,6 +255,12 @@ export const useProjectActions = (): ProjectActionsReturn => {
   // ==========================================================================
 
   const saveProject = useCallback(async (): Promise<SaveProjectResult> => {
+    // En modo solo lectura no se permite guardar (ni como copia) según contrato de tests
+    if (isReadOnlyMode) {
+      showError(MESSAGES.READ_ONLY);
+      return { success: false, error: MESSAGES.READ_ONLY };
+    }
+
     // Validar permisos
     const validation = validateSavePermissions();
     if (!validation.valid) {

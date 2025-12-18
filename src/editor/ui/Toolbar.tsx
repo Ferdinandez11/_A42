@@ -200,8 +200,11 @@ const ProjectActions: React.FC<{
         label={getSaveLabel()}
         onClick={onSave}
         disabled={isSaveDisabled}
-        className={`${isSaving ? 'text-yellow-400' : ''} ${isSaveDisabled ? 'opacity-50 cursor-not-allowed' : 'opacity-100 cursor-pointer'}`}
         title={getSaveTitle()}
+        className={[
+          isSaving ? 'text-yellow-400' : '',
+          isSaveDisabled ? 'opacity-50 cursor-not-allowed' : 'opacity-100 cursor-pointer',
+        ].filter(Boolean).join(' ')}
       />
       <ToolButton
         icon={<Upload size={20} />}

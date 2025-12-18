@@ -82,8 +82,8 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
       if (ordersError) throw ordersError;
 
-      const hasAssociatedOrders = ordersData && ordersData.length > 0;
-      const shouldBeReadOnly = forceReadOnly || hasAssociatedOrders;
+      const hasAssociatedOrders = (ordersData?.length ?? 0) > 0;
+      const shouldBeReadOnly = Boolean(forceReadOnly) || hasAssociatedOrders;
 
       const { data: project, error } = await supabase
         .from("projects")
