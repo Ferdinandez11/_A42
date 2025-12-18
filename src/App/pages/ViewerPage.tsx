@@ -11,6 +11,7 @@ import type { ExtendedUser } from "@/App/utils/types";
 export const ViewerPage: React.FC = () => {
   const isReadOnlyMode = useProjectStore((s) => s.isReadOnlyMode);
   const loadProjectFromURL = useProjectStore((s) => s.loadProjectFromURL);
+  const loadSharedProjectFromURL = useProjectStore((s) => s.loadSharedProjectFromURL);
   const resetProject = useProjectStore((s) => s.resetProject);
   const setProjectUser = useProjectStore((s) => s.setUser);
 
@@ -69,9 +70,16 @@ export const ViewerPage: React.FC = () => {
     const projectId = params.get("project_id");
     const isClone = params.get("mode") === "clone";
     const isReadOnly = params.get("mode") === "readonly";
+    const shareToken = params.get("token");
+    const isShared = params.get("share") === "1";
 
     if (projectId) {
-      loadProjectFromURL(projectId, isReadOnly)
+      const loader =
+        isShared && shareToken
+          ? loadSharedProjectFromURL(projectId, shareToken)
+          : loadProjectFromURL(projectId, isReadOnly);
+
+      loader
         .then(() => {
           if (isClone) resetProject();
         })
@@ -79,7 +87,7 @@ export const ViewerPage: React.FC = () => {
           handleError(error);
         });
     }
-  }, [loadProjectFromURL, resetProject, handleError]);
+  }, [loadProjectFromURL, loadSharedProjectFromURL, resetProject, handleError]);
 
   const isAdminOrEmployee =
     user?.role === "admin" || user?.role === "employee";

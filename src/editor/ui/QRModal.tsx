@@ -175,7 +175,7 @@ export const QRModal: React.FC<QRModalProps> = ({ isOpen, onClose }) => {
   
   // Store hooks
   const { user } = useAuthStore();
-  const { currentProjectId } = useProjectStore();
+  const { currentProjectId, currentProjectShareToken } = useProjectStore();
 
   // Early return if modal is closed
   if (!isOpen) {
@@ -183,10 +183,14 @@ export const QRModal: React.FC<QRModalProps> = ({ isOpen, onClose }) => {
   }
 
   // Computed values
-  const shareUrl = currentProjectId
-    ? `${window.location.origin}/?project_id=${currentProjectId}`
-    : "";
+  const shareUrl =
+    currentProjectId && currentProjectShareToken
+      ? `${window.location.origin}/?project_id=${currentProjectId}&mode=readonly&share=1&token=${encodeURIComponent(
+          currentProjectShareToken
+        )}`
+      : "";
   const isProjectSaved = !!currentProjectId;
+  const hasShareToken = !!currentProjectShareToken;
 
   // Handlers
   const handleNavigateToLogin = (): void => {
@@ -196,7 +200,7 @@ export const QRModal: React.FC<QRModalProps> = ({ isOpen, onClose }) => {
   // Render modal content based on state
   const renderContent = (): React.ReactNode => {
     // Case 1: Project is saved → Show QR
-    if (isProjectSaved) {
+    if (isProjectSaved && hasShareToken) {
       return (
         <QRContent
           shareUrl={shareUrl}
@@ -206,14 +210,14 @@ export const QRModal: React.FC<QRModalProps> = ({ isOpen, onClose }) => {
       );
     }
 
-    // Case 2: Project not saved + User logged in → Ask to save
+    // Case 2: Project not saved (or no share token yet) + User logged in → Ask to save
     if (user) {
       return (
         <EmptyState
           icon={Save}
           variant="warning"
-          title="Proyecto no guardado"
-          description="Guarda el proyecto para generar un enlace único."
+          title="Proyecto no listo para compartir"
+          description="Guarda el proyecto para generar un enlace único (QR)."
           buttonText="Volver y Guardar"
           onButtonClick={onClose}
           buttonVariant="secondary"

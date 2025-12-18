@@ -52,6 +52,7 @@ describe('useProjectStore', () => {
       user: null,
       currentProjectId: null,
       currentProjectName: null,
+      currentProjectShareToken: null,
       isReadOnlyMode: false,
     });
     

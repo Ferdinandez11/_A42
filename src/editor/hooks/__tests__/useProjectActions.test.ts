@@ -55,6 +55,7 @@ describe('useProjectActions', () => {
       user: { id: 'user-1' },
       currentProjectId: null,
       currentProjectName: null,
+      currentProjectShareToken: null,
       isReadOnlyMode: false,
       setProjectInfo: mockSetProjectInfo,
     });
@@ -118,6 +119,7 @@ describe('useProjectActions', () => {
         user: { id: 'user-1' },
         currentProjectId: 'project-1',
         currentProjectName: 'Existing Project',
+        currentProjectShareToken: 'token-1',
         isReadOnlyMode: true,
         setProjectInfo: mockSetProjectInfo,
       });
@@ -138,6 +140,7 @@ describe('useProjectActions', () => {
         user: null,
         currentProjectId: null,
         currentProjectName: null,
+        currentProjectShareToken: null,
         isReadOnlyMode: false,
         setProjectInfo: mockSetProjectInfo,
       });

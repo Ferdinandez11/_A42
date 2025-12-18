@@ -16,12 +16,18 @@ interface ProjectState {
   user: User | null;
   currentProjectId: string | null;
   currentProjectName: string | null;
+  currentProjectShareToken: string | null;
   isReadOnlyMode: boolean;
 
   setUser: (user: User | null) => void;
-  setProjectInfo: (id: string | null, name: string | null) => void;
+  setProjectInfo: (
+    id: string | null,
+    name: string | null,
+    shareToken?: string | null
+  ) => void;
   resetProject: () => void;
   loadProjectFromURL: (projectId: string) => Promise<void>;
+  loadSharedProjectFromURL: (projectId: string, token: string) => Promise<void>;
 }
 
 /**
@@ -32,6 +38,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
   user: null,
   currentProjectId: null,
   currentProjectName: null,
+  currentProjectShareToken: null,
   isReadOnlyMode: false,
 
   /**
@@ -42,10 +49,11 @@ export const useProjectStore = create<ProjectState>((set) => ({
   /**
    * Sets project information (ID and name)
    */
-  setProjectInfo: (id, name) =>
+  setProjectInfo: (id, name, shareToken = null) =>
     set({
       currentProjectId: id,
       currentProjectName: name,
+      currentProjectShareToken: shareToken,
       isReadOnlyMode: false,
     }),
 
@@ -59,6 +67,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       set({
         currentProjectId: null,
         currentProjectName: null,
+        currentProjectShareToken: null,
         isReadOnlyMode: false,
       });
     } catch (error) {
@@ -137,11 +146,64 @@ export const useProjectStore = create<ProjectState>((set) => ({
       set({
         currentProjectId: project.id,
         currentProjectName: project.name,
+        currentProjectShareToken:
+          (project as any).share_token ? String((project as any).share_token) : null,
         isReadOnlyMode: shouldBeReadOnly,
       });
     } catch (error) {
       // Re-throw for component to handle with useErrorHandler
       throw handleError(error, 'useProjectStore.loadProjectFromURL');
+    }
+  },
+
+  /**
+   * Loads a shared project (public/QR) using a share token.
+   * Requires an RPC on Supabase: get_shared_project(project_id, token)
+   * Always forces read-only mode.
+   */
+  loadSharedProjectFromURL: async (projectId: string, token: string) => {
+    try {
+      const { data: project, error } = await supabase.rpc("get_shared_project", {
+        project_id: projectId,
+        token,
+      });
+
+      if (error) throw error;
+
+      if (!project) {
+        throw new AppError(ErrorType.NOT_FOUND, "Shared project not found", {
+          userMessage: "Enlace inválido o expirado",
+          severity: ErrorSeverity.MEDIUM,
+        });
+      }
+
+      const sceneData = (project as any).data || {};
+
+      const items: SceneItem[] = Array.isArray(sceneData.items) ? sceneData.items : [];
+      const fenceConfig: FenceConfig = sceneData.fenceConfig || {
+        presetId: "wood",
+        colors: { post: 0, slatA: 0 },
+      };
+      const totalPrice = items.reduce((sum, item) => sum + (item.price || 0), 0);
+
+      useSceneStore.setState({
+        items,
+        fenceConfig,
+        totalPrice,
+      });
+
+      useEditorStore.setState({
+        cameraType: sceneData.camera || "perspective",
+      });
+
+      set({
+        currentProjectId: (project as any).id ?? projectId,
+        currentProjectName: (project as any).name ?? null,
+        currentProjectShareToken: token,
+        isReadOnlyMode: true,
+      });
+    } catch (error) {
+      throw handleError(error, "useProjectStore.loadSharedProjectFromURL");
     }
   },
 }));

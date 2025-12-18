@@ -206,6 +206,8 @@ export const useProjectActions = (): ProjectActionsReturn => {
           data: projectData,
           thumbnail_url: thumbnailBase64,
           total_price: totalPrice,
+          // Enabled share-by-QR by default (requires DB columns: share_enabled/share_token)
+          share_enabled: true,
         },
       ])
       .select()
@@ -214,7 +216,11 @@ export const useProjectActions = (): ProjectActionsReturn => {
     if (error) throw error;
 
     if (data) {
-      setProjectInfo(data.id, data.name);
+      setProjectInfo(
+        data.id,
+        data.name,
+        (data as any).share_token ? String((data as any).share_token) : null
+      );
     }
 
     return {
