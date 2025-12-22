@@ -199,12 +199,12 @@ export const QRModal: React.FC<QRModalProps> = ({ isOpen, onClose }) => {
 
   // Render modal content based on state
   const renderContent = (): React.ReactNode => {
-    // Case 1: Project is saved → Show QR
+    // Case 1: Project is saved + has share token → Show QR
     if (isProjectSaved && hasShareToken) {
       return (
         <QRContent
           shareUrl={shareUrl}
-          projectId={currentProjectId}
+          projectId={currentProjectId!}
           hasUser={!!user}
         />
       );

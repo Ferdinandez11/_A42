@@ -108,6 +108,7 @@ describe('useProjectStore', () => {
       const mockProject = {
         id: 'project-1',
         name: 'Test Project',
+        share_token: 'token-123',
         data: {
           items: [
             { uuid: 'item-1', price: 100 },

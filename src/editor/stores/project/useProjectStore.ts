@@ -20,13 +20,9 @@ interface ProjectState {
   isReadOnlyMode: boolean;
 
   setUser: (user: User | null) => void;
-  setProjectInfo: (
-    id: string | null,
-    name: string | null,
-    shareToken?: string | null
-  ) => void;
+  setProjectInfo: (id: string | null, name: string | null, shareToken?: string | null) => void;
   resetProject: () => void;
-  loadProjectFromURL: (projectId: string) => Promise<void>;
+  loadProjectFromURL: (projectId: string, forceReadOnly?: boolean) => Promise<void>;
   loadSharedProjectFromURL: (projectId: string, token: string) => Promise<void>;
 }
 
@@ -47,7 +43,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
   setUser: (user) => set({ user }),
 
   /**
-   * Sets project information (ID and name)
+   * Sets project information (ID, name, and optional share token)
    */
   setProjectInfo: (id, name, shareToken = null) =>
     set({
@@ -96,7 +92,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
       const { data: project, error } = await supabase
         .from("projects")
-        .select("id, name, data")
+        .select("id, name, data, share_token")
         .eq("id", projectId)
         .single();
 
@@ -146,8 +142,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       set({
         currentProjectId: project.id,
         currentProjectName: project.name,
-        currentProjectShareToken:
-          (project as any).share_token ? String((project as any).share_token) : null,
+        currentProjectShareToken: (project as any).share_token ? String((project as any).share_token) : null,
         isReadOnlyMode: shouldBeReadOnly,
       });
     } catch (error) {
@@ -170,14 +165,24 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
       if (error) throw error;
 
-      if (!project) {
+      if (!project || (Array.isArray(project) && project.length === 0)) {
         throw new AppError(ErrorType.NOT_FOUND, "Shared project not found", {
           userMessage: "Enlace inválido o expirado",
           severity: ErrorSeverity.MEDIUM,
         });
       }
 
-      const sceneData = (project as any).data || {};
+      // RPC returns a single row or array, normalize it
+      const projectData = Array.isArray(project) ? project[0] : project;
+
+      if (!projectData) {
+        throw new AppError(ErrorType.NOT_FOUND, "Shared project not found", {
+          userMessage: "Enlace inválido o expirado",
+          severity: ErrorSeverity.MEDIUM,
+        });
+      }
+
+      const sceneData = projectData.data || {};
 
       const items: SceneItem[] = Array.isArray(sceneData.items) ? sceneData.items : [];
       const fenceConfig: FenceConfig = sceneData.fenceConfig || {
@@ -197,8 +202,8 @@ export const useProjectStore = create<ProjectState>((set) => ({
       });
 
       set({
-        currentProjectId: (project as any).id ?? projectId,
-        currentProjectName: (project as any).name ?? null,
+        currentProjectId: projectData.id ?? projectId,
+        currentProjectName: projectData.name ?? null,
         currentProjectShareToken: token,
         isReadOnlyMode: true,
       });

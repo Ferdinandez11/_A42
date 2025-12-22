@@ -70,7 +70,7 @@ describe('useProjectActions', () => {
       mockRequestInput.mockResolvedValue('New Project');
       
       const mockSingle = vi.fn().mockResolvedValue({
-        data: { id: 'project-1', name: 'New Project' },
+        data: { id: 'project-1', name: 'New Project', share_token: 'token-123' },
         error: null,
       });
       const mockSelect = vi.fn().mockReturnValue({
