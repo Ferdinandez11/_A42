@@ -206,16 +206,26 @@ export const useProjectActions = (): ProjectActionsReturn => {
           data: projectData,
           thumbnail_url: thumbnailBase64,
           total_price: totalPrice,
-          share_enabled: true,
+          share_enabled: true, // Habilitar share por defecto
         },
       ])
-      .select()
+      .select('id, name, share_token') // Asegurar que seleccionamos share_token
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('[createNewProject] Insert error:', error);
+      throw error;
+    }
 
     if (data) {
+      // El share_token se genera automáticamente por la DB (DEFAULT gen_random_uuid())
       const shareToken = (data as any).share_token ? String((data as any).share_token) : null;
+      console.log('[createNewProject] Project created:', { id: data.id, name: data.name, shareToken });
+      
+      if (!shareToken) {
+        console.warn('[createNewProject] Warning: share_token is null, project may not be shareable');
+      }
+      
       setProjectInfo(data.id, data.name, shareToken);
     }
 
@@ -232,7 +242,9 @@ export const useProjectActions = (): ProjectActionsReturn => {
     projectData: ProjectData,
     thumbnailBase64: string
   ): Promise<SaveProjectResult> => {
-    const { error } = await supabase
+    // Al actualizar, también habilitar share si no está habilitado
+    // y obtener el share_token para actualizar el estado
+    const { data, error } = await supabase
       .from('projects')
       .update({
         name,
@@ -240,10 +252,19 @@ export const useProjectActions = (): ProjectActionsReturn => {
         thumbnail_url: thumbnailBase64,
         total_price: totalPrice,
         updated_at: new Date(),
+        share_enabled: true, // Asegurar que share está habilitado
       })
-      .eq('id', projectId);
+      .eq('id', projectId)
+      .select('id, name, share_token')
+      .single();
 
     if (error) throw error;
+
+    // Actualizar el share_token en el estado si existe
+    if (data) {
+      const shareToken = (data as any).share_token ? String((data as any).share_token) : null;
+      setProjectInfo(projectId, name, shareToken);
+    }
 
     return {
       success: true,

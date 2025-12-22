@@ -70,10 +70,34 @@ export const ViewerPage: React.FC = () => {
     const projectId = params.get("project_id");
     const isClone = params.get("mode") === "clone";
     const isReadOnly = params.get("mode") === "readonly";
-    const shareToken = params.get("token");
+    const shareTokenRaw = params.get("token");
     const isShared = params.get("share") === "1";
 
+    // Decodificar token de la URL (puede estar encodeURIComponent)
+    const shareToken = shareTokenRaw ? decodeURIComponent(shareTokenRaw) : null;
+
     if (projectId) {
+      // Validar formato UUID para projectId y token
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      
+      if (!uuidRegex.test(projectId)) {
+        handleError(new AppError(ErrorType.VALIDATION, "Invalid project ID format", {
+          userMessage: "ID de proyecto inválido",
+          severity: ErrorSeverity.MEDIUM,
+        }));
+        return;
+      }
+
+      if (isShared && shareToken) {
+        if (!uuidRegex.test(shareToken)) {
+          handleError(new AppError(ErrorType.VALIDATION, "Invalid token format", {
+            userMessage: "Token de enlace inválido",
+            severity: ErrorSeverity.MEDIUM,
+          }));
+          return;
+        }
+      }
+
       const loader =
         isShared && shareToken
           ? loadSharedProjectFromURL(projectId, shareToken)

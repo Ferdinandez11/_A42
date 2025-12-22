@@ -158,25 +158,60 @@ export const useProjectStore = create<ProjectState>((set) => ({
    */
   loadSharedProjectFromURL: async (projectId: string, token: string) => {
     try {
-      const { data: project, error } = await supabase.rpc("get_shared_project", {
-        project_id: projectId,
-        token,
-      });
-
-      if (error) throw error;
-
-      if (!project || (Array.isArray(project) && project.length === 0)) {
-        throw new AppError(ErrorType.NOT_FOUND, "Shared project not found", {
+      // Validate inputs
+      if (!projectId || !token) {
+        throw new AppError(ErrorType.VALIDATION, "Missing project ID or token", {
           userMessage: "Enlace inválido o expirado",
           severity: ErrorSeverity.MEDIUM,
         });
       }
 
-      // RPC returns a single row or array, normalize it
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(projectId) || !uuidRegex.test(token)) {
+        throw new AppError(ErrorType.VALIDATION, "Invalid UUID format", {
+          userMessage: "Enlace inválido o expirado",
+          severity: ErrorSeverity.MEDIUM,
+        });
+      }
+
+      console.log("[loadSharedProjectFromURL] Calling RPC with:", { projectId, token });
+
+      // Call RPC - Supabase RPC with RETURNS TABLE returns an array
+      // Pass as UUID type (Supabase will handle conversion)
+      const { data: project, error } = await supabase.rpc("get_shared_project", {
+        project_id: projectId,
+        token: token,
+      });
+
+      console.log("[loadSharedProjectFromURL] RPC response:", { project, error });
+
+      if (error) {
+        console.error("[loadSharedProjectFromURL] RPC error:", error);
+        throw new AppError(ErrorType.NOT_FOUND, `RPC error: ${error.message}`, {
+          userMessage: "Enlace inválido o expirado",
+          severity: ErrorSeverity.MEDIUM,
+          metadata: { originalError: error, projectId, token },
+        });
+      }
+
+      // RPC with RETURNS TABLE always returns an array (even if empty)
+      // If no rows match, it returns []
+      if (!project || (Array.isArray(project) && project.length === 0)) {
+        console.warn("[loadSharedProjectFromURL] No project found", { projectId, token, project });
+        throw new AppError(ErrorType.NOT_FOUND, "Shared project not found", {
+          userMessage: "Enlace inválido o expirado. Verifica que el proyecto tenga el compartir habilitado.",
+          severity: ErrorSeverity.MEDIUM,
+          metadata: { projectId, token },
+        });
+      }
+
+      // RPC returns array, get first element
       const projectData = Array.isArray(project) ? project[0] : project;
 
-      if (!projectData) {
-        throw new AppError(ErrorType.NOT_FOUND, "Shared project not found", {
+      if (!projectData || !projectData.id) {
+        console.warn("[loadSharedProjectFromURL] Invalid project data", { projectData });
+        throw new AppError(ErrorType.NOT_FOUND, "Shared project data invalid", {
           userMessage: "Enlace inválido o expirado",
           severity: ErrorSeverity.MEDIUM,
         });
