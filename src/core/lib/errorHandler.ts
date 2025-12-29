@@ -240,6 +240,18 @@ class ErrorHandler {
    * Normaliza cualquier error a AppError
    */
   private normalizeError(error: unknown, context?: string): AppError {
+    // Ignorar errores de extensiones del navegador
+    if (error instanceof Error && error.message.includes('message channel closed')) {
+      return new AppError(
+        ErrorType.UNKNOWN,
+        'Browser extension error (ignored)',
+        {
+          severity: ErrorSeverity.LOW,
+          userMessage: '',
+        }
+      );
+    }
+    
     // Ya es un AppError
     if (error instanceof AppError) {
       return error;
@@ -478,6 +490,10 @@ class ErrorHandler {
   shouldShowToUser(error: AppError): boolean {
     // No mostrar errores de baja severidad
     if (error.severity === ErrorSeverity.LOW) {
+      return false;
+    }
+    // No mostrar errores sin mensaje de usuario
+    if (!error.userMessage || error.userMessage.trim() === '') {
       return false;
     }
     return true;

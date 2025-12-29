@@ -110,15 +110,30 @@ const handleAuth = async (e: React.FormEvent<HTMLFormElement>): Promise<void> =>
       await checkUserStatus(result.data.user.id);
     }
   } catch (error) {
-    // Log del error completo para debugging
-    if (import.meta.env.DEV) {
-      console.error('[LoginPage] Error completo:', error);
-      if (error && typeof error === 'object' && 'code' in error) {
-        console.error('[LoginPage] Código de error:', (error as { code: string }).code);
-        console.error('[LoginPage] Mensaje de error:', (error as { message: string }).message);
-      }
+    // Ignorar errores de extensiones del navegador
+    if (error instanceof Error && error.message.includes('message channel closed')) {
+      return;
     }
     
+    // Log del error completo para debugging
+    if (import.meta.env.DEV) {
+      console.group('[LoginPage] Error de autenticación');
+      console.error('Error completo:', error);
+      if (error && typeof error === 'object') {
+        if ('code' in error) {
+          console.error('Código de error:', (error as { code: string }).code);
+        }
+        if ('message' in error) {
+          console.error('Mensaje de error:', (error as { message: string }).message);
+        }
+        if ('status' in error) {
+          console.error('Status:', (error as { status: number }).status);
+        }
+      }
+      console.groupEnd();
+    }
+    
+    // Manejar el error
     handleError(error);
   } finally {
     setLoading(false);

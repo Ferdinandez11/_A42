@@ -6,7 +6,8 @@ import { useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { 
   handleError as handleErrorCore, 
-  getUserMessage, 
+  getUserMessage,
+  errorHandler,
   AppError,
   ErrorType,
   ErrorSeverity,
@@ -103,29 +104,32 @@ export const useErrorHandler = (
       // Procesar el error
       const appError = handleErrorCore(error, mergedOptions.context || context);
       
-      // Mostrar toast si está habilitado
-      if (showToast) {
+      // Mostrar toast si está habilitado y el error debe mostrarse
+      if (showToast && errorHandler.shouldShowToUser(appError)) {
         const message = mergedOptions.customMessage || getUserMessage(appError);
         
-        // Elegir tipo de toast según severidad
-        switch (appError.severity) {
-          case ErrorSeverity.CRITICAL:
-          case ErrorSeverity.HIGH:
-            toast.error(message, {
-              duration: 6000,
-              icon: '🚨',
-            });
-            break;
-          
-          case ErrorSeverity.MEDIUM:
-            toast.error(message);
-            break;
-          
-          case ErrorSeverity.LOW:
-            toast(message, {
-              icon: 'ℹ️',
-            });
-            break;
+        // Solo mostrar si hay mensaje
+        if (message && message.trim() !== '') {
+          // Elegir tipo de toast según severidad
+          switch (appError.severity) {
+            case ErrorSeverity.CRITICAL:
+            case ErrorSeverity.HIGH:
+              toast.error(message, {
+                duration: 6000,
+                icon: '🚨',
+              });
+              break;
+            
+            case ErrorSeverity.MEDIUM:
+              toast.error(message);
+              break;
+            
+            case ErrorSeverity.LOW:
+              toast(message, {
+                icon: 'ℹ️',
+              });
+              break;
+          }
         }
       }
       
