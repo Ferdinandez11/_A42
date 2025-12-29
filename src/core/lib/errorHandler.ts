@@ -298,8 +298,62 @@ class ErrorHandler {
    */
   private handleSupabaseError(error: { code: string; message: string }, context?: string): AppError {
     const code = error.code;
+    const message = error.message.toLowerCase();
     
-    // Errores de autenticación
+    // Errores de autenticación de Supabase Auth
+    if (code === 'invalid_credentials' || message.includes('invalid login credentials')) {
+      return new AppError(
+        ErrorType.AUTH,
+        error.message,
+        {
+          severity: ErrorSeverity.HIGH,
+          userMessage: 'Email o contraseña incorrectos. Verifica tus credenciales.',
+          metadata: { component: context, code },
+          originalError: error,
+        }
+      );
+    }
+    
+    if (code === 'email_not_confirmed' || message.includes('email not confirmed')) {
+      return new AppError(
+        ErrorType.AUTH,
+        error.message,
+        {
+          severity: ErrorSeverity.MEDIUM,
+          userMessage: 'Por favor, confirma tu email antes de iniciar sesión.',
+          metadata: { component: context, code },
+          originalError: error,
+        }
+      );
+    }
+    
+    if (code === 'user_not_found' || message.includes('user not found')) {
+      return new AppError(
+        ErrorType.AUTH,
+        error.message,
+        {
+          severity: ErrorSeverity.HIGH,
+          userMessage: 'Usuario no encontrado. Verifica tu email o regístrate.',
+          metadata: { component: context, code },
+          originalError: error,
+        }
+      );
+    }
+    
+    if (code === 'signup_disabled' || message.includes('signup disabled')) {
+      return new AppError(
+        ErrorType.AUTH,
+        error.message,
+        {
+          severity: ErrorSeverity.MEDIUM,
+          userMessage: 'El registro está deshabilitado temporalmente.',
+          metadata: { component: context, code },
+          originalError: error,
+        }
+      );
+    }
+    
+    // Errores de autenticación HTTP
     if (code === 'PGRST301' || code === '401') {
       return new AppError(
         ErrorType.AUTH,
@@ -320,6 +374,7 @@ class ErrorHandler {
         error.message,
         {
           severity: ErrorSeverity.MEDIUM,
+          userMessage: 'No tienes permisos para realizar esta acción.',
           metadata: { component: context, code },
           originalError: error,
         }
@@ -333,6 +388,7 @@ class ErrorHandler {
         error.message,
         {
           severity: ErrorSeverity.LOW,
+          userMessage: 'No se encontró el recurso solicitado.',
           metadata: { component: context, code },
           originalError: error,
         }
@@ -345,6 +401,7 @@ class ErrorHandler {
       error.message,
       {
         severity: ErrorSeverity.MEDIUM,
+        userMessage: 'Error al procesar la solicitud. Intenta nuevamente.',
         metadata: { component: context, code },
         originalError: error,
       }

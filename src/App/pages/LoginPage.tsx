@@ -110,6 +110,15 @@ const handleAuth = async (e: React.FormEvent<HTMLFormElement>): Promise<void> =>
       await checkUserStatus(result.data.user.id);
     }
   } catch (error) {
+    // Log del error completo para debugging
+    if (import.meta.env.DEV) {
+      console.error('[LoginPage] Error completo:', error);
+      if (error && typeof error === 'object' && 'code' in error) {
+        console.error('[LoginPage] Código de error:', (error as { code: string }).code);
+        console.error('[LoginPage] Mensaje de error:', (error as { message: string }).message);
+      }
+    }
+    
     handleError(error);
   } finally {
     setLoading(false);
