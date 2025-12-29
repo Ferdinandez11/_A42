@@ -4,6 +4,7 @@ import { supabase } from '@/core/lib/supabase';
 // ✅ IMPORTS DEL SISTEMA DE ERRORES
 import { useErrorHandler } from '@/core/hooks/useErrorHandler';
 import { AppError, ErrorType, ErrorSeverity } from '@/core/lib/errorHandler';
+import { ProfileSchema, getFormErrors } from '@/core/lib/formSchemas';
 
 // ============================================================================
 // TYPES
@@ -68,12 +69,17 @@ const SectionTitle: React.FC<{ icon: string; children: React.ReactNode }> = ({
   </h4>
 );
 
-const FormField: React.FC<FormFieldProps> = ({
+interface FormFieldWithErrorProps extends FormFieldProps {
+  error?: string;
+}
+
+const FormField: React.FC<FormFieldWithErrorProps> = ({
   label,
   type = 'text',
   placeholder,
   value,
   onChange,
+  error,
 }) => (
   <label className="block mb-4">
     <span className="block text-neutral-400 text-sm mb-1">{label}</span>
@@ -82,17 +88,29 @@ const FormField: React.FC<FormFieldProps> = ({
       placeholder={placeholder}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full px-3 py-2.5 bg-neutral-800 border border-neutral-700 rounded-lg text-white focus:outline-none focus:border-orange-500 transition-colors"
+      className={`w-full px-3 py-2.5 bg-neutral-800 border rounded-lg text-white focus:outline-none transition-colors ${
+        error 
+          ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+          : 'border-neutral-700 focus:border-orange-500 focus:ring-orange-500'
+      } focus:ring-1`}
     />
+    {error && (
+      <p className="text-red-400 text-sm mt-1">{error}</p>
+    )}
   </label>
 );
 
-const TextareaField: React.FC<TextareaFieldProps> = ({
+interface TextareaFieldWithErrorProps extends TextareaFieldProps {
+  error?: string;
+}
+
+const TextareaField: React.FC<TextareaFieldWithErrorProps> = ({
   label,
   rows = 3,
   placeholder,
   value,
   onChange,
+  error,
 }) => (
   <label className="block mb-4">
     <span className="block text-neutral-400 text-sm mb-1">{label}</span>
@@ -101,8 +119,15 @@ const TextareaField: React.FC<TextareaFieldProps> = ({
       placeholder={placeholder}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full px-3 py-2.5 bg-neutral-800 border border-neutral-700 rounded-lg text-white resize-none focus:outline-none focus:border-orange-500 transition-colors"
+      className={`w-full px-3 py-2.5 bg-neutral-800 border rounded-lg text-white resize-none focus:outline-none transition-colors ${
+        error 
+          ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+          : 'border-neutral-700 focus:border-orange-500 focus:ring-orange-500'
+      } focus:ring-1`}
     />
+    {error && (
+      <p className="text-red-400 text-sm mt-1">{error}</p>
+    )}
   </label>
 );
 
@@ -113,6 +138,7 @@ const TextareaField: React.FC<TextareaFieldProps> = ({
 const useProfile = () => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<Profile>(EMPTY_PROFILE);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   
   // ✅ AÑADIR ERROR HANDLER
   const { handleError, showSuccess, showLoading, dismissToast } = useErrorHandler({
@@ -159,8 +185,25 @@ const useProfile = () => {
   };
 
   const saveProfile = async (): Promise<void> => {
+    // Validar con Zod
+    const validation = ProfileSchema.safeParse(formData);
+    
+    if (!validation.success) {
+      setErrors(getFormErrors(validation.error));
+      handleError(new AppError(
+        ErrorType.VALIDATION,
+        'Form validation failed',
+        {
+          userMessage: 'Por favor, corrige los errores en el formulario',
+          severity: ErrorSeverity.MEDIUM,
+        }
+      ));
+      return;
+    }
+
     const loadingToast = showLoading('Guardando cambios...');
     setLoading(true);
+    setErrors({});
 
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -180,7 +223,7 @@ const useProfile = () => {
 
       const { error } = await supabase
         .from('profiles')
-        .update(formData)
+        .update(validation.data)
         .eq('id', user.id);
 
       if (error) throw error;
@@ -200,11 +243,20 @@ const useProfile = () => {
     value: Profile[K]
   ): void => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    // Limpiar error del campo cuando el usuario empieza a escribir
+    if (errors[field as string]) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[field as string];
+        return newErrors;
+      });
+    }
   };
 
   return {
     loading,
     formData,
+    errors,
     loadProfile,
     saveProfile,
     updateField,
@@ -216,7 +268,7 @@ const useProfile = () => {
 // ============================================================================
 
 export const ProfilePage: React.FC = () => {
-  const { loading, formData, loadProfile, saveProfile, updateField } = useProfile();
+  const { loading, formData, errors, loadProfile, saveProfile, updateField } = useProfile();
 
   useEffect(() => {
     loadProfile();
@@ -242,11 +294,13 @@ export const ProfilePage: React.FC = () => {
             label="Nombre Empresa"
             value={formData.company_name || ''}
             onChange={(value) => updateField('company_name', value)}
+            error={errors.company_name}
           />
           <FormField
             label="CIF / NIF"
             value={formData.cif || ''}
             onChange={(value) => updateField('cif', value)}
+            error={errors.cif}
           />
         </div>
 
@@ -257,12 +311,14 @@ export const ProfilePage: React.FC = () => {
             label="Nombre Completo"
             value={formData.full_name || ''}
             onChange={(value) => updateField('full_name', value)}
+            error={errors.full_name}
           />
           <FormField
             label="Teléfono"
             type="tel"
             value={formData.phone || ''}
             onChange={(value) => updateField('phone', value)}
+            error={errors.phone}
           />
         </div>
 
@@ -273,6 +329,7 @@ export const ProfilePage: React.FC = () => {
           placeholder="ejemplo@empresa.com"
           value={formData.email || ''}
           onChange={(value) => updateField('email', value)}
+          error={errors.email}
         />
 
         <FormField
@@ -281,6 +338,7 @@ export const ProfilePage: React.FC = () => {
           placeholder="contabilidad@empresa.com"
           value={formData.billing_email || ''}
           onChange={(value) => updateField('billing_email', value)}
+          error={errors.billing_email}
         />
 
         {/* Addresses */}
@@ -290,11 +348,13 @@ export const ProfilePage: React.FC = () => {
             label="Dirección de Envío"
             value={formData.shipping_address || ''}
             onChange={(value) => updateField('shipping_address', value)}
+            error={errors.shipping_address}
           />
           <TextareaField
             label="Dirección de Facturación"
             value={formData.billing_address || ''}
             onChange={(value) => updateField('billing_address', value)}
+            error={errors.billing_address}
           />
         </div>
 
@@ -305,6 +365,7 @@ export const ProfilePage: React.FC = () => {
           rows={2}
           value={formData.observations || ''}
           onChange={(value) => updateField('observations', value)}
+          error={errors.observations}
         />
 
         {/* Save Button */}

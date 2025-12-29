@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, Suspense, lazy } from "react";
 import { A42Engine } from "./engine/A42Engine";
 import { EngineContext } from "./context/EngineContext";
 
@@ -17,8 +17,10 @@ import { FloorProperties } from "./ui/FloorProperties";
 import { FenceProperties } from "./ui/FenceProperties";
 import { InputModal } from "./ui/InputModal";
 import { QRModal } from "./ui/QRModal";
-import { Catalog } from "./ui/Catalog";
 import { ItemsModal } from "./ui/ItemsModal";
+
+// Lazy load heavy components
+const Catalog = lazy(() => import("./ui/Catalog").then(module => ({ default: module.Catalog })));
 
 import { useEditorStore } from "@/editor/stores/editor/useEditorStore";
 import { useSceneStore } from "@/editor/stores/scene/useSceneStore";
@@ -302,7 +304,16 @@ export const Editor3D: React.FC = () => {
         {/* Catalog Overlay */}
         {showCatalog && (
           <div className={CLASSES.catalogOverlay}>
-            <Catalog />
+            <Suspense fallback={
+              <div className="absolute inset-0 bg-neutral-900 bg-opacity-90 flex items-center justify-center z-50">
+                <div className="text-center">
+                  <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                  <p className="text-white text-lg">Cargando catálogo...</p>
+                </div>
+              </div>
+            }>
+              <Catalog />
+            </Suspense>
           </div>
         )}
 

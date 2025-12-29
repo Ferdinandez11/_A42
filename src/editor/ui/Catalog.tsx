@@ -125,7 +125,7 @@ const EmptySearchState: React.FC<{ searchTerm: string }> = ({ searchTerm }) => (
 // COMPONENTES DE TARJETAS
 // ============================================================================
 
-const ProductCard: React.FC<ProductCardProps> = ({
+const ProductCard: React.FC<ProductCardProps> = React.memo(({
   product,
   onSelect,
   showCategory = false,
@@ -179,9 +179,21 @@ const ProductCard: React.FC<ProductCardProps> = ({
       </div>
     </div>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison for better performance
+  return (
+    prevProps.product.id === nextProps.product.id &&
+    prevProps.product.name === nextProps.product.name &&
+    prevProps.product.price === nextProps.product.price &&
+    prevProps.product.img_2d === nextProps.product.img_2d &&
+    prevProps.showCategory === nextProps.showCategory &&
+    prevProps.onSelect === nextProps.onSelect
+  );
+});
 
-const CategoryCard: React.FC<CategoryCardProps> = ({
+ProductCard.displayName = 'ProductCard';
+
+const CategoryCard: React.FC<CategoryCardProps> = React.memo(({
   name,
   productCount,
   imageUrl,
@@ -209,9 +221,18 @@ const CategoryCard: React.FC<CategoryCardProps> = ({
       </p>
     </div>
   </div>
-);
+), (prevProps, nextProps) => {
+  return (
+    prevProps.name === nextProps.name &&
+    prevProps.productCount === nextProps.productCount &&
+    prevProps.imageUrl === nextProps.imageUrl &&
+    prevProps.onClick === nextProps.onClick
+  );
+});
 
-const LineCard: React.FC<LineCardProps> = ({ name, imageUrl, onClick }) => (
+CategoryCard.displayName = 'CategoryCard';
+
+const LineCard: React.FC<LineCardProps> = React.memo(({ name, imageUrl, onClick }) => (
   <div
     onClick={onClick}
     className="relative h-64 rounded-2xl overflow-hidden cursor-pointer shadow-2xl hover:shadow-purple-500/40 transition-all duration-300 group border border-neutral-700"
@@ -235,7 +256,15 @@ const LineCard: React.FC<LineCardProps> = ({ name, imageUrl, onClick }) => (
       </span>
     </div>
   </div>
-);
+), (prevProps, nextProps) => {
+  return (
+    prevProps.name === nextProps.name &&
+    prevProps.imageUrl === nextProps.imageUrl &&
+    prevProps.onClick === nextProps.onClick
+  );
+});
+
+LineCard.displayName = 'LineCard';
 
 // ============================================================================
 // COMPONENTES DE NAVEGACIÓN
@@ -244,7 +273,7 @@ const LineCard: React.FC<LineCardProps> = ({ name, imageUrl, onClick }) => (
 const Breadcrumbs: React.FC<{
   items: BreadcrumbItem[];
   isSearching: boolean;
-}> = ({ items, isSearching }) => {
+}> = React.memo(({ items, isSearching }) => {
   if (isSearching) return null;
 
   return (
@@ -266,9 +295,22 @@ const Breadcrumbs: React.FC<{
       ))}
     </div>
   );
-};
+}, (prevProps, nextProps) => {
+  if (prevProps.isSearching !== nextProps.isSearching) return false;
+  if (prevProps.items.length !== nextProps.items.length) return false;
+  return prevProps.items.every((item, index) => {
+    const nextItem = nextProps.items[index];
+    return (
+      item.label === nextItem.label &&
+      item.isActive === nextItem.isActive &&
+      item.onClick === nextItem.onClick
+    );
+  });
+});
 
-const SearchBar: React.FC<SearchBarProps> = ({ value, onChange, onClear }) => (
+Breadcrumbs.displayName = 'Breadcrumbs';
+
+const SearchBar: React.FC<SearchBarProps> = React.memo(({ value, onChange, onClear }) => (
   <div className="relative w-full md:w-80">
     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
       <Search size={18} className="text-neutral-400" />
@@ -289,7 +331,15 @@ const SearchBar: React.FC<SearchBarProps> = ({ value, onChange, onClear }) => (
       </button>
     )}
   </div>
-);
+), (prevProps, nextProps) => {
+  return (
+    prevProps.value === nextProps.value &&
+    prevProps.onChange === nextProps.onChange &&
+    prevProps.onClear === nextProps.onClear
+  );
+});
+
+SearchBar.displayName = 'SearchBar';
 
 // ============================================================================
 // COMPONENTE PRINCIPAL

@@ -1,6 +1,7 @@
 // CrmDashboard.tsx
 // ✅ Refactorizado - Usa hooks y componentes extraídos
-import { useState, useEffect } from 'react';
+// ✅ Optimizado - React.memo, useMemo, useCallback
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useErrorHandler } from '@/core/hooks/useErrorHandler';
 
@@ -31,6 +32,217 @@ const EMPTY_CLIENT_DATA: NewClientData = {
 };
 
 // ============================================================================
+// MEMOIZED COMPONENTS
+// ============================================================================
+
+interface OrderRowProps {
+  order: import('@/crm/hooks/useAdminOrders').Order;
+  activeTab: DashboardTab;
+  onStatusUpdate: (id: string, status: OrderStatus) => void;
+  onView: (id: string) => void;
+  onDelete: (id: string) => void;
+}
+
+const OrderRow: React.FC<OrderRowProps> = React.memo(({
+  order,
+  activeTab,
+  onStatusUpdate,
+  onView,
+  onDelete,
+}) => {
+  const handleStatusChange = useCallback((status: OrderStatus) => {
+    onStatusUpdate(order.id, status);
+  }, [order.id, onStatusUpdate]);
+
+  const handleView = useCallback(() => {
+    onView(order.id);
+  }, [order.id, onView]);
+
+  const handleDelete = useCallback(() => {
+    onDelete(order.id);
+  }, [order.id, onDelete]);
+
+  const createdDate = useMemo(() => 
+    new Date(order.created_at).toLocaleDateString(),
+    [order.created_at]
+  );
+
+  const deliveryDate = useMemo(() => 
+    order.estimated_delivery_date 
+      ? new Date(order.estimated_delivery_date).toLocaleDateString()
+      : null,
+    [order.estimated_delivery_date]
+  );
+
+  const deliveryClassName = useMemo(() => 
+    activeTab === 'orders' ? 'text-orange-500' : 'text-neutral-400',
+    [activeTab]
+  );
+
+  return (
+    <tr className="border-b border-neutral-800">
+      <td className="p-3 text-center align-middle">
+        <AlertIndicator order={order} />
+      </td>
+      
+      <td className="p-3 align-middle">
+        <strong>{order.order_ref}</strong>
+        {order.custom_name && (
+          <div className="text-xs text-neutral-500">
+            {order.custom_name}
+          </div>
+        )}
+      </td>
+      
+      <td className="p-3 align-middle text-blue-400">
+        {order.profiles ? (
+          order.profiles.company_name || order.profiles.email
+        ) : (
+          <span className="text-neutral-600">Eliminado</span>
+        )}
+      </td>
+      
+      <td className="p-3 align-middle">
+        <StatusSelect
+          value={order.status}
+          onChange={handleStatusChange}
+          isBudget={activeTab === 'budgets'}
+        />
+      </td>
+      
+      <td className="p-3 align-middle">
+        {createdDate}
+      </td>
+      
+      <td className="p-3 align-middle">
+        {deliveryDate ? (
+          <span className={deliveryClassName}>
+            {deliveryDate}
+          </span>
+        ) : (
+          '--'
+        )}
+      </td>
+      
+      <td className="p-3 align-middle">
+        <PriceCell
+          price={order.total_price || 0}
+          discountRate={order.profiles?.discount_rate || 0}
+        />
+      </td>
+      
+      <td className="p-3 align-middle">
+        <button
+          onClick={handleView}
+          className="bg-neutral-800 text-white border border-neutral-600 px-3 py-1 rounded mr-2 hover:bg-neutral-700 transition-colors"
+        >
+          👁️
+        </button>
+        <button
+          onClick={handleDelete}
+          className="text-neutral-600 hover:text-red-500 transition-colors"
+        >
+          🗑️
+        </button>
+      </td>
+    </tr>
+  );
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.order.id === nextProps.order.id &&
+    prevProps.order.status === nextProps.order.status &&
+    prevProps.order.total_price === nextProps.order.total_price &&
+    prevProps.activeTab === nextProps.activeTab &&
+    prevProps.onStatusUpdate === nextProps.onStatusUpdate &&
+    prevProps.onView === nextProps.onView &&
+    prevProps.onDelete === nextProps.onDelete
+  );
+});
+
+OrderRow.displayName = 'OrderRow';
+
+interface ClientRowProps {
+  client: import('@/crm/hooks/useClients').Client;
+  onApprove: (id: string) => void;
+  onView: (id: string) => void;
+  onDelete: (id: string) => void;
+}
+
+const ClientRow: React.FC<ClientRowProps> = React.memo(({
+  client,
+  onApprove,
+  onView,
+  onDelete,
+}) => {
+  const handleApprove = useCallback(() => {
+    onApprove(client.id);
+  }, [client.id, onApprove]);
+
+  const handleView = useCallback(() => {
+    onView(client.id);
+  }, [client.id, onView]);
+
+  const handleDelete = useCallback(() => {
+    onDelete(client.id);
+  }, [client.id, onDelete]);
+
+  return (
+    <tr className="border-b border-neutral-800">
+      <td className="p-3 align-middle">
+        {client.is_approved ? (
+          <span title="Activo">✅</span>
+        ) : (
+          <button
+            onClick={handleApprove}
+            className="bg-orange-500 hover:bg-orange-400 text-white px-2 py-1 rounded text-xs transition-colors"
+          >
+            Aprobar
+          </button>
+        )}
+      </td>
+      
+      <td className="p-3 align-middle font-bold">
+        {client.company_name || '---'}
+      </td>
+      
+      <td className="p-3 align-middle">{client.email}</td>
+      
+      <td className="p-3 align-middle text-green-500 font-bold">
+        {client.discount_rate}%
+      </td>
+      
+      <td className="p-3 align-middle">
+        <button
+          onClick={handleView}
+          className="bg-neutral-800 text-white border border-neutral-600 px-3 py-1 rounded mr-2 hover:bg-neutral-700 transition-colors"
+        >
+          Ficha
+        </button>
+        <button
+          onClick={handleDelete}
+          className="text-red-500 hover:text-red-400 transition-colors"
+        >
+          🗑️
+        </button>
+      </td>
+    </tr>
+  );
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.client.id === nextProps.client.id &&
+    prevProps.client.is_approved === nextProps.client.is_approved &&
+    prevProps.client.company_name === nextProps.client.company_name &&
+    prevProps.client.email === nextProps.client.email &&
+    prevProps.client.discount_rate === nextProps.client.discount_rate &&
+    prevProps.onApprove === nextProps.onApprove &&
+    prevProps.onView === nextProps.onView &&
+    prevProps.onDelete === nextProps.onDelete
+  );
+});
+
+ClientRow.displayName = 'ClientRow';
+
+// ============================================================================
 // COMPONENTE PRINCIPAL
 // ============================================================================
 
@@ -53,7 +265,11 @@ export const CrmDashboard: React.FC = () => {
   } = useClients();
   const { handleError } = useErrorHandler({ context: 'CrmDashboard' });
 
-  const loading = ordersLoading || clientsLoading;
+  // ==========================================================================
+  // COMPUTED VALUES
+  // ==========================================================================
+
+  const loading = useMemo(() => ordersLoading || clientsLoading, [ordersLoading, clientsLoading]);
 
   // ==========================================================================
   // EFECTOS
@@ -72,63 +288,80 @@ export const CrmDashboard: React.FC = () => {
   // HANDLERS
   // =========================================================================
 
-  const handleApproveClient = async (clientId: string): Promise<void> => {
+  const handleApproveClient = useCallback(async (clientId: string): Promise<void> => {
     try {
       await approveClient(clientId);
-  } catch (error) {
+    } catch (error) {
       // Error ya manejado en el hook
-  }
-};
+    }
+  }, [approveClient]);
 
-const handleCreateClient = async (): Promise<void> => {
-  try {
+  const handleCreateClient = useCallback(async (): Promise<void> => {
+    try {
       await createClient(newClientData);
-    setShowCreateModal(false);
-    setNewClientData(EMPTY_CLIENT_DATA);
-  } catch (error) {
+      setShowCreateModal(false);
+      setNewClientData(EMPTY_CLIENT_DATA);
+    } catch (error) {
       // Error ya manejado en el hook
-  }
-};
+    }
+  }, [createClient, newClientData]);
 
-const handleDeleteClient = async (id: string): Promise<void> => {
-  if (!confirm('¿Borrar cliente?')) return;
-  try {
+  const handleDeleteClient = useCallback(async (id: string): Promise<void> => {
+    if (!confirm('¿Borrar cliente?')) return;
+    try {
       await deleteClient(id);
-  } catch (error) {
+    } catch (error) {
       // Error ya manejado en el hook
-  }
-};
+    }
+  }, [deleteClient]);
 
-const handleDeleteOrder = async (id: string): Promise<void> => {
-  if (!confirm('¿Borrar registro?')) return;
+  const handleDeleteOrder = useCallback(async (id: string): Promise<void> => {
+    if (!confirm('¿Borrar registro?')) return;
     try {
       await deleteOrder(id);
-  } catch (error) {
+    } catch (error) {
       // Error ya manejado en el hook
-  }
-};
+    }
+  }, [deleteOrder]);
 
-  const handleStatusUpdate = async (
+  const handleStatusUpdate = useCallback(async (
     id: string,
     newStatus: OrderStatus
   ): Promise<void> => {
-  if (!confirm(`¿Cambiar estado a "${newStatus.toUpperCase()}"?`)) return;
+    if (!confirm(`¿Cambiar estado a "${newStatus.toUpperCase()}"?`)) return;
 
-  try {
-    const deliveryDate = calculateEstimatedDelivery(newStatus);
+    try {
+      const deliveryDate = calculateEstimatedDelivery(newStatus);
       await updateOrderStatus(id, newStatus, deliveryDate || undefined);
     } catch (error) {
       // Error ya manejado en el hook
     }
-  };
+  }, [updateOrderStatus]);
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     if (activeTab === 'clients') {
       fetchClients();
     } else {
       fetchOrders(activeTab);
-  }
-};
+    }
+  }, [activeTab, fetchClients, fetchOrders]);
+
+  const handleTabChange = useCallback((tab: DashboardTab) => {
+    setActiveTab(tab);
+  }, []);
+
+  const handleCloseModal = useCallback(() => {
+    setShowCreateModal(false);
+    setNewClientData(EMPTY_CLIENT_DATA);
+  }, []);
+
+  const handleViewOrder = useCallback((id: string) => {
+    navigate(`/admin/order/${id}`);
+  }, [navigate]);
+
+  const handleViewClient = useCallback((id: string) => {
+    navigate(`/admin/client/${id}`);
+  }, [navigate]);
 
   // ==========================================================================
   // RENDER
@@ -146,21 +379,21 @@ const handleDeleteOrder = async (id: string): Promise<void> => {
         <div className="flex gap-2">
           <CrmTabButton
             active={activeTab === 'clients'}
-            onClick={() => setActiveTab('clients')}
+            onClick={() => handleTabChange('clients')}
           >
             👥 Clientes
           </CrmTabButton>
           
           <CrmTabButton
             active={activeTab === 'budgets'}
-            onClick={() => setActiveTab('budgets')}
+            onClick={() => handleTabChange('budgets')}
           >
             📄 Presupuestos
           </CrmTabButton>
           
           <CrmTabButton
             active={activeTab === 'orders'}
-            onClick={() => setActiveTab('orders')}
+            onClick={() => handleTabChange('orders')}
           >
             📦 Pedidos
           </CrmTabButton>
@@ -197,78 +430,14 @@ const handleDeleteOrder = async (id: string): Promise<void> => {
                 
                 <tbody>
                   {orders.map((order) => (
-                    <tr key={order.id} className="border-b border-neutral-800">
-                      <td className="p-3 text-center align-middle">
-                        <AlertIndicator order={order} />
-                      </td>
-                      
-                      <td className="p-3 align-middle">
-                        <strong>{order.order_ref}</strong>
-                        {order.custom_name && (
-                          <div className="text-xs text-neutral-500">
-                            {order.custom_name}
-                          </div>
-                        )}
-                      </td>
-                      
-                      <td className="p-3 align-middle text-blue-400">
-                        {order.profiles ? (
-                          order.profiles.company_name || order.profiles.email
-                        ) : (
-                          <span className="text-neutral-600">Eliminado</span>
-                        )}
-                      </td>
-                      
-                      <td className="p-3 align-middle">
-                        <StatusSelect
-                          value={order.status}
-                          onChange={(status) => handleStatusUpdate(order.id, status)}
-                          isBudget={activeTab === 'budgets'}
-                        />
-                      </td>
-                      
-                      <td className="p-3 align-middle">
-                        {new Date(order.created_at).toLocaleDateString()}
-                      </td>
-                      
-                      <td className="p-3 align-middle">
-                        {order.estimated_delivery_date ? (
-                          <span
-                            className={
-                              activeTab === 'orders' ? 'text-orange-500' : 'text-neutral-400'
-                            }
-                          >
-                            {new Date(
-                              order.estimated_delivery_date
-                            ).toLocaleDateString()}
-                          </span>
-                        ) : (
-                          '--'
-                        )}
-                      </td>
-                      
-                      <td className="p-3 align-middle">
-                        <PriceCell
-                          price={order.total_price || 0}
-                          discountRate={order.profiles?.discount_rate || 0}
-                        />
-                      </td>
-                      
-                      <td className="p-3 align-middle">
-                        <button
-                          onClick={() => navigate(`/admin/order/${order.id}`)}
-                          className="bg-neutral-800 text-white border border-neutral-600 px-3 py-1 rounded mr-2 hover:bg-neutral-700 transition-colors"
-                        >
-                          👁️
-                        </button>
-                        <button
-                          onClick={() => handleDeleteOrder(order.id)}
-                          className="text-neutral-600 hover:text-red-500 transition-colors"
-                        >
-                          🗑️
-                        </button>
-                      </td>
-                    </tr>
+                    <OrderRow
+                      key={order.id}
+                      order={order}
+                      activeTab={activeTab}
+                      onStatusUpdate={handleStatusUpdate}
+                      onView={handleViewOrder}
+                      onDelete={handleDeleteOrder}
+                    />
                   ))}
                   
                   {orders.length === 0 && (
@@ -308,45 +477,13 @@ const handleDeleteOrder = async (id: string): Promise<void> => {
                 
                 <tbody>
                   {clients.map((client) => (
-                    <tr key={client.id} className="border-b border-neutral-800">
-                      <td className="p-3 align-middle">
-                        {client.is_approved ? (
-                          <span title="Activo">✅</span>
-                        ) : (
-                          <button
-                            onClick={() => handleApproveClient(client.id)}
-                            className="bg-orange-500 hover:bg-orange-400 text-white px-2 py-1 rounded text-xs transition-colors"
-                          >
-                            Aprobar
-                          </button>
-                        )}
-                      </td>
-                      
-                      <td className="p-3 align-middle font-bold">
-                        {client.company_name || '---'}
-                      </td>
-                      
-                      <td className="p-3 align-middle">{client.email}</td>
-                      
-                      <td className="p-3 align-middle text-green-500 font-bold">
-                        {client.discount_rate}%
-                      </td>
-                      
-                      <td className="p-3 align-middle">
-                        <button
-                          onClick={() => navigate(`/admin/client/${client.id}`)}
-                          className="bg-neutral-800 text-white border border-neutral-600 px-3 py-1 rounded mr-2 hover:bg-neutral-700 transition-colors"
-                        >
-                          Ficha
-                        </button>
-                        <button
-                          onClick={() => handleDeleteClient(client.id)}
-                          className="text-red-500 hover:text-red-400 transition-colors"
-                        >
-                          🗑️
-                        </button>
-                      </td>
-                    </tr>
+                    <ClientRow
+                      key={client.id}
+                      client={client}
+                      onApprove={handleApproveClient}
+                      onView={handleViewClient}
+                      onDelete={handleDeleteClient}
+                    />
                   ))}
                 </tbody>
               </table>
@@ -358,10 +495,7 @@ const handleDeleteOrder = async (id: string): Promise<void> => {
       {/* Create Client Modal */}
       <CreateClientModal
         isOpen={showCreateModal}
-        onClose={() => {
-          setShowCreateModal(false);
-          setNewClientData(EMPTY_CLIENT_DATA);
-        }}
+        onClose={handleCloseModal}
         onSubmit={handleCreateClient}
         data={newClientData}
         onChange={setNewClientData}

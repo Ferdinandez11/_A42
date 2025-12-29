@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/core/lib/supabase";
 import { useAuthStore } from "@/core/stores/auth/useAuthStore";
 import { useErrorHandler } from '@/core/hooks/useErrorHandler';
 import { AppError, ErrorType, ErrorSeverity } from "@/core/lib/errorHandler";
 import type { AuthStep, TargetRole, Profile} from "@/App/utils/types";
+import { LoginSchema, getFirstError } from "@/core/lib/formSchemas";
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -17,9 +18,10 @@ export const LoginPage: React.FC = () => {
   const [targetRole, setTargetRole] = React.useState<TargetRole>("client");
   const [isRegistering, setIsRegistering] = React.useState<boolean>(false);
 
-  const [email, setEmail] = React.useState<string>("");
-  const [password, setPassword] = React.useState<string>("");
-  const [loading, setLoading] = React.useState<boolean>(false);
+  const [email, setEmail] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   
 
   const selectRole = (role: TargetRole): void => {
@@ -62,22 +64,44 @@ const checkUserStatus = async (userId: string): Promise<void> => {
 };
 const handleAuth = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
   e.preventDefault();
+  setErrors({});
   setLoading(true);
 
   try {
+    // Validar formulario con Zod
+    const validation = LoginSchema.safeParse({ email, password });
+    
+    if (!validation.success) {
+      const formErrors: { email?: string; password?: string } = {};
+      validation.error.errors.forEach((err) => {
+        const field = err.path[0] as 'email' | 'password';
+        if (field) {
+          formErrors[field] = err.message;
+        }
+      });
+      setErrors(formErrors);
+      setLoading(false);
+      return;
+    }
+
+    const { email: validatedEmail, password: validatedPassword } = validation.data;
+
     let result;
 
     if (isRegistering) {
       result = await supabase.auth.signUp({
-        email,
-        password,
+        email: validatedEmail,
+        password: validatedPassword,
         options: { data: { requested_role: targetRole } },
       });
       if (result.error) throw result.error;
 
       await checkUserStatus(result.data?.user?.id || "");
     } else {
-      result = await supabase.auth.signInWithPassword({ email, password });
+      result = await supabase.auth.signInWithPassword({ 
+        email: validatedEmail, 
+        password: validatedPassword 
+      });
       if (result.error) throw result.error;
 
       setUser(result.data.user);
@@ -139,22 +163,44 @@ const handleAuth = async (e: React.FormEvent<HTMLFormElement>): Promise<void> =>
 
 
             <form onSubmit={handleAuth} className="flex flex-col gap-4">
-              <input
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="p-3 rounded-md border border-zinc-700 bg-zinc-800 text-white"
-                required
-              />
-              <input
-                type="password"
-                placeholder="Contraseña"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="p-3 rounded-md border border-zinc-700 bg-zinc-800 text-white"
-                required
-              />
+              <div>
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
+                  }}
+                  className={`p-3 rounded-md border bg-zinc-800 text-white w-full ${
+                    errors.email 
+                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+                      : 'border-zinc-700 focus:border-blue-500 focus:ring-blue-500'
+                  } focus:outline-none focus:ring-1`}
+                />
+                {errors.email && (
+                  <p className="text-red-400 text-sm mt-1">{errors.email}</p>
+                )}
+              </div>
+              <div>
+                <input
+                  type="password"
+                  placeholder="Contraseña"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
+                  }}
+                  className={`p-3 rounded-md border bg-zinc-800 text-white w-full ${
+                    errors.password 
+                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+                      : 'border-zinc-700 focus:border-blue-500 focus:ring-blue-500'
+                  } focus:outline-none focus:ring-1`}
+                />
+                {errors.password && (
+                  <p className="text-red-400 text-sm mt-1">{errors.password}</p>
+                )}
+              </div>
 
               <button
                 type="submit"

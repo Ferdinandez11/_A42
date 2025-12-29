@@ -902,7 +902,7 @@ export const useSceneTools = (): SceneToolsActions =&gt; {
   const ensureEngine = (): boolean =&gt; {
     if (!engine) {
       handleError(
-        new AppError(ErrorType.INTERNAL, ERROR_MESSAGES.ENGINE_UNAVAILABLE, {
+        new AppError(ErrorType.ENGINE, ERROR_MESSAGES.ENGINE_UNAVAILABLE, {
           severity: ErrorSeverity.MEDIUM,
           userMessage: 'El motor 3D no está disponible',
         }),
@@ -917,7 +917,7 @@ export const useSceneTools = (): SceneToolsActions =&gt; {
     if (!ensureEngine()) return false;
     <span class="missing-if-branch" title="if path not taken" >I</span>if (!engine!.walkManager) {
 <span class="cstat-no" title="statement not covered" >      handleError(</span>
-        new AppError(ErrorType.INTERNAL, ERROR_MESSAGES.WALK_MANAGER_UNAVAILABLE, {
+        new AppError(ErrorType.ENGINE, ERROR_MESSAGES.WALK_MANAGER_UNAVAILABLE, {
           severity: ErrorSeverity.MEDIUM,
           userMessage: 'El modo paseo no está disponible',
         }),
@@ -932,7 +932,7 @@ export const useSceneTools = (): SceneToolsActions =&gt; {
     <span class="missing-if-branch" title="if path not taken" >I</span>if (!ensureEngine()) <span class="cstat-no" title="statement not covered" >return false;</span>
     <span class="missing-if-branch" title="if path not taken" >I</span>if (!engine!.toolsManager) {
 <span class="cstat-no" title="statement not covered" >      handleError(</span>
-        new AppError(ErrorType.INTERNAL, ERROR_MESSAGES.TOOLS_MANAGER_UNAVAILABLE, {
+        new AppError(ErrorType.ENGINE, ERROR_MESSAGES.TOOLS_MANAGER_UNAVAILABLE, {
           severity: ErrorSeverity.MEDIUM,
           userMessage: 'Las herramientas no están disponibles',
         }),
@@ -969,7 +969,7 @@ export const useSceneTools = (): SceneToolsActions =&gt; {
     } catch (error) {
       const errorMessage = <span class="cstat-no" title="statement not covered" >error instanceof Error ? error.message : 'Error desconocido';</span>
 <span class="cstat-no" title="statement not covered" >      handleError(</span>
-        new AppError(ErrorType.INTERNAL, 'Error al activar modo paseo', {
+        new AppError(ErrorType.ENGINE, 'Error al activar modo paseo', {
           severity: ErrorSeverity.MEDIUM,
           userMessage: 'No se pudo activar el modo paseo',
           metadata: { originalError: errorMessage },
@@ -994,7 +994,7 @@ export const useSceneTools = (): SceneToolsActions =&gt; {
     } catch (error) {
       const errorMessage = <span class="cstat-no" title="statement not covered" >error instanceof Error ? error.message : 'Error desconocido';</span>
 <span class="cstat-no" title="statement not covered" >      handleError(</span>
-        new AppError(ErrorType.INTERNAL, 'Error al desactivar modo paseo', {
+        new AppError(ErrorType.ENGINE, 'Error al desactivar modo paseo', {
           severity: ErrorSeverity.MEDIUM,
           userMessage: 'No se pudo desactivar el modo paseo',
           metadata: { originalError: errorMessage },
@@ -1024,7 +1024,7 @@ export const useSceneTools = (): SceneToolsActions =&gt; {
     } catch (error) {
       const errorMessage = <span class="cstat-no" title="statement not covered" >error instanceof Error ? error.message : 'Error desconocido';</span>
 <span class="cstat-no" title="statement not covered" >      handleError(</span>
-        new AppError(ErrorType.INTERNAL, 'Error al alternar modo paseo', {
+        new AppError(ErrorType.ENGINE, 'Error al alternar modo paseo', {
           severity: ErrorSeverity.MEDIUM,
           userMessage: 'No se pudo alternar el modo paseo',
           metadata: { originalError: errorMessage },
@@ -1085,7 +1085,7 @@ export const useSceneTools = (): SceneToolsActions =&gt; {
       } catch (error) {
         const errorMessage = <span class="cstat-no" title="statement not covered" >error instanceof Error ? error.message : 'Error desconocido';</span>
 <span class="cstat-no" title="statement not covered" >        handleError(</span>
-          new AppError(ErrorType.INTERNAL, 'Error al establecer segmento CAD', {
+          new AppError(ErrorType.ENGINE, 'Error al establecer segmento CAD', {
             severity: ErrorSeverity.MEDIUM,
             userMessage: 'No se pudo establecer el segmento',
             metadata: { originalError: errorMessage },
@@ -1126,7 +1126,7 @@ export const useSceneTools = (): SceneToolsActions =&gt; {
       } catch (error) {
         const errorMessage = <span class="cstat-no" title="statement not covered" >error instanceof Error ? error.message : 'Error desconocido';</span>
 <span class="cstat-no" title="statement not covered" >        handleError(</span>
-          new AppError(ErrorType.INTERNAL, 'Error al establecer ángulo CAD', {
+          new AppError(ErrorType.ENGINE, 'Error al establecer ángulo CAD', {
             severity: ErrorSeverity.MEDIUM,
             userMessage: 'No se pudo establecer el ángulo',
             metadata: { originalError: errorMessage },
@@ -1153,7 +1153,7 @@ export const useSceneTools = (): SceneToolsActions =&gt; {
     } catch (error) {
       const errorMessage = <span class="cstat-no" title="statement not covered" >error instanceof Error ? error.message : 'Error desconocido';</span>
 <span class="cstat-no" title="statement not covered" >      handleError(</span>
-        new AppError(ErrorType.INTERNAL, 'Error al intercambiar selección CAD', {
+        new AppError(ErrorType.ENGINE, 'Error al intercambiar selección CAD', {
           severity: ErrorSeverity.MEDIUM,
           userMessage: 'No se pudo intercambiar la selección',
           metadata: { originalError: errorMessage },
@@ -1240,7 +1240,7 @@ export const createCADSegmentParams = <span class="fstat-no" title="function not
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-12-18T20:38:52.025Z
+                at 2025-12-29T18:37:02.529Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

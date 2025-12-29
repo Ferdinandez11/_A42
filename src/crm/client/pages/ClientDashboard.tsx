@@ -1,6 +1,7 @@
 // ClientDashboard.tsx
 // ✅ Refactorizado - Usa hooks y componentes extraídos
-import React, { useEffect, useState, useCallback } from 'react';
+// ✅ Optimizado - React.memo, useMemo, useCallback
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FolderOpen } from 'lucide-react';
 import { supabase } from '@/core/lib/supabase';
@@ -50,18 +51,22 @@ const MESSAGES = {
 // COMPONENTES AUXILIARES
 // ============================================================================
 
-const LoadingState: React.FC = () => (
+const LoadingState: React.FC = React.memo(() => (
   <div className="flex items-center justify-center py-12">
     <p className="text-neutral-500 text-lg">{MESSAGES.LOADING}</p>
   </div>
-);
+));
 
-const EmptyProjectsState: React.FC = () => (
+LoadingState.displayName = 'LoadingState';
+
+const EmptyProjectsState: React.FC = React.memo(() => (
   <div className="text-center py-12">
     <FolderOpen size={64} className="mx-auto mb-4 text-neutral-600" />
     <p className="text-neutral-500 text-lg">{MESSAGES.NO_PROJECTS}</p>
   </div>
-);
+));
+
+EmptyProjectsState.displayName = 'EmptyProjectsState';
 
 // ============================================================================
 // COMPONENTE PRINCIPAL
@@ -87,11 +92,18 @@ export const ClientDashboard: React.FC = () => {
     isDestructive: false,
   });
 
-  const loading = projectsLoading || ordersLoading;
+  // ==========================================================================
+  // COMPUTED VALUES
+  // ==========================================================================
+
+  const loading = useMemo(() => projectsLoading || ordersLoading, [projectsLoading, ordersLoading]);
 
   // Proyectos que aún no tienen ningún presupuesto/pedido asociado
-  const standaloneProjects = projects.filter(
-    (project) => !project.orders || project.orders.length === 0
+  const standaloneProjects = useMemo(() => 
+    projects.filter(
+      (project) => !project.orders || project.orders.length === 0
+    ),
+    [projects]
   );
 
   // ==========================================================================
@@ -178,71 +190,75 @@ export const ClientDashboard: React.FC = () => {
 
   const handleRequestQuote = useCallback(
     (project: Project) => {
+      const confirmHandler = async () => {
+        const loadingToast = showLoading('Creando solicitud de presupuesto...');
+        
+        try {
+          const estimatedDate = new Date();
+          estimatedDate.setHours(estimatedDate.getHours() + 48);
+          const ref = 'SOL-' + Math.floor(10000 + Math.random() * 90000);
+          
+          const { data, error } = await supabase
+            .from('orders')
+            .insert([
+              {
+                user_id: userId,
+                project_id: project.id,
+                order_ref: ref,
+                total_price: 0,
+                status: 'pendiente',
+                estimated_delivery_date: estimatedDate.toISOString(),
+              },
+            ])
+            .select();
+
+          if (error) throw error;
+          
+          dismissToast(loadingToast);
+          showSuccess('✅ Solicitud de presupuesto enviada');
+
+          if (data) {
+            navigate(`/portal/order/${data[0].id}`);
+          }
+          setModal((prev) => ({ ...prev, isOpen: false }));
+        } catch (error) {
+          dismissToast(loadingToast);
+          handleError(error);
+          setModal((prev) => ({ ...prev, isOpen: false }));
+        }
+      };
+
       setModal({
         isOpen: true,
         title: MESSAGES.REQUEST_QUOTE_TITLE,
         message: MESSAGES.REQUEST_QUOTE_MESSAGE(project.name),
         isDestructive: false,
-        onConfirm: async () => {
-          const loadingToast = showLoading('Creando solicitud de presupuesto...');
-          
-          try {
-            const estimatedDate = new Date();
-            estimatedDate.setHours(estimatedDate.getHours() + 48);
-            const ref = 'SOL-' + Math.floor(10000 + Math.random() * 90000);
-            
-            const { data, error } = await supabase
-              .from('orders')
-              .insert([
-                {
-                  user_id: userId,
-                  project_id: project.id,
-                  order_ref: ref,
-                  total_price: 0,
-                  status: 'pendiente',
-                  estimated_delivery_date: estimatedDate.toISOString(),
-                },
-              ])
-              .select();
-
-            if (error) throw error;
-            
-            dismissToast(loadingToast);
-            showSuccess('✅ Solicitud de presupuesto enviada');
-
-            if (data) {
-              navigate(`/portal/order/${data[0].id}`);
-            }
-            setModal({ ...modal, isOpen: false });
-          } catch (error) {
-            dismissToast(loadingToast);
-            handleError(error);
-            setModal({ ...modal, isOpen: false });
-          }
-        },
+        onConfirm: confirmHandler,
       });
     },
-    [userId, navigate, modal, handleError, showSuccess, showLoading, dismissToast]
+    [userId, navigate, handleError, showSuccess, showLoading, dismissToast]
   );
 
   const handleDeleteProject = useCallback(
     (id: string) => {
+      const confirmHandler = async () => {
+        try {
+          await deleteProject(id);
+          setModal((prev) => ({ ...prev, isOpen: false }));
+        } catch (error) {
+          setModal((prev) => ({ ...prev, isOpen: false }));
+        }
+      };
+
       setModal({
         isOpen: true,
         title: MESSAGES.DELETE_PROJECT_TITLE,
         message: MESSAGES.DELETE_PROJECT_MESSAGE,
         isDestructive: true,
-        onConfirm: async () => {
-          try {
-            await deleteProject(id);
-            setModal({ ...modal, isOpen: false });
-          } catch (error) {
-            setModal({ ...modal, isOpen: false });
-          }
-        },
+        onConfirm: confirmHandler,
       });
     },
-    [modal, deleteProject]
+    [deleteProject]
   );
 
   const handleViewOrder = useCallback(
@@ -254,28 +270,30 @@ export const ClientDashboard: React.FC = () => {
 
   const handleReactivate = useCallback(
     (order: Order) => {
+      const confirmHandler = async () => {
+        try {
+          await reactivateOrder(order);
+          setActiveTab('budgets');
+          setModal((prev) => ({ ...prev, isOpen: false }));
+        } catch (error) {
+          setModal((prev) => ({ ...prev, isOpen: false }));
+        }
+      };
+
       setModal({
         isOpen: true,
         title: MESSAGES.REACTIVATE_TITLE,
         message: MESSAGES.REACTIVATE_MESSAGE,
         isDestructive: false,
-        onConfirm: async () => {
-          try {
-            await reactivateOrder(order);
-            setActiveTab('budgets');
-            setModal({ ...modal, isOpen: false });
-          } catch (error) {
-            setModal({ ...modal, isOpen: false });
-          }
-        },
+        onConfirm: confirmHandler,
       });
     },
-    [modal, reactivateOrder, setActiveTab]
+    [reactivateOrder, setActiveTab]
   );
 
   const closeModal = useCallback(() => {
-    setModal({ ...modal, isOpen: false });
-  }, [modal]);
+    setModal((prev) => ({ ...prev, isOpen: false }));
+  }, []);
 
   // ==========================================================================
   // RENDER

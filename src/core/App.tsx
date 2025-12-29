@@ -4,7 +4,7 @@
 // Refactored: Sprint 5.5 - Components extracted to App/ folder
 // ============================================================================
 
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 // Layouts
@@ -19,11 +19,17 @@ import { ViewerPage } from "@/App/pages/ViewerPage";
 import { CrmDashboard } from "@/crm/admin/pages/CrmDashboard";
 import { ClientDashboard } from "@/crm//client/pages/ClientDashboard";
 import { ProfilePage } from "@/crm//client/pages/ProfilePage";
-import { BudgetDetailPage } from "@/crm/admin/components/BudgetDetailPage";
 import { AdminOrderDetailPage } from "@/crm/admin/pages/AdminOrderDetailPage";
 import { AdminClientDetailPage } from "@/crm/admin/pages/AdminClientDetailPage";
 import { AdminCalendarPage } from "@/crm/admin/pages/AdminCalendarPage";
 import { ClientCalendarPage } from "@/crm/client/pages/ClientCalendarPage";
+
+// Lazy load heavy components
+const BudgetDetailPage = lazy(() => 
+  import("@/crm/admin/components/BudgetDetailPage").then(module => ({ 
+    default: module.BudgetDetailPage 
+  }))
+);
 
 /**
  * App Root Component
@@ -51,7 +57,21 @@ const App: React.FC = () => {
           <Route index element={<ClientDashboard />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="calendar" element={<ClientCalendarPage />} />
-          <Route path="order/:id" element={<BudgetDetailPage />} />
+          <Route 
+            path="order/:id" 
+            element={
+              <Suspense fallback={
+                <div className="min-h-screen bg-black flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                    <p className="text-white text-lg">Cargando presupuesto...</p>
+                  </div>
+                </div>
+              }>
+                <BudgetDetailPage />
+              </Suspense>
+            } 
+          />
         </Route>
       </Routes>
     </BrowserRouter>

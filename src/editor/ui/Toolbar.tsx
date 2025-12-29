@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import React, { useRef, useState, useMemo, useCallback } from 'react';
 import { 
   MousePointer2, Grid3X3, Component, Trees, Grid, Undo2, Redo2, Eye, Box, ArrowUp, 
   ArrowRight, GalleryVerticalEnd, Square, Sun, Upload, Ruler, Footprints, Video, 
@@ -70,11 +70,13 @@ const CLASSES = {
 } as const;
 
 // 🎨 Sub-Components
-const Divider: React.FC<DividerProps> = ({ className = CLASSES.divider }) => (
+const Divider: React.FC<DividerProps> = React.memo(({ className = CLASSES.divider }) => (
   <div className={className} />
-);
+));
 
-const ToolButton: React.FC<ToolButtonProps> = ({
+Divider.displayName = 'Divider';
+
+const ToolButton: React.FC<ToolButtonProps> = React.memo(({
   icon,
   label,
   onClick,
@@ -94,9 +96,20 @@ const ToolButton: React.FC<ToolButtonProps> = ({
     {icon}
     <span className={CLASSES.toolLabel}>{label}</span>
   </button>
-);
+), (prevProps, nextProps) => {
+  return (
+    prevProps.isActive === nextProps.isActive &&
+    prevProps.disabled === nextProps.disabled &&
+    prevProps.className === nextProps.className &&
+    prevProps.label === nextProps.label &&
+    prevProps.onClick === nextProps.onClick &&
+    prevProps.title === nextProps.title
+  );
+});
 
-const ViewButton: React.FC<ViewButtonConfig> = ({
+ToolButton.displayName = 'ToolButton';
+
+const ViewButton: React.FC<ViewButtonConfig> = React.memo(({
   icon,
   label,
   onClick,
@@ -109,67 +122,106 @@ const ViewButton: React.FC<ViewButtonConfig> = ({
   >
     {icon}
   </button>
-);
+), (prevProps, nextProps) => {
+  return (
+    prevProps.isActive === nextProps.isActive &&
+    prevProps.onClick === nextProps.onClick &&
+    prevProps.label === nextProps.label
+  );
+});
+
+ViewButton.displayName = 'ViewButton';
 
 const ViewsPanel: React.FC<{
   cameraType: string;
   onCameraChange: (type: 'perspective' | 'orthographic') => void;
   onViewTrigger: (view: 'top' | 'front' | 'side' | 'iso') => void;
-}> = ({ cameraType, onCameraChange, onViewTrigger }) => (
-  <div className={CLASSES.floatingPanel}>
-    <ViewButton
-      icon={<Eye size={18} />}
-      label="3D"
-      onClick={() => onCameraChange('perspective')}
-      isActive={cameraType === 'perspective'}
-    />
-    <ViewButton
-      icon={<Square size={18} />}
-      label="2D"
-      onClick={() => onCameraChange('orthographic')}
-      isActive={cameraType === 'orthographic'}
-    />
-    <Divider />
-    <ViewButton
-      icon={<ArrowUp size={18} />}
-      label="Planta"
-      onClick={() => onViewTrigger('top')}
-    />
-    <ViewButton
-      icon={<GalleryVerticalEnd size={18} />}
-      label="Alzado"
-      onClick={() => onViewTrigger('front')}
-    />
-    <ViewButton
-      icon={<ArrowRight size={18} />}
-      label="Perfil"
-      onClick={() => onViewTrigger('side')}
-    />
-    <ViewButton
-      icon={<Box size={18} />}
-      label="Iso"
-      onClick={() => onViewTrigger('iso')}
-    />
-  </div>
-);
+}> = React.memo(({ cameraType, onCameraChange, onViewTrigger }) => {
+  const handlePerspective = useCallback(() => onCameraChange('perspective'), [onCameraChange]);
+  const handleOrthographic = useCallback(() => onCameraChange('orthographic'), [onCameraChange]);
+  const handleTop = useCallback(() => onViewTrigger('top'), [onViewTrigger]);
+  const handleFront = useCallback(() => onViewTrigger('front'), [onViewTrigger]);
+  const handleSide = useCallback(() => onViewTrigger('side'), [onViewTrigger]);
+  const handleIso = useCallback(() => onViewTrigger('iso'), [onViewTrigger]);
+
+  return (
+    <div className={CLASSES.floatingPanel}>
+      <ViewButton
+        icon={<Eye size={18} />}
+        label="3D"
+        onClick={handlePerspective}
+        isActive={cameraType === 'perspective'}
+      />
+      <ViewButton
+        icon={<Square size={18} />}
+        label="2D"
+        onClick={handleOrthographic}
+        isActive={cameraType === 'orthographic'}
+      />
+      <Divider />
+      <ViewButton
+        icon={<ArrowUp size={18} />}
+        label="Planta"
+        onClick={handleTop}
+      />
+      <ViewButton
+        icon={<GalleryVerticalEnd size={18} />}
+        label="Alzado"
+        onClick={handleFront}
+      />
+      <ViewButton
+        icon={<ArrowRight size={18} />}
+        label="Perfil"
+        onClick={handleSide}
+      />
+      <ViewButton
+        icon={<Box size={18} />}
+        label="Iso"
+        onClick={handleIso}
+      />
+    </div>
+  );
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.cameraType === nextProps.cameraType &&
+    prevProps.onCameraChange === nextProps.onCameraChange &&
+    prevProps.onViewTrigger === nextProps.onViewTrigger
+  );
+});
+
+ViewsPanel.displayName = 'ViewsPanel';
 
 const MainTools: React.FC<{
   tools: ToolConfig[];
   currentMode: string;
   onModeChange: (mode: string) => void;
-}> = ({ tools, currentMode, onModeChange }) => (
-  <>
-    {tools.map((tool) => (
-      <ToolButton
-        key={tool.id}
-        icon={tool.icon}
-        label={tool.label}
-        onClick={() => onModeChange(tool.id)}
-        isActive={currentMode === tool.id}
-      />
-    ))}
-  </>
-);
+}> = React.memo(({ tools, currentMode, onModeChange }) => {
+  const handleToolClick = useCallback((toolId: string) => {
+    onModeChange(toolId);
+  }, [onModeChange]);
+
+  return (
+    <>
+      {tools.map((tool) => (
+        <ToolButton
+          key={tool.id}
+          icon={tool.icon}
+          label={tool.label}
+          onClick={() => handleToolClick(tool.id)}
+          isActive={currentMode === tool.id}
+        />
+      ))}
+    </>
+  );
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.currentMode === nextProps.currentMode &&
+    prevProps.onModeChange === nextProps.onModeChange &&
+    prevProps.tools === nextProps.tools
+  );
+});
+
+MainTools.displayName = 'MainTools';
 
 const ProjectActions: React.FC<{
   isSaving: boolean;
@@ -177,35 +229,39 @@ const ProjectActions: React.FC<{
   hasUser: boolean;
   onSave: () => void;
   onImport: () => void;
-}> = ({ isSaving, isReadOnly, hasUser, onSave, onImport }) => {
-  const getSaveTitle = (): string => {
+}> = React.memo(({ isSaving, isReadOnly, hasUser, onSave, onImport }) => {
+  const saveTitle = useMemo(() => {
     if (!hasUser) return "Login Requerido";
     if (isReadOnly) return "Guardar como nuevo proyecto (no sobrescribirá el original)";
     return "Guardar";
-  };
+  }, [hasUser, isReadOnly]);
 
-  const getSaveLabel = (): string => {
+  const saveLabel = useMemo(() => {
     if (!hasUser) return 'Login';
     if (isSaving) return '...';
     if (isReadOnly) return 'Guardar como nuevo';
     return 'Guardar';
-  };
+  }, [hasUser, isSaving, isReadOnly]);
 
   // Permitir guardar incluso en modo solo lectura (siempre como nuevo proyecto)
   const isSaveDisabled = isSaving || !hasUser;
+
+  const saveClassName = useMemo(() => {
+    return [
+      isSaving ? 'text-yellow-400' : '',
+      isSaveDisabled ? 'opacity-50 cursor-not-allowed' : 'opacity-100 cursor-pointer',
+    ].filter(Boolean).join(' ');
+  }, [isSaving, isSaveDisabled]);
 
   return (
     <>
       <ToolButton
         icon={<Save size={20} className={isSaving ? 'animate-pulse' : ''} />}
-        label={getSaveLabel()}
+        label={saveLabel}
         onClick={onSave}
         disabled={isSaveDisabled}
-        title={getSaveTitle()}
-        className={[
-          isSaving ? 'text-yellow-400' : '',
-          isSaveDisabled ? 'opacity-50 cursor-not-allowed' : 'opacity-100 cursor-pointer',
-        ].filter(Boolean).join(' ')}
+        title={saveTitle}
+        className={saveClassName}
       />
       <ToolButton
         icon={<Upload size={20} />}
@@ -215,7 +271,17 @@ const ProjectActions: React.FC<{
       />
     </>
   );
-};
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.isSaving === nextProps.isSaving &&
+    prevProps.isReadOnly === nextProps.isReadOnly &&
+    prevProps.hasUser === nextProps.hasUser &&
+    prevProps.onSave === nextProps.onSave &&
+    prevProps.onImport === nextProps.onImport
+  );
+});
+
+ProjectActions.displayName = 'ProjectActions';
 
 const Helpers: React.FC<{
   showViews: boolean;
@@ -226,7 +292,7 @@ const Helpers: React.FC<{
   onToggleEnv: () => void;
   onToggleMeasure: () => void;
   onToggleSafety: () => void;
-}> = ({
+}> = React.memo(({
   showViews,
   envPanelVisible,
   mode,
@@ -235,35 +301,53 @@ const Helpers: React.FC<{
   onToggleEnv,
   onToggleMeasure,
   onToggleSafety,
-}) => (
-  <>
-    <ToolButton
-      icon={<Eye size={20} />}
-      label="Vistas"
-      onClick={onToggleViews}
-      isActive={showViews}
-    />
-    <ToolButton
-      icon={<Sun size={20} />}
-      label="Entorno"
-      onClick={onToggleEnv}
-      isActive={envPanelVisible}
-    />
-    <ToolButton
-      icon={<Ruler size={20} />}
-      label="Medir"
-      onClick={onToggleMeasure}
-      isActive={mode === 'measuring'}
-    />
-    <ToolButton
-      icon={<ShieldAlert size={20} />}
-      label="Zonas"
-      onClick={onToggleSafety}
-      isActive={safetyZonesVisible}
-      className={safetyZonesVisible ? 'text-red-400' : ''}
-    />
-  </>
-);
+}) => {
+  const isMeasuring = mode === 'measuring';
+  const safetyClassName = safetyZonesVisible ? 'text-red-400' : '';
+
+  return (
+    <>
+      <ToolButton
+        icon={<Eye size={20} />}
+        label="Vistas"
+        onClick={onToggleViews}
+        isActive={showViews}
+      />
+      <ToolButton
+        icon={<Sun size={20} />}
+        label="Entorno"
+        onClick={onToggleEnv}
+        isActive={envPanelVisible}
+      />
+      <ToolButton
+        icon={<Ruler size={20} />}
+        label="Medir"
+        onClick={onToggleMeasure}
+        isActive={isMeasuring}
+      />
+      <ToolButton
+        icon={<ShieldAlert size={20} />}
+        label="Zonas"
+        onClick={onToggleSafety}
+        isActive={safetyZonesVisible}
+        className={safetyClassName}
+      />
+    </>
+  );
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.showViews === nextProps.showViews &&
+    prevProps.envPanelVisible === nextProps.envPanelVisible &&
+    prevProps.mode === nextProps.mode &&
+    prevProps.safetyZonesVisible === nextProps.safetyZonesVisible &&
+    prevProps.onToggleViews === nextProps.onToggleViews &&
+    prevProps.onToggleEnv === nextProps.onToggleEnv &&
+    prevProps.onToggleMeasure === nextProps.onToggleMeasure &&
+    prevProps.onToggleSafety === nextProps.onToggleSafety
+  );
+});
+
+Helpers.displayName = 'Helpers';
 
 const MediaTools: React.FC<{
   hasUser: boolean;
@@ -272,7 +356,7 @@ const MediaTools: React.FC<{
   onExportGLB: () => void;
   onExportDXF: () => void;
   onGeneratePDF: () => void;
-}> = ({ hasUser, onTakePhoto, onStart360, onExportGLB, onExportDXF, onGeneratePDF }) => (
+}> = React.memo(({ hasUser, onTakePhoto, onStart360, onExportGLB, onExportDXF, onGeneratePDF }) => (
   <>
     <ToolButton
       icon={<Camera size={20} />}
@@ -304,34 +388,58 @@ const MediaTools: React.FC<{
       onClick={onGeneratePDF}
     />
   </>
-);
+), (prevProps, nextProps) => {
+  return (
+    prevProps.hasUser === nextProps.hasUser &&
+    prevProps.onTakePhoto === nextProps.onTakePhoto &&
+    prevProps.onStart360 === nextProps.onStart360 &&
+    prevProps.onExportGLB === nextProps.onExportGLB &&
+    prevProps.onExportDXF === nextProps.onExportDXF &&
+    prevProps.onGeneratePDF === nextProps.onGeneratePDF
+  );
+});
+
+MediaTools.displayName = 'MediaTools';
 
 const WalkAndRecord: React.FC<{
   isRecording: boolean;
   onActivateWalk: () => void;
   onToggleRecording: () => void;
-}> = ({ isRecording, onActivateWalk, onToggleRecording }) => (
-  <>
-    <ToolButton
-      icon={<Footprints size={20} />}
-      label="Paseo"
-      onClick={onActivateWalk}
-    />
-    <ToolButton
-      icon={<Video size={20} />}
-      label={isRecording ? "Stop" : "Rec"}
-      onClick={onToggleRecording}
-      className={isRecording ? 'text-red-500 hover:text-red-400' : ''}
-    />
-  </>
-);
+}> = React.memo(({ isRecording, onActivateWalk, onToggleRecording }) => {
+  const recordLabel = isRecording ? "Stop" : "Rec";
+  const recordClassName = isRecording ? 'text-red-500 hover:text-red-400' : '';
+
+  return (
+    <>
+      <ToolButton
+        icon={<Footprints size={20} />}
+        label="Paseo"
+        onClick={onActivateWalk}
+      />
+      <ToolButton
+        icon={<Video size={20} />}
+        label={recordLabel}
+        onClick={onToggleRecording}
+        className={recordClassName}
+      />
+    </>
+  );
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.isRecording === nextProps.isRecording &&
+    prevProps.onActivateWalk === nextProps.onActivateWalk &&
+    prevProps.onToggleRecording === nextProps.onToggleRecording
+  );
+});
+
+WalkAndRecord.displayName = 'WalkAndRecord';
 
 const UndoRedo: React.FC<{
   canUndo: boolean;
   canRedo: boolean;
   onUndo: () => void;
   onRedo: () => void;
-}> = ({ canUndo, canRedo, onUndo, onRedo }) => (
+}> = React.memo(({ canUndo, canRedo, onUndo, onRedo }) => (
   <>
     <ToolButton
       icon={<Undo2 size={20} />}
@@ -348,7 +456,16 @@ const UndoRedo: React.FC<{
       className={canRedo ? 'opacity-100' : 'opacity-30'}
     />
   </>
-);
+), (prevProps, nextProps) => {
+  return (
+    prevProps.canUndo === nextProps.canUndo &&
+    prevProps.canRedo === nextProps.canRedo &&
+    prevProps.onUndo === nextProps.onUndo &&
+    prevProps.onRedo === nextProps.onRedo
+  );
+});
+
+UndoRedo.displayName = 'UndoRedo';
 
 // 🎨 Main Component
 export const Toolbar: React.FC = () => {
@@ -374,18 +491,24 @@ export const Toolbar: React.FC = () => {
   const { user, isReadOnlyMode } = useProjectStore();
 
   // Computed values
-  const canUndo = past.length > 0;
-  const canRedo = future.length > 0;
-  const isAdmin = user?.email?.includes('admin') || user?.email?.includes('levipark');
-  const portalRoute = isAdmin ? '/admin/crm' : '/portal?tab=projects';
+  const canUndo = useMemo(() => past.length > 0, [past.length]);
+  const canRedo = useMemo(() => future.length > 0, [future.length]);
+  const isAdmin = useMemo(() => 
+    user?.email?.includes('admin') || user?.email?.includes('levipark'),
+    [user?.email]
+  );
+  const portalRoute = useMemo(() => 
+    isAdmin ? '/admin/crm' : '/portal?tab=projects',
+    [isAdmin]
+  );
 
   // Handlers
-  const handleModeChange = (newMode: string): void => {
+  const handleModeChange = useCallback((newMode: string): void => {
     setMode(newMode as EditorMode);
     setShowViews(false);
-  };
+  }, [setMode]);
 
-  const handleToggleMeasure = (): void => {
+  const handleToggleMeasure = useCallback((): void => {
     if (mode === 'measuring') {
       setMode('idle');
       setMeasurementResult(null);
@@ -393,19 +516,19 @@ export const Toolbar: React.FC = () => {
       setMode('measuring');
       setShowViews(false);
     }
-  };
+  }, [mode, setMode, setMeasurementResult]);
 
-  const handleToggleViews = (): void => {
+  const handleToggleViews = useCallback((): void => {
     setShowViews((prev) => !prev);
-  };
+  }, []);
 
-  const handleImportClick = (): void => {
+  const handleImportClick = useCallback((): void => {
     fileInputRef.current?.click();
-  };
+  }, []);
 
-  const handleNavigateToPortal = (): void => {
+  const handleNavigateToPortal = useCallback((): void => {
     navigate(portalRoute);
-  };
+  }, [navigate, portalRoute]);
 
   return (
     <div className={CLASSES.container}>
