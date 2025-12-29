@@ -91,8 +91,10 @@ describe('useProjectActions', () => {
         saveResult = await result.current.saveProject();
       });
 
-      await waitFor(() => {
-        expect(saveResult).toBeDefined();
+      await act(async () => {
+        await waitFor(() => {
+          expect(saveResult).toBeDefined();
+        });
       });
       
       // Verificamos que se haya llamado requestInput (indica que el flujo llegó hasta ahí)

@@ -1,6 +1,6 @@
 // useProjects.test.ts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import { useProjects } from '../useProjects';
 import { supabase } from '@/core/lib/supabase';
 import { useErrorHandler } from '@/core/hooks/useErrorHandler';
@@ -52,11 +52,15 @@ describe('useProjects', () => {
 
       const { result } = renderHook(() => useProjects());
 
-      await result.current.fetchProjects('user-1');
+      await act(async () => {
+        await result.current.fetchProjects('user-1');
+      });
 
-      await waitFor(() => {
-        expect(result.current.projects).toEqual(mockProjects);
-        expect(result.current.loading).toBe(false);
+      await act(async () => {
+        await waitFor(() => {
+          expect(result.current.projects).toEqual(mockProjects);
+          expect(result.current.loading).toBe(false);
+        });
       });
 
       expect(mockShowLoading).toHaveBeenCalledWith('Cargando proyectos...');
@@ -77,10 +81,14 @@ describe('useProjects', () => {
 
       const { result } = renderHook(() => useProjects());
 
-      await result.current.fetchProjects('user-1');
+      await act(async () => {
+        await result.current.fetchProjects('user-1');
+      });
 
-      await waitFor(() => {
-        expect(result.current.loading).toBe(false);
+      await act(async () => {
+        await waitFor(() => {
+          expect(result.current.loading).toBe(false);
+        });
       });
 
       expect(mockHandleError).toHaveBeenCalledWith(mockError);
@@ -108,11 +116,15 @@ describe('useProjects', () => {
       // Set initial projects
       result.current.projects = initialProjects as any;
 
-      await result.current.deleteProject('1');
+      await act(async () => {
+        await result.current.deleteProject('1');
+      });
 
-      await waitFor(() => {
-        expect(mockShowSuccess).toHaveBeenCalledWith('✅ Proyecto eliminado');
-        expect(mockDismissToast).toHaveBeenCalledWith('toast-id');
+      await act(async () => {
+        await waitFor(() => {
+          expect(mockShowSuccess).toHaveBeenCalledWith('✅ Proyecto eliminado');
+          expect(mockDismissToast).toHaveBeenCalledWith('toast-id');
+        });
       });
 
       // Verify project was removed (we need to check the internal state)
@@ -155,10 +167,14 @@ describe('useProjects', () => {
 
       const { result } = renderHook(() => useProjects());
 
-      await result.current.refreshProjects('user-1');
+      await act(async () => {
+        await result.current.refreshProjects('user-1');
+      });
 
-      await waitFor(() => {
-        expect(result.current.projects).toEqual(mockProjects);
+      await act(async () => {
+        await waitFor(() => {
+          expect(result.current.projects).toEqual(mockProjects);
+        });
       });
     });
   });

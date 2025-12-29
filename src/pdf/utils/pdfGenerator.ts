@@ -143,7 +143,10 @@ export const generateBudgetPDF = async (
     } catch (error) {
       // Image loading failure is non-critical, continue without image
       if (import.meta.env.DEV) {
-        console.warn("Could not load PDF image", error);
+        // Log warning but don't break PDF generation
+        if (import.meta.env.DEV) {
+          console.warn("[PDFGenerator] Could not load PDF image", error);
+        }
       }
     }
   }

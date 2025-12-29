@@ -11,6 +11,7 @@ import {
   ErrorType,
   ErrorSeverity,
 } from '../lib/errorHandler';
+import { logger } from '../lib/logger';
 
 /**
  * Opciones para el manejo de errores
@@ -53,6 +54,18 @@ interface UseErrorHandlerResult {
   
   /** Oculta todos los toasts */
   dismissAll: () => void;
+  
+  /** Log de debug (solo en desarrollo) */
+  logDebug: (message: string, meta?: Record<string, unknown>) => void;
+  
+  /** Log de información (solo en desarrollo) */
+  logInfo: (message: string, meta?: Record<string, unknown>) => void;
+  
+  /** Log de advertencia (solo en desarrollo) */
+  logWarn: (message: string, meta?: Record<string, unknown>) => void;
+  
+  /** Log de error (siempre, pero estructurado) */
+  logError: (message: string, error?: unknown, meta?: Record<string, unknown>) => void;
 }
 
 /**
@@ -173,6 +186,40 @@ export const useErrorHandler = (
     toast.dismiss();
   }, []);
 
+  /**
+   * Log de debug (solo en desarrollo)
+   */
+  const logDebug = useCallback((message: string, meta?: Record<string, unknown>) => {
+    logger.debug(message, { context, meta });
+  }, [context]);
+
+  /**
+   * Log de información (solo en desarrollo)
+   */
+  const logInfo = useCallback((message: string, meta?: Record<string, unknown>) => {
+    logger.info(message, { context, meta });
+  }, [context]);
+
+  /**
+   * Log de advertencia (solo en desarrollo)
+   */
+  const logWarn = useCallback((message: string, meta?: Record<string, unknown>) => {
+    logger.warn(message, { context, meta });
+  }, [context]);
+
+  /**
+   * Log de error (siempre, pero estructurado)
+   * En producción, los errores se envían al sistema de error handling
+   */
+  const logError = useCallback((message: string, error?: unknown, meta?: Record<string, unknown>) => {
+    logger.error(message, error, { context, meta });
+    
+    // También procesar el error a través del sistema de error handling
+    if (error) {
+      handleErrorCore(error, context);
+    }
+  }, [context]);
+
   return {
     handleError,
     showSuccess,
@@ -181,6 +228,10 @@ export const useErrorHandler = (
     showLoading,
     dismissToast,
     dismissAll,
+    logDebug,
+    logInfo,
+    logWarn,
+    logError,
   };
 };
 

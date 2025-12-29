@@ -399,3 +399,21 @@ export type SceneItemSummary = Pick<
   SceneItem,
   'uuid' | 'type' | 'name' | 'price'
 >;
+
+// ============================================================================
+// PROJECT DATA TYPE
+// ============================================================================
+
+/**
+ * Project data structure stored in database
+ * This type is now validated using Zod schemas (see editor.schema.ts)
+ * Use ValidatedProjectData from editor.schema.ts for validated data
+ */
+export interface ProjectData {
+  items: SceneItem[];
+  fenceConfig: FenceConfig;
+  camera: CameraType;
+}
+
+// Re-export validated type from schema
+export type { ValidatedProjectData } from './editor.schema';

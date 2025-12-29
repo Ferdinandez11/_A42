@@ -1,6 +1,6 @@
 // BudgetDetailPage.test.tsx
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import { BudgetDetailPage } from '../BudgetDetailPage';
 
 // Evitar errores de scrollIntoView en el entorno de test
@@ -127,11 +127,14 @@ describe('BudgetDetailPage', () => {
   it('debería intentar cargar los datos de la orden al montar', async () => {
     render(<BudgetDetailPage />);
 
-    await waitFor(() => {
-      expect(mockFrom).toHaveBeenCalledWith('orders');
+    await act(async () => {
+      await waitFor(() => {
+        expect(mockFrom).toHaveBeenCalledWith('orders');
+      });
     });
   });
 });
+
 
 
 

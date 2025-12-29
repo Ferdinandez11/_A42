@@ -78,7 +78,8 @@ export const BudgetDetailPage = () => {
   const isLocked = !isPending && !isOrderConfirmed && order.status !== 'presupuestado' && !isArchived;
 
   // OrderData is compatible with Order for UI components
-  const orderForUI = order as any;
+  // Both types share the same structure for the fields used by UI components
+  const orderForUI = order as unknown as import('@/domain/types/types').Order;
 
   return (
     <div className="budget-detail-container p-5 bg-black min-h-screen">

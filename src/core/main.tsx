@@ -46,10 +46,13 @@ const initializeApp = (): void => {
     
     // Log successful initialization in development
     if (import.meta.env.DEV) {
-      console.log('✅ Application initialized successfully');
+      if (import.meta.env.DEV) {
+        console.log('✅ Application initialized successfully');
+      }
     }
   } catch (error) {
     console.error('❌ Failed to initialize application:', error);
+    // Error is already handled by error boundary
     
     // Display user-friendly error message
     document.body.innerHTML = `

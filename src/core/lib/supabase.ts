@@ -78,11 +78,11 @@ try {
       }
     );
   } else {
-    // Log error for debugging but allow the module to load
-    if (import.meta.env.DEV) {
-      console.error('Failed to initialize Supabase client:', error);
-    }
-    throw error;
+  // Log error for debugging but allow the module to load
+  if (import.meta.env.DEV) {
+    console.error('Failed to initialize Supabase client:', error);
+  }
+  throw error;
   }
 }
 

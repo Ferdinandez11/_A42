@@ -1,4 +1,5 @@
 import type { ProductDefinition } from "@/domain/types/catalog";
+import { logDebug, logError } from "@/core/lib/logger";
 
 // 🎨 Types
 export type Product = ProductDefinition & { 
@@ -171,7 +172,7 @@ const parseProductFromRow = (
     id: ref,
     name: nombre,
     price: precio,
-    type: 'model' as any,
+    type: 'model',
     modelUrl: glbUrl,
     img_2d: getColumnValue(cols, indices.img),
     line: linea,
@@ -220,9 +221,7 @@ const addProductToDB = (
  * Fetches and parses the CSV data from Google Sheets
  */
 const fetchAndParseCsv = async (): Promise<CatalogDB> => {
-  if (import.meta.env.DEV) {
-    console.log('[CatalogService] Descargando CSV...');
-  }
+  logDebug('Descargando CSV...', { context: 'CatalogService' });
   
   const response = await fetch(GOOGLE_SHEET_CSV_URL);
   
@@ -283,15 +282,14 @@ export const loadCatalogData = async (): Promise<void> => {
     isLoaded = true;
     loadError = null;
     
-    if (import.meta.env.DEV) {
-      console.log('[CatalogService] CSV procesado correctamente. Datos cargados:', catalogData);
-    }
-  } catch (err: any) {
-    loadError = `Error CSV: ${err.message || err}`;
+    logDebug('CSV procesado correctamente. Datos cargados', { 
+      context: 'CatalogService', 
+      meta: { catalogData } 
+    });
+  } catch (err: unknown) {
+    loadError = err instanceof Error ? `Error CSV: ${err.message}` : `Error CSV: ${String(err)}`;
     // Error is stored in loadError and can be retrieved via getCatalogLoadStatus
-    if (import.meta.env.DEV) {
-      console.error('[CatalogService]', err);
-    }
+    logError('Error al procesar CSV', err, { context: 'CatalogService' });
     isLoaded = false;
     catalogData = null;
   }

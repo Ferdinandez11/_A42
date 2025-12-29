@@ -14,7 +14,6 @@
     "test:watch": "vitest --watch",
     "type-check": "tsc --noEmit",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
-   
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.86.0",
@@ -29,6 +28,7 @@
     "react-hot-toast": "^2.6.0",
     "react-router-dom": "^7.9.6",
     "three": "^0.158.0",
+    "zod": "^4.2.1",
     "zustand": "^5.0.8"
   },
   "devDependencies": {

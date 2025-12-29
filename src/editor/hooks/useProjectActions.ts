@@ -7,16 +7,16 @@ import { useProjectStore } from '@/editor/stores/project/useProjectStore';
 import { useEngine } from '@/editor/context/EngineContext';
 import { useErrorHandler } from '@/core/hooks/useErrorHandler';
 import { AppError, ErrorType, ErrorSeverity } from '@/core/lib/errorHandler';
+import type { SupabaseProjectWithShareToken } from '@/domain/types/supabase';
+import type { ModelItem } from '@/domain/types/editor';
+import { validateProjectData, type ValidatedProjectData } from '@/domain/types/editor.schema';
 
 // ============================================================================
 // TIPOS E INTERFACES
 // ============================================================================
 
-interface ProjectData {
-  items: any[];
-  fenceConfig: any;
-  camera: string;
-}
+// ProjectData type is now inferred from Zod schema
+// Use ValidatedProjectData from editor.schema.ts
 
 interface SaveProjectResult {
   success: boolean;
@@ -75,7 +75,7 @@ const MESSAGES = {
 export const useProjectActions = (): ProjectActionsReturn => {
   const engine = useEngine();
   const [isSaving, setIsSaving] = useState<boolean>(false);
-  const { handleError, showSuccess, showError } = useErrorHandler({
+  const { handleError, showSuccess, showError, logDebug, logWarn, logError } = useErrorHandler({
     context: 'useProjectActions',
   });
 
@@ -122,12 +122,14 @@ export const useProjectActions = (): ProjectActionsReturn => {
     );
   };
 
-  const prepareProjectData = (): ProjectData => {
-    return {
+  const prepareProjectData = (): ValidatedProjectData => {
+    const data = {
       items,
       fenceConfig,
       camera: cameraType,
     };
+    // Validate before returning
+    return validateProjectData(data);
   };
 
   // ==========================================================================
@@ -190,7 +192,7 @@ export const useProjectActions = (): ProjectActionsReturn => {
 
   const createNewProject = async (
     name: string,
-    projectData: ProjectData,
+    projectData: ValidatedProjectData,
     thumbnailBase64: string
   ): Promise<SaveProjectResult> => {
     if (!user) {
@@ -213,17 +215,18 @@ export const useProjectActions = (): ProjectActionsReturn => {
       .single();
 
     if (error) {
-      console.error('[createNewProject] Insert error:', error);
+      logError('Insert error', error);
       throw error;
     }
 
     if (data) {
       // El share_token se genera automáticamente por la DB (DEFAULT gen_random_uuid())
-      const shareToken = (data as any).share_token ? String((data as any).share_token) : null;
-      console.log('[createNewProject] Project created:', { id: data.id, name: data.name, shareToken });
+      const projectData = data as SupabaseProjectWithShareToken;
+      const shareToken = projectData.share_token ? String(projectData.share_token) : null;
+      logDebug('Project created', { id: data.id, name: data.name, shareToken });
       
       if (!shareToken) {
-        console.warn('[createNewProject] Warning: share_token is null, project may not be shareable');
+        logWarn('share_token is null, project may not be shareable');
       }
       
       setProjectInfo(data.id, data.name, shareToken);
@@ -239,7 +242,7 @@ export const useProjectActions = (): ProjectActionsReturn => {
   const updateExistingProject = async (
     projectId: string,
     name: string,
-    projectData: ProjectData,
+    projectData: ValidatedProjectData,
     thumbnailBase64: string
   ): Promise<SaveProjectResult> => {
     // Al actualizar, también habilitar share si no está habilitado
@@ -262,7 +265,8 @@ export const useProjectActions = (): ProjectActionsReturn => {
 
     // Actualizar el share_token en el estado si existe
     if (data) {
-      const shareToken = (data as any).share_token ? String((data as any).share_token) : null;
+      const projectData = data as SupabaseProjectWithShareToken;
+      const shareToken = projectData.share_token ? String(projectData.share_token) : null;
       setProjectInfo(projectId, name, shareToken);
     }
 
@@ -379,7 +383,7 @@ export const useProjectActions = (): ProjectActionsReturn => {
         const fileName = file.name.replace(/\.(glb|gltf)$/i, '');
 
         // Crear item modelo
-        const newItem = {
+        const newItem: ModelItem = {
           uuid: crypto.randomUUID(),
           productId: 'custom_upload',
           name: fileName,
@@ -391,7 +395,7 @@ export const useProjectActions = (): ProjectActionsReturn => {
           scale: [1, 1, 1] as [number, number, number],
         };
 
-        addItem(newItem as any);
+        addItem(newItem);
 
         // Limpiar input para permitir importar el mismo archivo nuevamente
         event.target.value = '';

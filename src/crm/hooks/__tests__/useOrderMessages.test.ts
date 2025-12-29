@@ -69,9 +69,11 @@ describe('useOrderMessages', () => {
       await result.current.fetchMessages('order-1');
     });
 
-    await waitFor(() => {
-      expect(result.current.messages).toHaveLength(1);
-      expect(result.current.messages[0].id).toBe('msg-1');
+    await act(async () => {
+      await waitFor(() => {
+        expect(result.current.messages).toHaveLength(1);
+        expect(result.current.messages[0].id).toBe('msg-1');
+      });
     });
   });
 
@@ -103,8 +105,10 @@ describe('useOrderMessages', () => {
       await result.current.sendMessage('order-1', 'New message');
     });
 
-    await waitFor(() => {
-      expect(mockShowSuccess).toHaveBeenCalledWith('✅ Mensaje enviado');
+    await act(async () => {
+      await waitFor(() => {
+        expect(mockShowSuccess).toHaveBeenCalledWith('✅ Mensaje enviado');
+      });
     });
   });
 
@@ -137,8 +141,10 @@ describe('useOrderMessages', () => {
       await result.current.fetchMessages('order-1');
     });
 
-    await waitFor(() => {
-      expect(mockHandleError).toHaveBeenCalledWith(error);
+    await act(async () => {
+      await waitFor(() => {
+        expect(mockHandleError).toHaveBeenCalledWith(error);
+      });
     });
   });
 });

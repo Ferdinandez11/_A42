@@ -74,9 +74,11 @@ describe('useOrderAttachments', () => {
       await result.current.fetchAttachments('order-1');
     });
 
-    await waitFor(() => {
-      expect(result.current.attachments).toHaveLength(1);
-      expect(result.current.attachments[0].id).toBe('att-1');
+    await act(async () => {
+      await waitFor(() => {
+        expect(result.current.attachments).toHaveLength(1);
+        expect(result.current.attachments[0].id).toBe('att-1');
+      });
     });
   });
 
@@ -109,10 +111,12 @@ describe('useOrderAttachments', () => {
       await result.current.uploadFile('order-1', mockFile);
     });
 
-    await waitFor(() => {
-      expect(mockShowSuccess).toHaveBeenCalledWith(
-        expect.stringContaining('subido correctamente')
-      );
+    await act(async () => {
+      await waitFor(() => {
+        expect(mockShowSuccess).toHaveBeenCalledWith(
+          expect.stringContaining('subido correctamente')
+        );
+      });
     });
   });
 
@@ -136,9 +140,11 @@ describe('useOrderAttachments', () => {
       await result.current.deleteAttachment('att-1');
     });
 
-    await waitFor(() => {
-      expect(mockShowSuccess).toHaveBeenCalledWith('✅ Archivo eliminado');
-      expect(result.current.attachments).toHaveLength(0);
+    await act(async () => {
+      await waitFor(() => {
+        expect(mockShowSuccess).toHaveBeenCalledWith('✅ Archivo eliminado');
+        expect(result.current.attachments).toHaveLength(0);
+      });
     });
   });
 
@@ -160,8 +166,10 @@ describe('useOrderAttachments', () => {
       await result.current.fetchAttachments('order-1');
     });
 
-    await waitFor(() => {
-      expect(mockHandleError).toHaveBeenCalledWith(error);
+    await act(async () => {
+      await waitFor(() => {
+        expect(mockHandleError).toHaveBeenCalledWith(error);
+      });
     });
   });
 });

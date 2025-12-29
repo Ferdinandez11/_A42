@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/core/lib/supabase';
 import { useErrorHandler } from '@/core/hooks/useErrorHandler';
 import { AppError, ErrorType, ErrorSeverity } from '@/core/lib/errorHandler';
+import type { SupabaseError } from '@/domain/types/supabase';
 
 export interface Project {
   id: string;
@@ -71,7 +72,8 @@ export const useProjects = (): UseProjectsReturn => {
 
         if (error) {
           // 409/23503 = violación de FK (hay pedidos/presupuestos enlazados)
-          if ((error as any).code === '23503' || String(error.message).includes('foreign key')) {
+          const supabaseError = error as SupabaseError;
+          if (supabaseError.code === '23503' || String(error.message).includes('foreign key')) {
             handleError(
               new AppError(ErrorType.VALIDATION, 'No se puede eliminar el proyecto', {
                 userMessage:

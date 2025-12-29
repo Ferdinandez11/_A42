@@ -75,9 +75,11 @@ describe('useClients', () => {
       await result.current.fetchClients();
     });
 
-    await waitFor(() => {
-      expect(result.current.clients).toHaveLength(1);
-      expect(result.current.clients[0].id).toBe('client-1');
+    await act(async () => {
+      await waitFor(() => {
+        expect(result.current.clients).toHaveLength(1);
+        expect(result.current.clients[0].id).toBe('client-1');
+      });
     });
   });
 
@@ -97,8 +99,10 @@ describe('useClients', () => {
       await result.current.fetchClients();
     });
 
-    await waitFor(() => {
-      expect(mockHandleError).toHaveBeenCalled();
+    await act(async () => {
+      await waitFor(() => {
+        expect(mockHandleError).toHaveBeenCalled();
+      });
     });
   });
 
@@ -132,17 +136,21 @@ describe('useClients', () => {
       await result.current.fetchClients();
     });
 
-    await waitFor(() => {
-      expect(result.current.clients).toHaveLength(1);
+    await act(async () => {
+      await waitFor(() => {
+        expect(result.current.clients).toHaveLength(1);
+      });
     });
 
     await act(async () => {
       await result.current.approveClient('client-1');
     });
 
-    await waitFor(() => {
-      expect(mockShowSuccess).toHaveBeenCalledWith('✅ Cliente aprobado correctamente');
-      expect(result.current.clients[0].is_approved).toBe(true);
+    await act(async () => {
+      await waitFor(() => {
+        expect(mockShowSuccess).toHaveBeenCalledWith('✅ Cliente aprobado correctamente');
+        expect(result.current.clients[0].is_approved).toBe(true);
+      });
     });
   });
 
@@ -173,11 +181,13 @@ describe('useClients', () => {
       await result.current.createClient(mockNewClient);
     });
 
-    await waitFor(() => {
-      expect(mockShowSuccess).toHaveBeenCalledWith(
-        expect.stringContaining('creado correctamente')
-      );
-      expect(mockInsertFn).toHaveBeenCalled();
+    await act(async () => {
+      await waitFor(() => {
+        expect(mockShowSuccess).toHaveBeenCalledWith(
+          expect.stringContaining('creado correctamente')
+        );
+        expect(mockInsertFn).toHaveBeenCalled();
+      });
     });
   });
 
@@ -224,17 +234,21 @@ describe('useClients', () => {
       await result.current.fetchClients();
     });
 
-    await waitFor(() => {
-      expect(result.current.clients).toHaveLength(1);
+    await act(async () => {
+      await waitFor(() => {
+        expect(result.current.clients).toHaveLength(1);
+      });
     });
 
     await act(async () => {
       await result.current.deleteClient('client-1');
     });
 
-    await waitFor(() => {
-      expect(mockShowSuccess).toHaveBeenCalledWith('✅ Cliente eliminado');
-      expect(result.current.clients).toHaveLength(0);
+    await act(async () => {
+      await waitFor(() => {
+        expect(mockShowSuccess).toHaveBeenCalledWith('✅ Cliente eliminado');
+        expect(result.current.clients).toHaveLength(0);
+      });
     });
   });
 });

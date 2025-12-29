@@ -1,6 +1,7 @@
 // BudgetAttachmentsCard.tsx
 import { useState, useEffect } from 'react';
 import { supabase } from '@/core/lib/supabase';
+import { logError } from '@/core/lib/logger';
 import type { Attachment } from '@/crm/pages/budgetTypes';
 
 interface BudgetAttachmentsCardProps {
@@ -36,7 +37,7 @@ export const BudgetAttachmentsCard = ({
           }
         }
       } catch (error) {
-        console.error('Error loading user:', error);
+        logError('Error loading user', error, { context: 'BudgetAttachmentsCard' });
       }
     };
     loadUser();

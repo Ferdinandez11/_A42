@@ -69,9 +69,11 @@ describe('useOrderObservations', () => {
       await result.current.fetchObservations('order-1');
     });
 
-    await waitFor(() => {
-      expect(result.current.observations).toHaveLength(1);
-      expect(result.current.observations[0].id).toBe('obs-1');
+    await act(async () => {
+      await waitFor(() => {
+        expect(result.current.observations).toHaveLength(1);
+        expect(result.current.observations[0].id).toBe('obs-1');
+      });
     });
   });
 
@@ -103,8 +105,10 @@ describe('useOrderObservations', () => {
       await result.current.addObservation('order-1', 'New observation');
     });
 
-    await waitFor(() => {
-      expect(mockShowSuccess).toHaveBeenCalledWith('✅ Observación añadida');
+    await act(async () => {
+      await waitFor(() => {
+        expect(mockShowSuccess).toHaveBeenCalledWith('✅ Observación añadida');
+      });
     });
   });
 
@@ -138,8 +142,10 @@ describe('useOrderObservations', () => {
       await result.current.fetchObservations('order-1');
     });
 
-    await waitFor(() => {
-      expect(mockHandleError).toHaveBeenCalledWith(error);
+    await act(async () => {
+      await waitFor(() => {
+        expect(mockHandleError).toHaveBeenCalledWith(error);
+      });
     });
   });
 });

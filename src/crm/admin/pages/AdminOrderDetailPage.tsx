@@ -32,7 +32,7 @@ import { ParametricModal } from '../../shared/components/ParametricModal';
 
 export const AdminOrderDetailPage = () => {
   const { id } = useParams<{ id: string }>();
-  const { handleError, showSuccess, showLoading, dismissToast } = useErrorHandler({
+  const { handleError, showSuccess, showLoading, dismissToast, logError } = useErrorHandler({
     context: 'AdminOrderDetailPage',
   });
   
@@ -174,7 +174,7 @@ export const AdminOrderDetailPage = () => {
           ]);
 
           if (obsError) {
-            console.error('Error adding observation:', obsError);
+            logError('Error adding observation', obsError);
           } else {
             // Recargar observaciones para mostrar la nueva
             await fetchObservations(id);

@@ -4,8 +4,11 @@ import type { User } from "@supabase/supabase-js";
 
 // ✅ IMPORTS DEL SISTEMA DE ERRORES
 import { handleError, AppError, ErrorType, ErrorSeverity } from '@/core/lib/errorHandler';
+import { logDebug, logInfo, logWarn, logError } from '@/core/lib/logger';
 
 import type { SceneItem, FenceConfig } from "@/domain/types/editor";
+import type { SupabaseProjectWithData } from "@/domain/types/supabase";
+import { validateProjectData, safeValidateProjectData } from "@/domain/types/editor.schema";
 import { useSceneStore } from "@/editor/stores/scene/useSceneStore";
 import { useEditorStore } from "@/editor/stores/editor/useEditorStore";
 
@@ -109,15 +112,24 @@ export const useProjectStore = create<ProjectState>((set) => ({
         );
       }
 
-      const sceneData = project.data || {};
+      // Validate project data using Zod schema
+      let validatedData;
+      try {
+        validatedData = validateProjectData(project.data);
+      } catch (validationError) {
+        logWarn("Invalid project data format, using defaults", { 
+          context: 'useProjectStore.loadProjectFromURL', 
+          meta: { projectId, error: validationError } 
+        });
+        // Use safe validation as fallback
+        validatedData = safeValidateProjectData(project.data) || validateProjectData({});
+      }
 
-      // Extract items
-      const items: SceneItem[] = Array.isArray(sceneData.items)
-        ? sceneData.items
-        : [];
+      // Extract validated items
+      const items: SceneItem[] = validatedData.items || [];
 
-      // Extract fence configuration
-      const fenceConfig: FenceConfig = sceneData.fenceConfig || {
+      // Extract validated fence configuration
+      const fenceConfig: FenceConfig = validatedData.fenceConfig || {
         presetId: "wood",
         colors: { post: 0, slatA: 0 },
       };
@@ -134,15 +146,16 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
       // Update editor store
       useEditorStore.setState({
-        cameraType: sceneData.camera || "perspective",
+        cameraType: validatedData.camera || "perspective",
       });
 
       // Update project store
       // Project is read-only if: forced by URL parameter OR has associated orders (presupuestos)
+      const projectData = project as SupabaseProjectWithData;
       set({
         currentProjectId: project.id,
         currentProjectName: project.name,
-        currentProjectShareToken: (project as any).share_token ? String((project as any).share_token) : null,
+        currentProjectShareToken: projectData.share_token ? String(projectData.share_token) : null,
         isReadOnlyMode: shouldBeReadOnly,
       });
     } catch (error) {
@@ -175,7 +188,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
         });
       }
 
-      console.log("[loadSharedProjectFromURL] Calling RPC with:", { projectId, token });
+      logDebug("Calling RPC with", { context: 'useProjectStore.loadSharedProjectFromURL', meta: { projectId, token } });
 
       // Call RPC - Supabase RPC with RETURNS TABLE returns an array
       // Pass as UUID type (Supabase will handle conversion)
@@ -184,10 +197,10 @@ export const useProjectStore = create<ProjectState>((set) => ({
         token: token,
       });
 
-      console.log("[loadSharedProjectFromURL] RPC response:", { project, error });
+      logDebug("RPC response", { context: 'useProjectStore.loadSharedProjectFromURL', meta: { project, error } });
 
       if (error) {
-        console.error("[loadSharedProjectFromURL] RPC error:", error);
+        logError("RPC error", error, { context: 'useProjectStore.loadSharedProjectFromURL', meta: { projectId, token } });
         throw new AppError(ErrorType.NOT_FOUND, `RPC error: ${error.message}`, {
           userMessage: "Enlace inválido o expirado",
           severity: ErrorSeverity.MEDIUM,
@@ -198,7 +211,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       // RPC with RETURNS TABLE always returns an array (even if empty)
       // If no rows match, it returns []
       if (!project || (Array.isArray(project) && project.length === 0)) {
-        console.warn("[loadSharedProjectFromURL] No project found", { projectId, token, project });
+        logWarn("No project found", { context: 'useProjectStore.loadSharedProjectFromURL', meta: { projectId, token, project } });
         throw new AppError(ErrorType.NOT_FOUND, "Shared project not found", {
           userMessage: "Enlace inválido o expirado. Verifica que el proyecto tenga el compartir habilitado.",
           severity: ErrorSeverity.MEDIUM,
@@ -210,17 +223,29 @@ export const useProjectStore = create<ProjectState>((set) => ({
       const projectData = Array.isArray(project) ? project[0] : project;
 
       if (!projectData || !projectData.id) {
-        console.warn("[loadSharedProjectFromURL] Invalid project data", { projectData });
+        logWarn("Invalid project data", { context: 'useProjectStore.loadSharedProjectFromURL', meta: { projectData } });
         throw new AppError(ErrorType.NOT_FOUND, "Shared project data invalid", {
           userMessage: "Enlace inválido o expirado",
           severity: ErrorSeverity.MEDIUM,
         });
       }
 
-      const sceneData = projectData.data || {};
+      // Validate project data using Zod schema
+      let validatedData;
+      try {
+        validatedData = validateProjectData(projectData.data);
+      } catch (validationError) {
+        logWarn("Invalid shared project data format, using defaults", { 
+          context: 'useProjectStore.loadSharedProjectFromURL', 
+          meta: { projectId, token, error: validationError } 
+        });
+        // Use safe validation as fallback
+        validatedData = safeValidateProjectData(projectData.data) || validateProjectData({});
+      }
 
-      const items: SceneItem[] = Array.isArray(sceneData.items) ? sceneData.items : [];
-      const fenceConfig: FenceConfig = sceneData.fenceConfig || {
+      // Extract validated items
+      const items: SceneItem[] = validatedData.items || [];
+      const fenceConfig: FenceConfig = validatedData.fenceConfig || {
         presetId: "wood",
         colors: { post: 0, slatA: 0 },
       };
@@ -233,7 +258,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       });
 
       useEditorStore.setState({
-        cameraType: sceneData.camera || "perspective",
+        cameraType: validatedData.camera || "perspective",
       });
 
       set({

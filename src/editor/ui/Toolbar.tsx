@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { useEditorStore } from "@/editor/stores/editor/useEditorStore";
 import { useSceneStore } from "@/editor/stores/scene/useSceneStore";
 import { useProjectStore } from "@/editor/stores/project/useProjectStore";
+import type { EditorMode } from "@/domain/types/editor";
 
 // HOOKS
 import { useEditorMedia } from '@/editor/hooks/useEditorMedia';
@@ -380,7 +381,7 @@ export const Toolbar: React.FC = () => {
 
   // Handlers
   const handleModeChange = (newMode: string): void => {
-    setMode(newMode as any);
+    setMode(newMode as EditorMode);
     setShowViews(false);
   };
 

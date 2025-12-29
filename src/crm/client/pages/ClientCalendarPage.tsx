@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/core/lib/supabase";
+import { logError } from "@/core/lib/logger";
 
 // Types
 interface Order {
@@ -83,7 +84,7 @@ export const ClientCalendarPage: React.FC = () => {
 
       setOrders((data as Order[]) || []);
     } catch (error) {
-      console.error('Error loading calendar:', error);
+      logError('Error loading calendar', error, { context: 'ClientCalendarPage' });
     }
   };
 
