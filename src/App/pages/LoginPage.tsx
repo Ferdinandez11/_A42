@@ -36,31 +36,45 @@ const checkUserStatus = async (userId: string): Promise<void> => {
       .eq("id", userId)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('[LoginPage] Error al obtener perfil:', error);
+      throw error;
+    }
 
-    if (profile) {
-      const typedProfile = profile as Profile;
-      
-      if (typedProfile.role === "admin" || typedProfile.role === "employee") {
-        navigate("/admin/crm");
-        return;
-      }
+    if (!profile) {
+      console.error('[LoginPage] Perfil no encontrado para userId:', userId);
+      throw new AppError(
+        ErrorType.NOT_FOUND,
+        'Profile not found',
+        {
+          severity: ErrorSeverity.HIGH,
+          userMessage: 'Perfil de usuario no encontrado. Contacta a soporte.',
+          metadata: { userId },
+        }
+      );
+    }
 
-      if (typedProfile.is_approved) {
-        navigate("/portal");
-      } else {
-        await supabase.auth.signOut();
-        showSuccess('✅ Cuenta creada. Pendiente de aprobación.');
-        throw new AppError(
-          ErrorType.PERMISSION,
-          'Account pending approval',
-          { 
-            severity: ErrorSeverity.LOW,
-            userMessage: 'Tu cuenta está pendiente de validación por un administrador.' 
-          }
-        );
-      }
-  }
+    const typedProfile = profile as Profile;
+    
+    if (typedProfile.role === "admin" || typedProfile.role === "employee") {
+      navigate("/admin/crm");
+      return;
+    }
+
+    if (typedProfile.is_approved) {
+      navigate("/portal");
+    } else {
+      await supabase.auth.signOut();
+      showSuccess('✅ Cuenta creada. Pendiente de aprobación.');
+      throw new AppError(
+        ErrorType.PERMISSION,
+        'Account pending approval',
+        { 
+          severity: ErrorSeverity.LOW,
+          userMessage: 'Tu cuenta está pendiente de validación por un administrador.' 
+        }
+      );
+    }
 };
 const handleAuth = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
   e.preventDefault();
@@ -112,26 +126,37 @@ const handleAuth = async (e: React.FormEvent<HTMLFormElement>): Promise<void> =>
   } catch (error) {
     // Ignorar errores de extensiones del navegador
     if (error instanceof Error && error.message.includes('message channel closed')) {
+      setLoading(false);
       return;
     }
     
-    // Log del error completo para debugging
-    if (import.meta.env.DEV) {
-      console.group('[LoginPage] Error de autenticación');
-      console.error('Error completo:', error);
-      if (error && typeof error === 'object') {
-        if ('code' in error) {
-          console.error('Código de error:', (error as { code: string }).code);
-        }
-        if ('message' in error) {
-          console.error('Mensaje de error:', (error as { message: string }).message);
-        }
-        if ('status' in error) {
-          console.error('Status:', (error as { status: number }).status);
-        }
+    // Log del error completo SIEMPRE (para debugging)
+    console.group('[LoginPage] Error de autenticación');
+    console.error('Error completo:', error);
+    console.error('Tipo de error:', typeof error);
+    console.error('Es instancia de Error:', error instanceof Error);
+    
+    if (error && typeof error === 'object') {
+      console.error('Propiedades del error:', Object.keys(error));
+      
+      if ('code' in error) {
+        console.error('Código de error:', (error as { code: string }).code);
       }
-      console.groupEnd();
+      if ('message' in error) {
+        console.error('Mensaje de error:', (error as { message: string }).message);
+      }
+      if ('status' in error) {
+        console.error('Status:', (error as { status: number }).status);
+      }
+      if ('statusCode' in error) {
+        console.error('Status Code:', (error as { statusCode: number }).statusCode);
+      }
+      
+      // Intentar acceder a propiedades comunes de Supabase Auth
+      const errorObj = error as Record<string, unknown>;
+      console.error('Error como objeto:', JSON.stringify(errorObj, null, 2));
     }
+    console.groupEnd();
     
     // Manejar el error
     handleError(error);

@@ -302,15 +302,35 @@ class ErrorHandler {
    * Detecta si es un error de Supabase
    */
   private isSupabaseError(error: unknown): boolean {
-    return error !== null && typeof error === 'object' && 'code' in error && 'message' in error;
+    if (error === null || typeof error !== 'object') {
+      return false;
+    }
+    
+    // Supabase Auth errors tienen 'code' y 'message'
+    if ('code' in error && 'message' in error) {
+      return true;
+    }
+    
+    // También pueden tener 'status' y 'statusCode'
+    if ('status' in error || 'statusCode' in error) {
+      return true;
+    }
+    
+    return false;
   }
 
   /**
    * Maneja errores específicos de Supabase
    */
-  private handleSupabaseError(error: { code: string; message: string }, context?: string): AppError {
-    const code = error.code;
-    const message = error.message.toLowerCase();
+  private handleSupabaseError(error: Record<string, unknown>, context?: string): AppError {
+    // Extraer código y mensaje de diferentes formatos posibles
+    const code = String(error.code || error.status || error.statusCode || '');
+    const message = String(error.message || error.error_description || error.error || '').toLowerCase();
+    
+    // Log para debugging
+    if (import.meta.env.DEV) {
+      console.log('[ErrorHandler] Procesando error de Supabase:', { code, message, error });
+    }
     
     // Errores de autenticación de Supabase Auth
     if (code === 'invalid_credentials' || message.includes('invalid login credentials')) {
