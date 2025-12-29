@@ -199,9 +199,15 @@ export function validateForm<T>(
 export function getFormErrors(error: z.ZodError): Record<string, string> {
   const errors: Record<string, string> = {};
   
+  // Validar que error.errors existe y es un array
+  if (!error || !error.errors || !Array.isArray(error.errors)) {
+    console.error('[getFormErrors] Error inválido:', error);
+    return { _general: 'Error de validación desconocido' };
+  }
+  
   error.errors.forEach((err) => {
-    const path = err.path.join('.');
-    errors[path] = err.message;
+    const path = err.path && Array.isArray(err.path) ? err.path.join('.') : 'unknown';
+    errors[path] = err.message || 'Error de validación';
   });
   
   return errors;
@@ -211,6 +217,9 @@ export function getFormErrors(error: z.ZodError): Record<string, string> {
  * Obtiene el primer mensaje de error
  */
 export function getFirstError(error: z.ZodError): string {
+  if (!error || !error.errors || !Array.isArray(error.errors) || error.errors.length === 0) {
+    return 'Error de validación';
+  }
   return error.errors[0]?.message || 'Error de validación';
 }
 

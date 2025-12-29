@@ -87,12 +87,21 @@ const handleAuth = async (e: React.FormEvent<HTMLFormElement>): Promise<void> =>
     
     if (!validation.success) {
       const formErrors: { email?: string; password?: string } = {};
-      validation.error.errors.forEach((err) => {
-        const field = err.path[0] as 'email' | 'password';
-        if (field) {
-          formErrors[field] = err.message;
-        }
-      });
+      
+      // Validar que validation.error.errors existe
+      if (validation.error && validation.error.errors && Array.isArray(validation.error.errors)) {
+        validation.error.errors.forEach((err) => {
+          const field = err.path && Array.isArray(err.path) ? err.path[0] as 'email' | 'password' : undefined;
+          if (field) {
+            formErrors[field] = err.message || 'Error de validación';
+          }
+        });
+      } else {
+        // Si no hay errores estructurados, mostrar error genérico
+        console.error('[LoginPage] Error de validación sin estructura:', validation.error);
+        formErrors.email = 'Error de validación. Verifica tus datos.';
+      }
+      
       setErrors(formErrors);
       setLoading(false);
       return;
@@ -116,7 +125,25 @@ const handleAuth = async (e: React.FormEvent<HTMLFormElement>): Promise<void> =>
         email: validatedEmail, 
         password: validatedPassword 
       });
-      if (result.error) throw result.error;
+      
+      // Verificar errores de autenticación
+      if (result.error) {
+        console.error('[LoginPage] Error de Supabase Auth:', result.error);
+        throw result.error;
+      }
+
+      // Verificar que tenemos datos de usuario
+      if (!result.data || !result.data.user) {
+        console.error('[LoginPage] No se recibieron datos de usuario');
+        throw new AppError(
+          ErrorType.AUTH,
+          'No user data received',
+          {
+            severity: ErrorSeverity.HIGH,
+            userMessage: 'Error de autenticación. No se recibieron datos del usuario.',
+          }
+        );
+      }
 
       setUser(result.data.user);
       setSession(result.data.session);
@@ -131,35 +158,58 @@ const handleAuth = async (e: React.FormEvent<HTMLFormElement>): Promise<void> =>
     }
     
     // Log del error completo SIEMPRE (para debugging)
-    console.group('[LoginPage] Error de autenticación');
-    console.error('Error completo:', error);
-    console.error('Tipo de error:', typeof error);
-    console.error('Es instancia de Error:', error instanceof Error);
-    
-    if (error && typeof error === 'object') {
-      console.error('Propiedades del error:', Object.keys(error));
+    try {
+      console.group('[LoginPage] Error de autenticación');
+      console.error('Error completo:', error);
+      console.error('Tipo de error:', typeof error);
+      console.error('Es instancia de Error:', error instanceof Error);
       
-      if ('code' in error) {
-        console.error('Código de error:', (error as { code: string }).code);
+      if (error && typeof error === 'object') {
+        try {
+          console.error('Propiedades del error:', Object.keys(error));
+        } catch (e) {
+          console.error('No se pudieron obtener las propiedades del error');
+        }
+        
+        if ('code' in error) {
+          console.error('Código de error:', (error as { code: string }).code);
+        }
+        if ('message' in error) {
+          console.error('Mensaje de error:', (error as { message: string }).message);
+        }
+        if ('status' in error) {
+          console.error('Status:', (error as { status: number }).status);
+        }
+        if ('statusCode' in error) {
+          console.error('Status Code:', (error as { statusCode: number }).statusCode);
+        }
+        
+        // Intentar acceder a propiedades comunes de Supabase Auth de forma segura
+        try {
+          const errorObj = error as Record<string, unknown>;
+          console.error('Error como objeto:', JSON.stringify(errorObj, null, 2));
+        } catch (e) {
+          console.error('No se pudo serializar el error');
+        }
       }
-      if ('message' in error) {
-        console.error('Mensaje de error:', (error as { message: string }).message);
-      }
-      if ('status' in error) {
-        console.error('Status:', (error as { status: number }).status);
-      }
-      if ('statusCode' in error) {
-        console.error('Status Code:', (error as { statusCode: number }).statusCode);
-      }
-      
-      // Intentar acceder a propiedades comunes de Supabase Auth
-      const errorObj = error as Record<string, unknown>;
-      console.error('Error como objeto:', JSON.stringify(errorObj, null, 2));
+      console.groupEnd();
+    } catch (logError) {
+      // Si falla el logging, al menos mostrar algo
+      console.error('[LoginPage] Error al hacer log:', logError);
+      console.error('[LoginPage] Error original:', error);
     }
-    console.groupEnd();
     
-    // Manejar el error
-    handleError(error);
+    // Manejar el error de forma segura
+    try {
+      handleError(error);
+    } catch (handleErrorError) {
+      // Si falla el manejo de errores, mostrar un mensaje genérico
+      console.error('[LoginPage] Error al manejar el error:', handleErrorError);
+      setErrors({ 
+        email: 'Error inesperado. Por favor, intenta de nuevo.',
+        password: undefined 
+      });
+    }
   } finally {
     setLoading(false);
   }
