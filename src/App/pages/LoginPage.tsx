@@ -88,16 +88,25 @@ const handleAuth = async (e: React.FormEvent<HTMLFormElement>): Promise<void> =>
     if (!validation.success) {
       const formErrors: { email?: string; password?: string } = {};
       
-      // Validar que validation.error.errors existe
-      if (validation.error && validation.error.errors && Array.isArray(validation.error.errors)) {
-        validation.error.errors.forEach((err) => {
-          const field = err.path && Array.isArray(err.path) ? err.path[0] as 'email' | 'password' : undefined;
+      // Zod siempre tiene validation.error.errors como array
+      // Pero verificamos por seguridad
+      const zodErrors = validation.error?.errors;
+      
+      if (zodErrors && Array.isArray(zodErrors) && zodErrors.length > 0) {
+        zodErrors.forEach((err) => {
+          const field = err.path && Array.isArray(err.path) && err.path.length > 0 
+            ? err.path[0] as 'email' | 'password' 
+            : undefined;
+          
           if (field) {
-            formErrors[field] = err.message || 'Error de validación';
+            // Si ya hay un error para este campo, mantener el primero o combinar
+            if (!formErrors[field]) {
+              formErrors[field] = err.message || 'Error de validación';
+            }
           }
         });
       } else {
-        // Si no hay errores estructurados, mostrar error genérico
+        // Fallback: si no hay errores estructurados, mostrar error genérico
         console.error('[LoginPage] Error de validación sin estructura:', validation.error);
         formErrors.email = 'Error de validación. Verifica tus datos.';
       }
