@@ -3,7 +3,6 @@ import {
   AppError,
   ErrorType,
   ErrorSeverity,
-  errorHandler,
   handleError,
   getUserMessage,
 } from '../errorHandler';
@@ -292,6 +291,7 @@ describe('errorHandler', () => {
     });
 
     it('should handle circular references in metadata', () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const circular: any = { name: 'test' };
       circular.self = circular;
 

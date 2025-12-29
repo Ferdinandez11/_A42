@@ -57,7 +57,7 @@ export const useSceneTools = (): SceneToolsActions => {
   const ensureEngine = (): boolean => {
     if (!engine) {
       handleError(
-        new AppError(ErrorType.INTERNAL, ERROR_MESSAGES.ENGINE_UNAVAILABLE, {
+        new AppError(ErrorType.ENGINE, ERROR_MESSAGES.ENGINE_UNAVAILABLE, {
           severity: ErrorSeverity.MEDIUM,
           userMessage: 'El motor 3D no está disponible',
         }),
@@ -72,7 +72,7 @@ export const useSceneTools = (): SceneToolsActions => {
     if (!ensureEngine()) return false;
     if (!engine!.walkManager) {
       handleError(
-        new AppError(ErrorType.INTERNAL, ERROR_MESSAGES.WALK_MANAGER_UNAVAILABLE, {
+        new AppError(ErrorType.ENGINE, ERROR_MESSAGES.WALK_MANAGER_UNAVAILABLE, {
           severity: ErrorSeverity.MEDIUM,
           userMessage: 'El modo paseo no está disponible',
         }),
@@ -87,7 +87,7 @@ export const useSceneTools = (): SceneToolsActions => {
     if (!ensureEngine()) return false;
     if (!engine!.toolsManager) {
       handleError(
-        new AppError(ErrorType.INTERNAL, ERROR_MESSAGES.TOOLS_MANAGER_UNAVAILABLE, {
+        new AppError(ErrorType.ENGINE, ERROR_MESSAGES.TOOLS_MANAGER_UNAVAILABLE, {
           severity: ErrorSeverity.MEDIUM,
           userMessage: 'Las herramientas no están disponibles',
         }),
@@ -124,7 +124,7 @@ export const useSceneTools = (): SceneToolsActions => {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
       handleError(
-        new AppError(ErrorType.INTERNAL, 'Error al activar modo paseo', {
+        new AppError(ErrorType.ENGINE, 'Error al activar modo paseo', {
           severity: ErrorSeverity.MEDIUM,
           userMessage: 'No se pudo activar el modo paseo',
           metadata: { originalError: errorMessage },
@@ -149,7 +149,7 @@ export const useSceneTools = (): SceneToolsActions => {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
       handleError(
-        new AppError(ErrorType.INTERNAL, 'Error al desactivar modo paseo', {
+        new AppError(ErrorType.ENGINE, 'Error al desactivar modo paseo', {
           severity: ErrorSeverity.MEDIUM,
           userMessage: 'No se pudo desactivar el modo paseo',
           metadata: { originalError: errorMessage },
@@ -179,7 +179,7 @@ export const useSceneTools = (): SceneToolsActions => {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
       handleError(
-        new AppError(ErrorType.INTERNAL, 'Error al alternar modo paseo', {
+        new AppError(ErrorType.ENGINE, 'Error al alternar modo paseo', {
           severity: ErrorSeverity.MEDIUM,
           userMessage: 'No se pudo alternar el modo paseo',
           metadata: { originalError: errorMessage },
@@ -240,7 +240,7 @@ export const useSceneTools = (): SceneToolsActions => {
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
         handleError(
-          new AppError(ErrorType.INTERNAL, 'Error al establecer segmento CAD', {
+          new AppError(ErrorType.ENGINE, 'Error al establecer segmento CAD', {
             severity: ErrorSeverity.MEDIUM,
             userMessage: 'No se pudo establecer el segmento',
             metadata: { originalError: errorMessage },
@@ -281,7 +281,7 @@ export const useSceneTools = (): SceneToolsActions => {
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
         handleError(
-          new AppError(ErrorType.INTERNAL, 'Error al establecer ángulo CAD', {
+          new AppError(ErrorType.ENGINE, 'Error al establecer ángulo CAD', {
             severity: ErrorSeverity.MEDIUM,
             userMessage: 'No se pudo establecer el ángulo',
             metadata: { originalError: errorMessage },
@@ -308,7 +308,7 @@ export const useSceneTools = (): SceneToolsActions => {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
       handleError(
-        new AppError(ErrorType.INTERNAL, 'Error al intercambiar selección CAD', {
+        new AppError(ErrorType.ENGINE, 'Error al intercambiar selección CAD', {
           severity: ErrorSeverity.MEDIUM,
           userMessage: 'No se pudo intercambiar la selección',
           metadata: { originalError: errorMessage },

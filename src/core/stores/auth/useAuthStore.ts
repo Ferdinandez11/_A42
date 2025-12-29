@@ -56,6 +56,8 @@ clearAuth: () => {
   // Los tests verifican que esto ocurra
   try {
     localStorage.clear();
-  } catch (_) {}
+  } catch {
+    // Ignorar errores de localStorage (puede fallar en algunos entornos)
+  }
 },
 }));

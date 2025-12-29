@@ -28,40 +28,36 @@ export const LoginPage: React.FC = () => {
   };
 
 const checkUserStatus = async (userId: string): Promise<void> => {
-  try {
-    const { data: profile, error } = await supabase
-      .from("profiles")
-      .select("role, is_approved")
-      .eq("id", userId)
-      .single();
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select("role, is_approved")
+    .eq("id", userId)
+    .single();
 
-    if (error) throw error;
+  if (error) throw error;
 
-    if (profile) {
-      const typedProfile = profile as Profile;
-      
-      if (typedProfile.role === "admin" || typedProfile.role === "employee") {
-        navigate("/admin/crm");
-        return;
-      }
-
-      if (typedProfile.is_approved) {
-        navigate("/portal");
-      } else {
-        await supabase.auth.signOut();
-        showSuccess('✅ Cuenta creada. Pendiente de aprobación.');
-        throw new AppError(
-          ErrorType.PERMISSION,
-          'Account pending approval',
-          { 
-            severity: ErrorSeverity.LOW,
-            userMessage: 'Tu cuenta está pendiente de validación por un administrador.' 
-          }
-        );
-      }
+  if (profile) {
+    const typedProfile = profile as Profile;
+    
+    if (typedProfile.role === "admin" || typedProfile.role === "employee") {
+      navigate("/admin/crm");
+      return;
     }
-  } catch (error) {
-    throw error; // Re-lanzar para que handleAuth lo capture
+
+    if (typedProfile.is_approved) {
+      navigate("/portal");
+    } else {
+      await supabase.auth.signOut();
+      showSuccess('✅ Cuenta creada. Pendiente de aprobación.');
+      throw new AppError(
+        ErrorType.PERMISSION,
+        'Account pending approval',
+        { 
+          severity: ErrorSeverity.LOW,
+          userMessage: 'Tu cuenta está pendiente de validación por un administrador.' 
+        }
+      );
+    }
   }
 };
 const handleAuth = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
@@ -89,7 +85,7 @@ const handleAuth = async (e: React.FormEvent<HTMLFormElement>): Promise<void> =>
 
       await checkUserStatus(result.data.user.id);
     }
-  } catch (error: any) {
+  } catch (error) {
     handleError(error);
   } finally {
     setLoading(false);

@@ -46,7 +46,7 @@ export const useEditorMedia = (): UseEditorMediaReturn => {
   const ensureEngine = (): boolean => {
     if (!engine) {
       handleErrorHook(
-        new AppError(ErrorType.INTERNAL, 'Engine no disponible', {
+        new AppError(ErrorType.ENGINE, 'Engine no disponible', {
           severity: ErrorSeverity.MEDIUM,
           userMessage: 'El motor 3D no está disponible',
         }),
@@ -60,7 +60,7 @@ export const useEditorMedia = (): UseEditorMediaReturn => {
   const handleError = (operation: string, error: unknown): MediaOperationResult => {
     const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
     handleErrorHook(
-      new AppError(ErrorType.INTERNAL, `Error en ${operation}`, {
+      new AppError(ErrorType.ENGINE, `Error en ${operation}`, {
         severity: ErrorSeverity.MEDIUM,
         userMessage: `Error al ${operation}`,
         metadata: { operation, originalError: error },
@@ -127,7 +127,7 @@ export const useEditorMedia = (): UseEditorMediaReturn => {
       }
     } catch (error) {
       handleErrorHook(
-        new AppError(ErrorType.INTERNAL, 'Error al alternar grabación', {
+        new AppError(ErrorType.ENGINE, 'Error al alternar grabación', {
           severity: ErrorSeverity.MEDIUM,
           userMessage: 'No se pudo alternar la grabación',
           metadata: { originalError: error },

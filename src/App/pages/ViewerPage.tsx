@@ -5,7 +5,7 @@ import { Editor3D } from "@/editor/Editor3D";
 import { useAuthStore } from "@/core/stores/auth/useAuthStore";
 import { useProjectStore } from "@/editor/stores/project/useProjectStore";
 import { useErrorHandler } from "@/core/hooks/useErrorHandler";
-import { AppError, ErrorType, ErrorSeverity } from "@/core/lib/errorHandler";
+import { AppError, ErrorType } from "@/core/lib/errorHandler";
 import type { ExtendedUser } from "@/App/utils/types";
 
 export const ViewerPage: React.FC = () => {

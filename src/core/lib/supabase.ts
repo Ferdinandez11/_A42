@@ -63,11 +63,27 @@ try {
   const config = getSupabaseConfig();
   supabaseInstance = createSupabaseClient(config);
 } catch (error) {
-  // Log error for debugging but allow the module to load
-  if (import.meta.env.DEV) {
-    console.error('Failed to initialize Supabase client:', error);
+  // En tests, permitir que el módulo se cargue sin errores (se mockeará)
+  if (import.meta.env.MODE === 'test' || import.meta.env.VITEST) {
+    // Crear un cliente mock para tests
+    supabaseInstance = createClient(
+      'https://test.supabase.co',
+      'test-key',
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+        },
+      }
+    );
+  } else {
+    // Log error for debugging but allow the module to load
+    if (import.meta.env.DEV) {
+      console.error('Failed to initialize Supabase client:', error);
+    }
+    throw error;
   }
-  throw error;
 }
 
 /**

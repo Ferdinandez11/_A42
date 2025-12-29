@@ -1,7 +1,6 @@
 // useErrorHandler.test.ts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import toast from 'react-hot-toast';
 import { useErrorHandler } from '../useErrorHandler';
 import { AppError, ErrorType, ErrorSeverity } from '@/core/lib/errorHandler';
 
@@ -38,9 +37,9 @@ vi.mock('@/core/lib/errorHandler', async () => {
   const actual = await vi.importActual('@/core/lib/errorHandler');
   return {
     ...actual,
-    handleError: vi.fn((error, context) => {
+    handleError: vi.fn((error) => {
       if (error instanceof AppError) return error;
-      return new AppError(ErrorType.INTERNAL, String(error), {
+      return new AppError(ErrorType.UNKNOWN, String(error), {
         severity: ErrorSeverity.MEDIUM,
       });
     }),
@@ -57,7 +56,7 @@ describe('useErrorHandler', () => {
     it('should handle errors and show toast by default', () => {
       const { result } = renderHook(() => useErrorHandler({ context: 'TestComponent' }));
       
-      const error = new AppError(ErrorType.INTERNAL, 'Test error', {
+      const error = new AppError(ErrorType.UNKNOWN, 'Test error', {
         severity: ErrorSeverity.MEDIUM,
         userMessage: 'Error de prueba',
       });
@@ -74,7 +73,7 @@ describe('useErrorHandler', () => {
         useErrorHandler({ context: 'TestComponent', showToast: false })
       );
       
-      const error = new AppError(ErrorType.INTERNAL, 'Test error', {
+      const error = new AppError(ErrorType.UNKNOWN, 'Test error', {
         severity: ErrorSeverity.MEDIUM,
       });
 
@@ -88,7 +87,7 @@ describe('useErrorHandler', () => {
     it('should show different toast styles based on severity', () => {
       const { result } = renderHook(() => useErrorHandler({ context: 'TestComponent' }));
       
-      const criticalError = new AppError(ErrorType.INTERNAL, 'Critical', {
+      const criticalError = new AppError(ErrorType.UNKNOWN, 'Critical', {
         severity: ErrorSeverity.CRITICAL,
         userMessage: 'Error crítico',
       });
@@ -109,7 +108,7 @@ describe('useErrorHandler', () => {
         useErrorHandler({ context: 'TestComponent', onError })
       );
       
-      const error = new AppError(ErrorType.INTERNAL, 'Test error', {
+      const error = new AppError(ErrorType.UNKNOWN, 'Test error', {
         severity: ErrorSeverity.MEDIUM,
       });
 
@@ -123,7 +122,7 @@ describe('useErrorHandler', () => {
     it('should use custom message when provided', () => {
       const { result } = renderHook(() => useErrorHandler({ context: 'TestComponent' }));
       
-      const error = new AppError(ErrorType.INTERNAL, 'Test error', {
+      const error = new AppError(ErrorType.UNKNOWN, 'Test error', {
         severity: ErrorSeverity.MEDIUM,
         userMessage: 'Original message',
       });

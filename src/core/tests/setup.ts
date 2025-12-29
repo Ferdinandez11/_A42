@@ -37,12 +37,13 @@ globalThis.IntersectionObserver = class IntersectionObserver {
 } as any;
 
 // Mock básico de Supabase para tests
-vi.mock('@/lib/supabase', () => ({
+vi.mock('@/core/lib/supabase', () => ({
   supabase: {
     auth: {
       signIn: vi.fn(),
       signOut: vi.fn(),
       signUp: vi.fn(),
+      signInWithPassword: vi.fn(),
       getUser: vi.fn(),
       getSession: vi.fn(),
     },

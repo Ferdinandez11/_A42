@@ -14,6 +14,12 @@ export default defineConfig({
     // Archivo de setup que se ejecuta antes de cada test
     setupFiles: ['./src/core/tests/setup.ts'],
     
+    // Variables de entorno para tests
+    env: {
+      VITE_SUPABASE_URL: 'https://test.supabase.co',
+      VITE_SUPABASE_KEY: 'test-key-for-testing-only',
+    },
+    
     // Configuración de coverage (cobertura de código)
     coverage: {
       provider: 'v8',

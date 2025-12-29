@@ -329,7 +329,7 @@ export const useProjectActions = (): ProjectActionsReturn => {
       const errorMessage =
         error instanceof Error ? error.message : 'Error desconocido';
       handleError(
-        new AppError(ErrorType.INTERNAL, 'Error al guardar proyecto', {
+        new AppError(ErrorType.ENGINE, 'Error al guardar proyecto', {
           severity: ErrorSeverity.HIGH,
           userMessage: MESSAGES.SAVE_ERROR(errorMessage),
           metadata: { originalError: error },
@@ -404,7 +404,7 @@ export const useProjectActions = (): ProjectActionsReturn => {
         const errorMessage =
           error instanceof Error ? error.message : 'Error desconocido';
         handleError(
-          new AppError(ErrorType.INTERNAL, 'Error al importar GLB', {
+          new AppError(ErrorType.ENGINE, 'Error al importar GLB', {
             severity: ErrorSeverity.MEDIUM,
             userMessage: MESSAGES.IMPORT_ERROR(errorMessage),
             metadata: { originalError: error },

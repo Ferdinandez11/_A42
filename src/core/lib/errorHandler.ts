@@ -65,7 +65,7 @@ export interface ErrorMetadata {
   userId?: string;
   
   /** Datos adicionales del contexto */
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   
   /** Código de error (para errores de Supabase, etc.) */
   code?: string;
@@ -289,14 +289,14 @@ class ErrorHandler {
   /**
    * Detecta si es un error de Supabase
    */
-  private isSupabaseError(error: any): boolean {
-    return error && typeof error === 'object' && 'code' in error && 'message' in error;
+  private isSupabaseError(error: unknown): boolean {
+    return error !== null && typeof error === 'object' && 'code' in error && 'message' in error;
   }
 
   /**
    * Maneja errores específicos de Supabase
    */
-  private handleSupabaseError(error: any, context?: string): AppError {
+  private handleSupabaseError(error: { code: string; message: string }, context?: string): AppError {
     const code = error.code;
     
     // Errores de autenticación
